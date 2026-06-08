@@ -1,0 +1,21 @@
+# Worker image — includes the heavy IDP deps (LiteParse, PyMuPDF) and
+# system packages LiteParse needs for image inputs (ImageMagick).
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# System deps for LiteParse image handling.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    imagemagick \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --upgrade pip && pip install ".[worker]"
+
+COPY . .
+
+CMD ["python", "-m", "app.worker"]
