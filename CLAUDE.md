@@ -27,9 +27,10 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 - `JSONB` + GIN indexes for metadata filtering
 
 **IDP pipeline (worker)**
-- Text layer: **PyMuPDF** (skip OCR when a text layer exists — biggest cost saver)
-- OCR fallback: **PaddleOCR / PP-Structure** (scans, tables, Malay/English/CJK)
-- Structured extraction: open-weight document **VLM (Qwen2.5-VL class)** via on-demand/serverless GPU, outputting **JSON directly** (no regex generation)
+- Parsing: **LiteParse** (LlamaIndex, Rust-based) — layout-aware text + bounding boxes + built-in OCR fallback. Skips OCR when a text layer exists (biggest cost saver).
+- Rasterize only: **PyMuPDF** — page → PNG for the VLM input (not for text extraction)
+- Structured extraction: **vLLM on Lightning AI Studio** (OpenAI-compatible endpoint, Qwen2.5-VL class), outputs **JSON directly**. Doc types are **dynamic** — stored as DB data, never hardcoded. Unknown/novel docs go to VLM; system learns templates and promotes to deterministic after N confirmations.
+- Self-learning loop: `document_types` + `document_templates` tables capture learned layouts. `extractions` table records every attempt — powers exception queue (low-confidence rows) and promote-after-N.
 
 **Frontend**
 - **Next.js / React** + TypeScript, **shadcn/ui** component kit. Keep UI minimal.
@@ -65,16 +66,25 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 | 4 | 8 | Hardening & security | All journeys pass; RLS isolation tests green; no critical bugs |
 | 5 | 9 | Pilot & launch | Pilot client live on real docs; KPIs instrumented |
 
-**➡️ CURRENT PHASE: Sprint 0 — Foundations (project just initialized).**
+**➡️ CURRENT PHASE: Sprint 1 — Core SaaS & Ingestion (Milestone B in progress).**
 
-**Immediate next steps**
-1. Lock the three decisions: Supabase vs self-host; serverless vs self-host GPU; which 1–2 document types form the thin slice.
-2. Scaffold repo, CI, `.env.example`, Docker setup.
-3. Define the Postgres schema with `tenant_id` + RLS policies; wire Alembic.
-4. Auth scaffold (Supabase Auth) + tenant-context middleware.
-5. Spike PyMuPDF + PaddleOCR + the VLM on a real sample document.
+**Decisions locked:**
+- Infrastructure: Supabase (DB + Auth + Storage), Redis + RQ (queue), vLLM on Lightning AI Studio
+- Doc types: dynamic (DB data, not code); self-learning IDP pipeline
+- JWT: HS256 verified with project secret; ES256/RS256 JWKS-based verification also supported
 
-**Out of scope for MVP (do NOT build without explicit approval):** classification/fingerprinting, deterministic extraction path, confidence/exception queue, type "promotion", client template manager, cold-tiering, analytics, public API, microservices, Elasticsearch, multi-region, SSO/SAML, mobile app.
+**Milestone A ✅ complete:** Login → `/auth/bootstrap` → tenant + user rows created in DB → dashboard loads.
+
+**Milestone B next steps (in progress):**
+1. `backend/app/modules/files/` — `service.py` (upload/list/get/download/dashboard) + `router.py`
+2. Register files + dashboard routers in `main.py`
+3. `frontend/lib/format.ts` (shared formatters) + `frontend/lib/auth.tsx` (AuthProvider/guard)
+4. Wire dashboard, documents list, document detail, upload pages to real API (replace mock data)
+5. Run `pytest test_tenant_isolation.py test_contract_camelcase.py` — must be green before B ships
+
+**Out of scope for MVP (do NOT build without explicit approval):** auto-classification, deterministic extraction path, type "promotion" UI, client template manager, cold-tiering, analytics, public API, microservices, Elasticsearch, multi-region, SSO/SAML, mobile app.
+
+**Phase 2 (post-MVP, data model already built for it):** real auto-classify + fingerprint, deterministic CPU extractor, promote-after-N, confidence-gate tuning, exception-review UI, pgvector semantic template matching.
 
 ## 5. Project Structure
 
