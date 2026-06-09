@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.modules.auth.router import router as auth_router
+from app.modules.files.router import dashboard_router, router as files_router
 
 app = FastAPI(
     title="DataWiz Digital Archive API",
@@ -26,12 +27,8 @@ app.add_middleware(
 
 # ---- Routers ----
 app.include_router(auth_router, prefix="/api")
-
-# Milestone B+ routers (added as each module is built):
-# from app.modules.files.router import router as files_router
-# from app.modules.search.router import router as search_router
-# app.include_router(files_router, prefix="/api")
-# app.include_router(search_router, prefix="/api")
+app.include_router(files_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
 
 
 @app.get("/api/health")

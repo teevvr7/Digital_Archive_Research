@@ -86,10 +86,17 @@ def seeds(direct_engine):
 
 
 def _session_with_guc(engine, tenant_id: uuid.UUID | None):
-    """Return a session with the tenant GUC set (or not set if tenant_id is None)."""
+    """Return a session with the tenant GUC set (or not set if tenant_id is None).
+
+    Switches to the 'authenticated' role inside the transaction so that RLS
+    policies are enforced. The 'postgres' Supabase role has BYPASSRLS and would
+    skip all policies without this switch.
+    """
     Session = sessionmaker(bind=engine, autocommit=False)
     db = Session()
     db.begin()
+    # Drop BYPASSRLS privilege for this transaction by switching roles.
+    db.execute(text("SET LOCAL ROLE authenticated"))
     if tenant_id is not None:
         db.execute(
             text("SELECT set_config('app.current_tenant', :tid, true)"),
@@ -148,12 +155,19 @@ def test_update_t2_doc_under_t1_affects_zero_rows(direct_engine, seeds):
 
 
 def test_no_guc_returns_zero_rows(direct_engine, seeds):
-    """No GUC set → every tenant table returns 0 rows (fail-closed)."""
-    db = _session_with_guc(direct_engine, None)
+    """No GUC set → every tenant table returns 0 rows (fail-closed).
+
+    Uses a fresh session per table because a failed query leaves the session
+    in an error state that blocks further queries.
+    """
     for table in ("documents", "users", "tenants", "activity_events"):
-        count = db.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()  # noqa: S608
-        assert count == 0, f"{table} returned rows with no GUC set"
-    db.rollback(); db.close()
+        db = _session_with_guc(direct_engine, None)
+        try:
+            count = db.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()  # noqa: S608
+            assert count == 0, f"{table} returned rows with no GUC set"
+        finally:
+            db.rollback()
+            db.close()
 
 
 def test_t2_sees_only_own_docs(direct_engine, seeds):
