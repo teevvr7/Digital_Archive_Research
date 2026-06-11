@@ -34,6 +34,7 @@ class DocumentOut(CamelModel):
     has_text_layer: bool
     ocr_confidence: float | None
     extracted_data: dict[str, Any] | None
+    extracted_text: str | None
     tags: list[str]
     storage_key: str
 

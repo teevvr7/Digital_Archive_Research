@@ -1,0 +1,162 @@
+"""Enqueue-on-upload test.
+
+Verifies that ``create_documents`` calls ``enqueue_document`` once per uploaded
+file, and that ``retry_document`` calls it once on retry.
+
+No DB, no Supabase, no Redis required — all I/O is mocked.
+
+Patch target: ``app.modules.files.service.enqueue_document`` — service binds the
+name at import time so that's where the patch must live.
+"""
+
+import io
+import uuid
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from app.core.security import TokenData
+from app.modules.files import service as files_service
+
+# Correct patch target — where the name is bound in the caller's module.
+_ENQUEUE_TARGET = "app.modules.files.service.enqueue_document"
+
+
+def _make_upload(filename: str = "test.pdf", content: bytes = b"%PDF-1.4 test") -> MagicMock:
+    upload = MagicMock()
+    upload.filename = filename
+    upload.content_type = "application/pdf"
+    upload.file = MagicMock()
+    upload.file.read = MagicMock(return_value=content)
+    return upload
+
+
+def _make_token(tenant_id: uuid.UUID, user_id: uuid.UUID) -> TokenData:
+    """Build a TokenData from a synthesised payload dict (matches real constructor)."""
+    return TokenData({
+        "sub": str(user_id),
+        "email": "test@example.com",
+        "app_metadata": {
+            "tenant_id": str(tenant_id),
+            "role": "user",
+        },
+    })
+
+
+def _dummy_doc_out():
+    """Minimal DocumentOut for patching _doc_to_out in serialisation-agnostic tests."""
+    from app.modules.files.schemas import DocumentOut
+    import datetime
+    return DocumentOut(
+        id=uuid.uuid4(),
+        tenant_id=uuid.uuid4(),
+        filename="test.pdf",
+        original_filename="test.pdf",
+        document_type="other",
+        mime_type="application/pdf",
+        size_bytes=100,
+        status="queued",
+        uploaded_by="Tester",
+        uploaded_at=datetime.datetime.now(datetime.timezone.utc),
+        processed_at=None,
+        page_count=None,
+        has_text_layer=False,
+        ocr_confidence=None,
+        extracted_data=None,
+        extracted_text=None,
+        tags=[],
+        storage_key="tenant/docs/id.pdf",
+    )
+
+
+@pytest.fixture()
+def mock_db():
+    """Minimal SQLAlchemy Session mock."""
+    db = MagicMock()
+    mock_user = MagicMock()
+    mock_user.name = "Test User"
+    db.get.return_value = mock_user
+    added = []
+    db.add.side_effect = lambda obj: added.append(obj)
+    db.flush.return_value = None
+    db.execute.return_value = MagicMock(scalar=MagicMock(return_value=0))
+    db._added = added
+    return db
+
+
+def test_enqueue_called_once_per_uploaded_file(mock_db):
+    """create_documents must call enqueue_document exactly once per file."""
+    tenant_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    token = _make_token(tenant_id, user_id)
+
+    upload1 = _make_upload("invoice.pdf")
+    upload2 = _make_upload("receipt.pdf")
+
+    dummy = _dummy_doc_out()
+
+    with patch(_ENQUEUE_TARGET) as mock_enqueue, \
+         patch("app.core.storage.upload_file"), \
+         patch.object(files_service, "_doc_to_out", return_value=dummy):
+
+        files_service.create_documents(mock_db, token, [upload1, upload2], ["invoice", "receipt"])
+
+    assert mock_enqueue.call_count == 2, (
+        f"Expected enqueue_document called twice, got {mock_enqueue.call_count}"
+    )
+
+
+def test_enqueue_not_called_when_no_files(mock_db):
+    """create_documents with an empty list → no enqueue calls."""
+    tenant_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    token = _make_token(tenant_id, user_id)
+
+    with patch(_ENQUEUE_TARGET) as mock_enqueue, \
+         patch("app.core.storage.upload_file"):
+        files_service.create_documents(mock_db, token, [], [])
+
+    mock_enqueue.assert_not_called()
+
+
+def test_retry_calls_enqueue_once(mock_db):
+    """retry_document must call enqueue_document exactly once."""
+    from app.models.document import STATUS_FAILED, Document
+
+    doc_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+
+    doc = MagicMock(spec=Document)
+    doc.id = doc_id
+    doc.tenant_id = tenant_id
+    doc.status = STATUS_FAILED
+    doc.error_message = "parse error"
+    doc.uploaded_by = uuid.uuid4()
+
+    mock_db.get.return_value = doc
+
+    dummy = _dummy_doc_out()
+
+    with patch(_ENQUEUE_TARGET) as mock_enqueue, \
+         patch.object(files_service, "_doc_to_out", return_value=dummy), \
+         patch.object(files_service, "_user_name", return_value="Test User"):
+        files_service.retry_document(mock_db, doc_id)
+
+    mock_enqueue.assert_called_once()
+
+
+def test_retry_raises_400_when_not_failed(mock_db):
+    """retry_document raises 400 (HTTPException) if document is not in 'failed' state."""
+    from fastapi import HTTPException
+    from app.models.document import STATUS_QUEUED, Document
+
+    doc = MagicMock(spec=Document)
+    doc.id = uuid.uuid4()
+    doc.status = STATUS_QUEUED
+    mock_db.get.return_value = doc
+
+    with patch(_ENQUEUE_TARGET):
+        with pytest.raises(HTTPException) as exc_info:
+            files_service.retry_document(mock_db, doc.id)
+
+    assert exc_info.value.status_code == 400

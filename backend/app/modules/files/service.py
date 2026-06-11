@@ -26,6 +26,8 @@ from app.modules.files.schemas import (
     DocumentListOut,
     DocumentOut,
 )
+from app.modules.idp.queue import enqueue_document
+from app.modules.search.query import apply_text_search
 
 ALLOWED_MIMES: dict[str, str] = {
     "application/pdf": "pdf",
@@ -74,6 +76,7 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         has_text_layer=doc.has_text_layer,
         ocr_confidence=doc.ocr_confidence,
         extracted_data=doc.extracted_data,
+        extracted_text=doc.extracted_text,
         tags=doc.tags or [],
         storage_key=doc.storage_key,
     )
@@ -106,7 +109,8 @@ def create_documents(
     """Validate, store in object storage, and register uploaded files.
 
     Each file gets a ProcessingJob (queued) and an upload ActivityEvent.
-    Worker enqueue is deferred to Milestone C; jobs stay queued until then.
+    Jobs are enqueued on the IDP queue after the DB transaction commits, so
+    the worker never races an uncommitted row.
     """
     max_bytes = settings.max_upload_mb * 1024 * 1024
     tenant_id = uuid.UUID(user.tenant_id)  # type: ignore[arg-type]
@@ -183,6 +187,13 @@ def create_documents(
     db.flush()
 
     items = [_doc_to_out(doc, uploader_name) for doc in created]
+
+    # Enqueue after building the response so any serialisation error can't
+    # silently drop the job. RQ Retry(max=3) handles the upload→commit race
+    # on the rare occasion the worker starts before the DB commits.
+    for doc in created:
+        enqueue_document(doc.id, tenant_id)
+
     return DocumentListOut(items=items, total=len(items), page=1, page_size=len(items))
 
 
@@ -205,8 +216,13 @@ def list_documents(
         stmt = stmt.where(Document.status == status_filter)
     if type_filter:
         stmt = stmt.where(Document.document_type == type_filter)
-    if q:
-        stmt = stmt.where(Document.original_filename.ilike(f"%{q}%"))
+
+    # When a query is present, match on full-text content OR fuzzy filename
+    # (shared with /search so ranking is identical). Otherwise plain browse.
+    rank_order = None
+    if q and q.strip():
+        stmt, rank_expr = apply_text_search(stmt, q.strip())
+        rank_order = rank_expr.desc()
 
     _sort_map = {
         "date_desc": Document.uploaded_at.desc(),
@@ -216,7 +232,11 @@ def list_documents(
         "size_asc": Document.size_bytes.asc(),
         "size_desc": Document.size_bytes.desc(),
     }
-    stmt = stmt.order_by(_sort_map.get(sort, Document.uploaded_at.desc()))
+    # A search with the default sort orders by relevance; an explicit sort wins.
+    if rank_order is not None and sort == "date_desc":
+        stmt = stmt.order_by(rank_order, Document.uploaded_at.desc())
+    else:
+        stmt = stmt.order_by(_sort_map.get(sort, Document.uploaded_at.desc()))
 
     total: int = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
@@ -271,6 +291,9 @@ def retry_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     doc.status = STATUS_QUEUED
     doc.error_message = None
     db.flush()
+
+    enqueue_document(doc.id, doc.tenant_id)
+
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
 
 

@@ -29,11 +29,11 @@ dependencies = [
 [project.optional-dependencies]
 # Heavy IDP deps — installed in the worker image only (keeps the API image lean).
 worker = [
-    "liteparse>=2.0.0b2",   # parsing + layout + OCR (beta — pinned via lower bound)
-    "pymupdf>=1.24",        # rasterize page -> image for the VLM
+    "pymupdf>=1.24",                # text-layer extraction + rasterize page -> image (OCR/VLM)
+    "rapidocr-onnxruntime>=1.2.3",  # OCR fallback (ONNX, CPU-only, no system deps — Windows-friendly)
     "pillow>=10.3",
-    "openai>=1.40",         # OpenAI-compatible vLLM client
-    "jsonschema>=4.22",
+    "openai>=1.40",                 # OpenAI-compatible vLLM client (next milestone: structured JSON)
+    "jsonschema>=4.22",             # (next milestone: validate VLM output against doc-type schema)
 ]
 dev = [
     "pytest>=8.2",

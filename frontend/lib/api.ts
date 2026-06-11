@@ -6,9 +6,9 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Document, ActivityEvent } from "@/types";
+import type { Document, ActivityEvent, SearchListResponse } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8001/api";
 
 // ---- Shared types --------------------------------------------------------
 
@@ -141,15 +141,23 @@ export const apiRetryDocument = (id: string) =>
 
 // ---- Search (Milestone D) ------------------------------------------------
 
-export type SearchQuery = { q: string; type?: string; date?: string };
+export type SearchQuery = {
+  q: string;
+  type?: string;
+  date?: string;
+  status?: string;
+  page?: number;
+};
 
 export const apiSearch = (query: SearchQuery) => {
   const params = new URLSearchParams(
     Object.fromEntries(
-      Object.entries(query).filter(([, v]) => v) as [string, string][]
+      Object.entries(query)
+        .filter(([, v]) => v !== undefined && v !== "")
+        .map(([k, v]) => [k, String(v)])
     )
   ).toString();
-  return get<unknown>(`/search?${params}`);
+  return get<SearchListResponse>(`/search?${params}`);
 };
 
 // ---- Settings (Milestone E) ----------------------------------------------

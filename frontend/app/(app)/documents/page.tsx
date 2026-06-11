@@ -19,6 +19,9 @@ import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { apiDocuments, apiDownloadUrl, apiRetryDocument, type DocumentListResponse } from "@/lib/api";
 import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
+const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "failed"]);
+const POLL_INTERVAL_MS = 3000;
+
 const ALL_STATUSES: ProcessingStatus[] = [
   "queued",
   "extracting_text",
@@ -70,6 +73,27 @@ export default function DocumentsPage() {
       .finally(() => setLoading(false));
   }, [statusFilter, typeFilter, sortBy, page, query]);
 
+  // Silent background poll while any visible document is still processing.
+  // Stops automatically once all documents reach a terminal state.
+  useEffect(() => {
+    const hasInProgress = data?.items.some((d) => !TERMINAL_STATUSES.has(d.status));
+    if (!hasInProgress) return;
+
+    const timerId = setInterval(() => {
+      apiDocuments({
+        status: statusFilter === "all" ? undefined : statusFilter,
+        type: typeFilter === "all" ? undefined : typeFilter,
+        q: query || undefined,
+        sort: sortBy,
+        page,
+      })
+        .then(setData)
+        .catch(() => {}); // silent — errors shown on next user-triggered fetch
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(timerId);
+  }, [data, statusFilter, typeFilter, sortBy, page, query]);
+
   const docs = data?.items ?? [];
   const total = data?.total ?? 0;
   const pageSize = data?.pageSize ?? 20;
@@ -120,7 +144,7 @@ export default function DocumentsPage() {
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            placeholder="Search by filename…"
+            placeholder="Search filename or content…"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 placeholder:text-slate-400"
           />
         </div>
