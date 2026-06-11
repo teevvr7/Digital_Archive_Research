@@ -54,6 +54,7 @@ export interface Document {
   hasTextLayer: boolean;
   ocrConfidence: number | null;
   extractedData: Record<string, unknown> | null;
+  extractedText: string | null;
   tags: string[];
   storageKey: string;
 }
@@ -78,6 +79,15 @@ export interface ActivityEvent {
 export interface SearchResult {
   document: Document;
   score: number;
+  /** Server-rendered HTML snippet with <mark> highlights (from ts_headline). */
   snippet?: string;
+  /** Which fields matched: any of "content", "filename". */
   matchedFields: string[];
+}
+
+export interface SearchListResponse {
+  items: SearchResult[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

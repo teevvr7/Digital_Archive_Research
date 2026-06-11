@@ -27,9 +27,10 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 - `JSONB` + GIN indexes for metadata filtering
 
 **IDP pipeline (worker)**
-- Text layer: **PyMuPDF** (skip OCR when a text layer exists — biggest cost saver)
-- OCR fallback: **PaddleOCR / PP-Structure** (scans, tables, Malay/English/CJK)
-- Structured extraction: open-weight document **VLM (Qwen2.5-VL class)** via on-demand/serverless GPU, outputting **JSON directly** (no regex generation)
+- Parsing: **PyMuPDF** — text-layer extraction (free, skips OCR when text layer exists — biggest cost saver) + page rasterization to PNG for OCR/VLM input. *(LiteParse dropped — Rust beta, unstable on Windows; replaced by RapidOCR for OCR fallback.)*
+- OCR fallback: **RapidOCR** (`rapidocr-onnxruntime`) — pip-only, CPU-only, Windows-friendly. Runs only when no usable text layer exists.
+- Structured extraction: **vLLM on Lightning AI Studio** (OpenAI-compatible endpoint, Qwen2.5-VL class), outputs **JSON directly**. Doc types are **dynamic** — stored as DB data, never hardcoded. Unknown/novel docs go to VLM; system learns templates and promotes to deterministic after N confirmations.
+- Self-learning loop: `document_types` + `document_templates` tables capture learned layouts. `extractions` table records every attempt — powers exception queue (low-confidence rows) and promote-after-N.
 
 **Frontend**
 - **Next.js / React** + TypeScript, **shadcn/ui** component kit. Keep UI minimal.
@@ -65,16 +66,30 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 | 4 | 8 | Hardening & security | All journeys pass; RLS isolation tests green; no critical bugs |
 | 5 | 9 | Pilot & launch | Pilot client live on real docs; KPIs instrumented |
 
-**➡️ CURRENT PHASE: Sprint 0 — Foundations (project just initialized).**
+**➡️ CURRENT PHASE: Sprint 2/3 — Search + Structured IDP (Milestone D next).**
 
-**Immediate next steps**
-1. Lock the three decisions: Supabase vs self-host; serverless vs self-host GPU; which 1–2 document types form the thin slice.
-2. Scaffold repo, CI, `.env.example`, Docker setup.
-3. Define the Postgres schema with `tenant_id` + RLS policies; wire Alembic.
-4. Auth scaffold (Supabase Auth) + tenant-context middleware.
-5. Spike PyMuPDF + PaddleOCR + the VLM on a real sample document.
+**Decisions locked:**
+- Infrastructure: Supabase (DB + Auth + Storage), Redis + RQ (queue), vLLM on Lightning AI Studio
+- Doc types: dynamic (DB data, not code); self-learning IDP pipeline
+- JWT: HS256 verified with project secret; ES256/RS256 JWKS-based verification also supported
+- OCR engine: **RapidOCR** (`rapidocr-onnxruntime`) — LiteParse dropped (Rust beta, unstable on Windows)
 
-**Out of scope for MVP (do NOT build without explicit approval):** classification/fingerprinting, deterministic extraction path, confidence/exception queue, type "promotion", client template manager, cold-tiering, analytics, public API, microservices, Elasticsearch, multi-region, SSO/SAML, mobile app.
+**Milestone A ✅ complete:** Login → `/auth/bootstrap` → tenant + user rows created in DB → dashboard loads.
+
+**Milestone B ✅ complete:** Upload → object storage → list → download; tenant RLS isolation proven by tests (9/9 green). Enqueue wired after-commit.
+
+**Milestone C ✅ complete (2026-06-10):** Async RQ worker (SimpleWorker on Windows / forking Worker on Linux); PyMuPDF text-layer extraction (free path) + RapidOCR fallback (OCR-only path); `search_tsv` populated after each extraction; full status lifecycle (`queued → extracting_text → [ocr_processing] → completed/failed`); live UI polling; real document viewer (`<img>`/`<iframe>` via signed URL). Tests: 13 passed, 9 skipped (DB isolation tests need `ALEMBIC_DATABASE_URL`).
+
+**Milestone D ✅ complete (2026-06-11):** `GET /api/search` — `websearch_to_tsquery` + prefix tsquery (`word:*`) for partial-word matching; `word_similarity(...) >= 0.2` case-insensitive for fuzzy filename; `ts_headline` with prefix tsquery for highlighted snippets; both `/search` page and `/documents` list upgraded. 7/7 tests green including tenant isolation. E2E verified: partial words, typo filenames, content snippets all confirmed.
+
+**Milestone E — next steps (VLM structured extraction):**
+1. Set up Lightning AI vLLM endpoint (Qwen2.5-VL) — needs API key + endpoint URL in `.env`
+2. `ai_extraction` pipeline stage after OCR: send page images to VLM, receive JSON
+3. Store result in `extracted_data JSONB` (already in schema), search via existing GIN index `ix_documents_extracted_gin`
+
+**Out of scope for MVP (do NOT build without explicit approval):** auto-classification, deterministic extraction path, type "promotion" UI, client template manager, cold-tiering, analytics, public API, microservices, Elasticsearch, multi-region, SSO/SAML, mobile app.
+
+**Phase 2 (post-MVP, data model already built for it):** real auto-classify + fingerprint, deterministic CPU extractor, promote-after-N, confidence-gate tuning, exception-review UI, pgvector semantic template matching.
 
 ## 5. Project Structure
 

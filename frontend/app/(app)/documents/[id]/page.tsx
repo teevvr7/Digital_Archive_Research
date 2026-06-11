@@ -1,13 +1,11 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   Download,
   RefreshCw,
-  FileText,
-  FileImage,
   FileScan,
   CheckCircle2,
   AlertCircle,
@@ -16,9 +14,12 @@ import {
   ChevronRight,
   Copy,
   Check,
+  Loader2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
-import { mockDocuments, formatBytes, formatRelativeTime } from "@/lib/mock-data";
+import { formatBytes, formatRelativeTime } from "@/lib/format";
+import { apiDocument, apiDownloadUrl, apiRetryDocument } from "@/lib/api";
+import type { Document } from "@/types";
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   const [open, setOpen] = useState(depth < 2);
@@ -87,14 +88,76 @@ export default function DocumentViewerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const doc = mockDocuments.find((d) => d.id === id);
+  const [doc, setDoc] = useState<Document | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw">("extracted");
+  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw">(
+    "extracted"
+  );
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  if (!doc) {
+  useEffect(() => {
+    apiDocument(id)
+      .then(setDoc)
+      .catch((e: unknown) =>
+        setLoadError(e instanceof Error ? e.message : String(e))
+      );
+  }, [id]);
+
+  // Poll while the document is still processing; stops at completed/failed.
+  useEffect(() => {
+    if (!doc || doc.status === "completed" || doc.status === "failed") return;
+
+    const timerId = setInterval(() => {
+      apiDocument(id).then(setDoc).catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(timerId);
+  }, [id, doc?.status]);
+
+  // Fetch signed URL for inline preview once the doc is loaded.
+  useEffect(() => {
+    if (!doc) return;
+    apiDownloadUrl(doc.id)
+      .then(({ url }) => setPreviewUrl(url))
+      .catch(() => {}); // preview is best-effort; user can still click Download
+  }, [doc?.id]);
+
+  const handleDownload = async () => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      const { url } = await apiDownloadUrl(doc.id);
+      window.open(url, "_blank");
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Download failed");
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      const updated = await apiRetryDocument(doc.id);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Retry failed");
+    }
+  };
+
+  const handleCopy = () => {
+    if (doc?.extractedData) {
+      navigator.clipboard.writeText(JSON.stringify(doc.extractedData, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (loadError) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">Document not found.</p>
+        <p className="text-red-500 text-sm">{loadError}</p>
         <Link href="/documents" className="text-blue-600 text-sm mt-2 inline-block">
           ← Back to documents
         </Link>
@@ -102,13 +165,13 @@ export default function DocumentViewerPage({
     );
   }
 
-  const handleCopy = () => {
-    if (doc.extractedData) {
-      navigator.clipboard.writeText(JSON.stringify(doc.extractedData, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  if (!doc) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -129,13 +192,22 @@ export default function DocumentViewerPage({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={doc.status} />
+          {actionError && (
+            <span className="text-xs text-red-500">{actionError}</span>
+          )}
           {doc.status === "failed" && (
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
+            >
               <RefreshCw className="w-3.5 h-3.5" />
               Retry
             </button>
           )}
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
             <Download className="w-3.5 h-3.5" />
             Download
           </button>
@@ -145,81 +217,30 @@ export default function DocumentViewerPage({
       <div className="flex flex-1 overflow-hidden">
         {/* Document preview panel */}
         <div className="flex-1 bg-slate-100 flex flex-col items-center justify-center border-r border-slate-200 overflow-hidden">
-          <div className="w-full h-full flex items-center justify-center p-8">
+          <div className="w-full h-full flex items-center justify-center">
             {doc.mimeType.startsWith("image/") ? (
-              /* Image preview mock */
-              <div className="bg-white shadow-lg rounded-lg overflow-hidden max-w-md w-full aspect-[3/4] flex items-center justify-center">
-                <div className="text-center">
-                  <FileImage className="w-16 h-16 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm">{doc.originalFilename}</p>
-                  {doc.ocrConfidence && (
-                    <div className="mt-3 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full inline-flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                      <span className="text-green-700 text-xs font-medium">
-                        OCR {Math.round(doc.ocrConfidence * 100)}% confidence
-                      </span>
-                    </div>
-                  )}
+              previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt={doc.originalFilename}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                  <p className="text-xs text-slate-400">Loading preview…</p>
                 </div>
-              </div>
+              )
+            ) : previewUrl ? (
+              <iframe
+                src={previewUrl}
+                className="w-full h-full border-0"
+                title={doc.originalFilename}
+              />
             ) : (
-              /* PDF preview mock */
-              <div className="bg-white shadow-lg rounded-lg w-full max-w-lg overflow-hidden">
-                {/* PDF toolbar */}
-                <div className="px-4 py-2 bg-slate-700 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                  </div>
-                  <span className="text-slate-300 text-xs">{doc.originalFilename}</span>
-                  <span className="text-slate-400 text-xs">
-                    {doc.pageCount ? `${doc.pageCount} page${doc.pageCount > 1 ? "s" : ""}` : ""}
-                  </span>
-                </div>
-
-                {/* Mock PDF pages */}
-                <div className="p-6 space-y-4 max-h-96 overflow-y-auto bg-slate-50">
-                  {Array.from({ length: Math.min(doc.pageCount ?? 1, 2) }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="bg-white border border-slate-200 rounded p-6 shadow-sm aspect-[3/4] flex flex-col gap-3"
-                    >
-                      {/* Mock page content lines */}
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1.5">
-                          <div className="h-3 bg-slate-200 rounded w-32" />
-                          <div className="h-2 bg-slate-100 rounded w-48" />
-                        </div>
-                        <div className="h-10 w-10 bg-blue-100 rounded" />
-                      </div>
-                      <div className="border-t border-slate-100 pt-3 space-y-2">
-                        {Array.from({ length: 6 }).map((_, j) => (
-                          <div key={j} className="h-2 bg-slate-100 rounded" style={{ width: `${70 + Math.random() * 25}%` }} />
-                        ))}
-                      </div>
-                      <div className="flex gap-4 pt-2">
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-2 bg-slate-100 rounded w-20" />
-                          <div className="h-3 bg-slate-200 rounded w-24" />
-                        </div>
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-2 bg-slate-100 rounded w-20" />
-                          <div className="h-3 bg-slate-200 rounded w-24" />
-                        </div>
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-2 bg-slate-100 rounded w-20" />
-                          <div className="h-3 bg-blue-200 rounded w-24" />
-                        </div>
-                      </div>
-                      <div className="mt-auto pt-4 border-t border-slate-100">
-                        <div className="h-2 bg-slate-100 rounded w-full" />
-                        <div className="h-2 bg-slate-100 rounded w-3/4 mt-1" />
-                      </div>
-                      <p className="text-slate-300 text-xs text-center">Page {i + 1} of {doc.pageCount}</p>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                <p className="text-xs text-slate-400">Loading preview…</p>
               </div>
             )}
           </div>
@@ -227,10 +248,17 @@ export default function DocumentViewerPage({
           {/* Processing info bar */}
           <div className="w-full px-6 py-3 bg-white border-t border-slate-200 flex items-center gap-4 text-xs text-slate-500 flex-shrink-0">
             <span className="flex items-center gap-1.5">
-              {doc.hasTextLayer
-                ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Text layer detected (OCR skipped)</>
-                : <><FileScan className="w-3.5 h-3.5 text-blue-500" /> Scanned document — OCR used</>
-              }
+              {doc.hasTextLayer ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Text layer
+                  detected (OCR skipped)
+                </>
+              ) : (
+                <>
+                  <FileScan className="w-3.5 h-3.5 text-blue-500" /> Scanned document —
+                  OCR used
+                </>
+              )}
             </span>
             {doc.processedAt && (
               <span className="flex items-center gap-1.5">
@@ -256,7 +284,11 @@ export default function DocumentViewerPage({
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {tab === "extracted" ? "Extracted Data" : tab === "metadata" ? "Metadata" : "Raw JSON"}
+                {tab === "extracted"
+                  ? "Extracted Data"
+                  : tab === "metadata"
+                  ? "Metadata"
+                  : "Raw JSON"}
               </button>
             ))}
           </div>
@@ -275,11 +307,18 @@ export default function DocumentViewerPage({
                             </p>
                             <div className="space-y-2">
                               {(value as Record<string, unknown>[]).map((item, i) => (
-                                <div key={i} className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1">
+                                <div
+                                  key={i}
+                                  className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
+                                >
                                   {Object.entries(item).map(([k, v]) => (
                                     <div key={k} className="flex items-center justify-between gap-2">
-                                      <span className="text-slate-400 capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
-                                      <span className="font-medium text-slate-700 text-right">{String(v)}</span>
+                                      <span className="text-slate-400 capitalize">
+                                        {k.replace(/([A-Z])/g, " $1")}
+                                      </span>
+                                      <span className="font-medium text-slate-700 text-right">
+                                        {String(v)}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
@@ -289,12 +328,16 @@ export default function DocumentViewerPage({
                         );
                       }
                       return (
-                        <div key={key} className="flex items-start justify-between gap-3 py-2 border-b border-slate-50">
+                        <div
+                          key={key}
+                          className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
+                        >
                           <span className="text-xs text-slate-500 capitalize flex-shrink-0">
                             {key.replace(/([A-Z])/g, " $1").trim()}
                           </span>
                           <span className="text-xs font-semibold text-slate-800 text-right">
-                            {typeof value === "number" && key.toLowerCase().includes("amount")
+                            {typeof value === "number" &&
+                            key.toLowerCase().includes("amount")
                               ? `MYR ${(value as number).toFixed(2)}`
                               : String(value)}
                           </span>
@@ -302,9 +345,26 @@ export default function DocumentViewerPage({
                       );
                     })}
                   </div>
+                ) : doc.extractedText ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Extracted Text
+                    </p>
+                    <pre className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3 max-h-[28rem] overflow-y-auto">
+                      {doc.extractedText}
+                    </pre>
+                    <p className="text-xs text-slate-400">
+                      Structured data extraction (AI) has not run yet.
+                    </p>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-32 text-center">
-                    {["queued", "extracting_text", "ocr_processing", "ai_extraction"].includes(doc.status) ? (
+                    {[
+                      "queued",
+                      "extracting_text",
+                      "ocr_processing",
+                      "ai_extraction",
+                    ].includes(doc.status) ? (
                       <>
                         <Clock className="w-8 h-8 text-slate-300 mb-2" />
                         <p className="text-slate-400 text-sm">Extraction in progress…</p>
@@ -314,7 +374,10 @@ export default function DocumentViewerPage({
                       <>
                         <AlertCircle className="w-8 h-8 text-red-300 mb-2" />
                         <p className="text-slate-400 text-sm">Extraction failed</p>
-                        <button className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <button
+                          onClick={handleRetry}
+                          className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
                           <RefreshCw className="w-3 h-3" /> Retry processing
                         </button>
                       </>
@@ -334,16 +397,31 @@ export default function DocumentViewerPage({
                   ["Size", formatBytes(doc.sizeBytes)],
                   ["Pages", doc.pageCount ?? "—"],
                   ["Has text layer", doc.hasTextLayer ? "Yes" : "No"],
-                  ["OCR confidence", doc.ocrConfidence ? `${Math.round(doc.ocrConfidence * 100)}%` : "—"],
+                  [
+                    "OCR confidence",
+                    doc.ocrConfidence
+                      ? `${Math.round(doc.ocrConfidence * 100)}%`
+                      : "—",
+                  ],
                   ["Uploaded by", doc.uploadedBy],
                   ["Uploaded at", new Date(doc.uploadedAt).toLocaleString("en-MY")],
-                  ["Processed at", doc.processedAt ? new Date(doc.processedAt).toLocaleString("en-MY") : "—"],
+                  [
+                    "Processed at",
+                    doc.processedAt
+                      ? new Date(doc.processedAt).toLocaleString("en-MY")
+                      : "—",
+                  ],
                   ["Tags", doc.tags.join(", ") || "—"],
                   ["Storage key", doc.storageKey],
                 ].map(([label, val]) => (
-                  <div key={String(label)} className="flex items-start justify-between gap-3 py-2 border-b border-slate-50">
+                  <div
+                    key={String(label)}
+                    className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
+                  >
                     <span className="text-xs text-slate-500 flex-shrink-0">{label}</span>
-                    <span className="text-xs font-medium text-slate-700 text-right break-all">{String(val)}</span>
+                    <span className="text-xs font-medium text-slate-700 text-right break-all">
+                      {String(val)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -352,12 +430,18 @@ export default function DocumentViewerPage({
             {activeTab === "raw" && (
               <div className="relative">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Extracted JSON</span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Extracted JSON
+                  </span>
                   <button
                     onClick={handleCopy}
                     className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs transition-colors"
                   >
-                    {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+                    {copied ? (
+                      <Check className="w-3 h-3 text-green-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
                     {copied ? "Copied" : "Copy"}
                   </button>
                 </div>
@@ -379,7 +463,10 @@ export default function DocumentViewerPage({
             <p className="text-xs text-slate-400 mb-2">Tags</p>
             <div className="flex flex-wrap gap-1.5">
               {doc.tags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs"
+                >
                   {tag}
                 </span>
               ))}

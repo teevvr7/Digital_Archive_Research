@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -14,10 +14,12 @@ import {
   X,
   Clock,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
-import { mockDocuments, formatBytes, formatRelativeTime } from "@/lib/mock-data";
-import type { Document, DocumentType } from "@/types";
+import { formatBytes, formatRelativeTime } from "@/lib/format";
+import { apiSearch, apiDownloadUrl } from "@/lib/api";
+import type { Document, DocumentType, SearchResult } from "@/types";
 
 const SUGGESTIONS = [
   "TNB invoice 2026",
@@ -31,6 +33,9 @@ const ALL_TYPES: DocumentType[] = [
   "invoice", "receipt", "contract", "report", "letter", "form", "other",
 ];
 
+type DateFilter = "any" | "today" | "week" | "month";
+
+/** Client-side highlight for the filename (the content snippet is highlighted server-side). */
 function highlight(text: string, query: string): React.ReactNode {
   if (!query.trim()) return text;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -54,32 +59,57 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [typeFilter, setTypeFilter] = useState<DocumentType | "all">("all");
-  const [dateFilter, setDateFilter] = useState<"any" | "today" | "week" | "month">("any");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("any");
   const [showFilters, setShowFilters] = useState(false);
+
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSearch = (q: string) => {
     setQuery(q);
-    setSubmitted(q);
+    setSubmitted(q.trim());
   };
 
-  const results = submitted
-    ? mockDocuments.filter((d) => {
-        const q = submitted.toLowerCase();
-        const matchesQuery =
-          d.originalFilename.toLowerCase().includes(q) ||
-          d.tags.some((t) => t.toLowerCase().includes(q)) ||
-          (d.extractedData &&
-            JSON.stringify(d.extractedData).toLowerCase().includes(q)) ||
-          d.documentType.includes(q) ||
-          d.uploadedBy.toLowerCase().includes(q);
-        const matchesType = typeFilter === "all" || d.documentType === typeFilter;
-        return matchesQuery && matchesType;
+  // Run the search whenever the submitted query or a filter changes.
+  useEffect(() => {
+    if (!submitted) {
+      setResults([]);
+      setTotal(0);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    apiSearch({
+      q: submitted,
+      type: typeFilter === "all" ? undefined : typeFilter,
+      date: dateFilter === "any" ? undefined : dateFilter,
+    })
+      .then((data) => {
+        setResults(data.items);
+        setTotal(data.total);
       })
-    : [];
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setResults([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, [submitted, typeFilter, dateFilter]);
 
   const clearSearch = () => {
     setQuery("");
     setSubmitted("");
+  };
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      const { url } = await apiDownloadUrl(doc.id);
+      window.open(url, "_blank");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Download failed");
+    }
   };
 
   return (
@@ -87,7 +117,7 @@ export default function SearchPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-900">Search</h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          Full-text search across filenames, extracted content, and metadata.
+          Find documents by filename or by the words inside them.
         </p>
       </div>
 
@@ -100,7 +130,7 @@ export default function SearchPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleSearch(query); }}
-              placeholder="Search documents, extracted data, tags…"
+              placeholder="Search filenames and document content…"
               className="w-full pl-11 pr-10 py-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 placeholder:text-slate-400"
             />
             {query && (
@@ -168,7 +198,7 @@ export default function SearchPage() {
               <div className="relative">
                 <select
                   value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value as typeof dateFilter)}
+                  onChange={(e) => setDateFilter(e.target.value as DateFilter)}
                   className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="any">Any time</option>
@@ -207,24 +237,24 @@ export default function SearchPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-semibold text-blue-800">Search capabilities</span>
+              <span className="text-sm font-semibold text-blue-800">How search works</span>
             </div>
             <ul className="space-y-1.5 text-sm text-blue-700">
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                Fuzzy filename matching via <code className="text-xs bg-blue-100 px-1 rounded">pg_trgm</code>
+                Matches the file name — even with small typos (fuzzy matching)
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                Full-text content search via <code className="text-xs bg-blue-100 px-1 rounded">tsvector</code>
+                Matches the words inside the document (full-text content search)
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                Structured data search via <code className="text-xs bg-blue-100 px-1 rounded">JSONB + GIN indexes</code>
+                Shows a highlighted snippet of where the match was found
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                Tag and metadata filtering
+                Results ranked best-match-first, filtered by type and date
               </li>
             </ul>
           </div>
@@ -234,21 +264,28 @@ export default function SearchPage() {
       {/* Results */}
       {submitted && (
         <div>
+          {error && (
+            <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              {error}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-slate-500">
-              {results.length === 0
-                ? "No results"
-                : `${results.length} result${results.length > 1 ? "s" : ""}`}{" "}
-              for <span className="font-medium text-slate-800">"{submitted}"</span>
+              {loading
+                ? "Searching…"
+                : total === 0
+                  ? "No results"
+                  : `${total} result${total > 1 ? "s" : ""}`}{" "}
+              for <span className="font-medium text-slate-800">&quot;{submitted}&quot;</span>
             </p>
-            {results.length > 0 && (
-              <p className="text-xs text-slate-400">
-                Search ran in ~4ms
-              </p>
-            )}
           </div>
 
-          {results.length === 0 ? (
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-xl flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            </div>
+          ) : results.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
               <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
               <p className="text-slate-500 font-medium">No documents found</p>
@@ -258,7 +295,7 @@ export default function SearchPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {results.map((doc) => (
+              {results.map(({ document: doc, snippet }) => (
                 <div
                   key={doc.id}
                   className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors group"
@@ -278,18 +315,12 @@ export default function SearchPage() {
                         <StatusBadge status={doc.status} />
                       </div>
 
-                      {/* Snippet from extracted data */}
-                      {doc.extractedData && (
-                        <p className="text-xs text-slate-500 mb-2 line-clamp-1">
-                          {highlight(
-                            Object.entries(doc.extractedData)
-                              .slice(0, 4)
-                              .filter(([, v]) => typeof v === "string" || typeof v === "number")
-                              .map(([k, v]) => `${k}: ${v}`)
-                              .join(" · "),
-                            submitted
-                          )}
-                        </p>
+                      {/* Content snippet (server-highlighted via ts_headline). */}
+                      {snippet && (
+                        <p
+                          className="text-xs text-slate-500 mb-2 line-clamp-2 [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:rounded [&_mark]:px-0.5"
+                          dangerouslySetInnerHTML={{ __html: snippet }}
+                        />
                       )}
 
                       <div className="flex items-center gap-3 flex-wrap">
@@ -306,7 +337,7 @@ export default function SearchPage() {
                             key={tag}
                             className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-xs"
                           >
-                            {highlight(tag, submitted)}
+                            {tag}
                           </span>
                         ))}
                       </div>
@@ -319,7 +350,10 @@ export default function SearchPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
-                      <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                      <button
+                        onClick={() => handleDownload(doc)}
+                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                      >
                         <Download className="w-4 h-4" />
                       </button>
                     </div>

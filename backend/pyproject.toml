@@ -1,0 +1,58 @@
+[project]
+name = "datawiz-backend"
+version = "0.1.0"
+description = "DataWiz Digital Archive — FastAPI backend + IDP pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    # API
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    # DB
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    # Auth
+    "pyjwt[crypto]>=2.8",
+    # Queue
+    "redis>=5.0",
+    "rq>=1.16",
+    # Storage / Supabase
+    "supabase>=2.5",
+    # Misc
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Heavy IDP deps — installed in the worker image only (keeps the API image lean).
+worker = [
+    "pymupdf>=1.24",                # text-layer extraction + rasterize page -> image (OCR/VLM)
+    "rapidocr-onnxruntime>=1.2.3",  # OCR fallback (ONNX, CPU-only, no system deps — Windows-friendly)
+    "pillow>=10.3",
+    "openai>=1.40",                 # OpenAI-compatible vLLM client (next milestone: structured JSON)
+    "jsonschema>=4.22",             # (next milestone: validate VLM output against doc-type schema)
+]
+dev = [
+    "pytest>=8.2",
+    "pytest-mock>=3.14",
+    "ruff>=0.5",
+    "black>=24.4",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+pythonpath = ["."]

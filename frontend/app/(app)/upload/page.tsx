@@ -13,6 +13,7 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
+import { apiUploadDocument } from "@/lib/api";
 import type { DocumentType } from "@/types";
 
 interface PendingFile {
@@ -20,7 +21,6 @@ interface PendingFile {
   file: File;
   docType: DocumentType;
   status: "pending" | "uploading" | "queued" | "error";
-  progress: number;
   error?: string;
 }
 
@@ -67,7 +67,6 @@ export default function UploadPage() {
           file: f,
           docType: defaultType,
           status: "pending",
-          progress: 0,
         });
       }
       setFiles((prev) => [...prev, ...newItems]);
@@ -88,31 +87,40 @@ export default function UploadPage() {
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, docType } : f)));
 
   const handleUpload = async () => {
-    if (files.length === 0) return;
+    const pending = files.filter((f) => f.status === "pending");
+    if (pending.length === 0) return;
     setUploading(true);
 
-    for (const pf of files) {
+    for (const pf of pending) {
       setFiles((prev) =>
-        prev.map((f) => (f.id === pf.id ? { ...f, status: "uploading", progress: 0 } : f))
+        prev.map((f) => (f.id === pf.id ? { ...f, status: "uploading" } : f))
       );
 
-      // Simulate upload progress
-      for (let p = 10; p <= 90; p += 20) {
-        await new Promise((r) => setTimeout(r, 200));
+      try {
+        const form = new FormData();
+        form.append("files", pf.file);
+        form.append("document_type", pf.docType);
+        await apiUploadDocument(form);
         setFiles((prev) =>
-          prev.map((f) => (f.id === pf.id ? { ...f, progress: p } : f))
+          prev.map((f) => (f.id === pf.id ? { ...f, status: "queued" } : f))
+        );
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Upload failed";
+        setFiles((prev) =>
+          prev.map((f) => (f.id === pf.id ? { ...f, status: "error", error: msg } : f))
         );
       }
-      await new Promise((r) => setTimeout(r, 300));
-
-      setFiles((prev) =>
-        prev.map((f) => (f.id === pf.id ? { ...f, status: "queued", progress: 100 } : f))
-      );
     }
 
     setUploading(false);
-    await new Promise((r) => setTimeout(r, 800));
-    router.push("/documents");
+
+    // Navigate to documents only if all succeeded
+    const updated = files.map((f) =>
+      pending.find((p) => p.id === f.id) ? { ...f, status: "queued" as const } : f
+    );
+    if (updated.every((f) => f.status === "queued")) {
+      setTimeout(() => router.push("/documents"), 800);
+    }
   };
 
   const allDone = files.length > 0 && files.every((f) => f.status === "queued");
@@ -201,24 +209,24 @@ export default function UploadPage() {
           <div className="divide-y divide-slate-50">
             {files.map((pf) => (
               <div key={pf.id} className="px-5 py-3.5 flex items-center gap-4">
-                {/* Icon */}
                 <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
                   <FileIcon mime={pf.file.type} />
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-sm font-medium text-slate-700 truncate">{pf.file.name}</span>
-                    <span className="text-xs text-slate-400 flex-shrink-0">{formatSize(pf.file.size)}</span>
+                    <span className="text-sm font-medium text-slate-700 truncate">
+                      {pf.file.name}
+                    </span>
+                    <span className="text-xs text-slate-400 flex-shrink-0">
+                      {formatSize(pf.file.size)}
+                    </span>
                   </div>
 
                   {pf.status === "uploading" ? (
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${pf.progress}%` }}
-                      />
+                    <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Uploading…
                     </div>
                   ) : pf.status === "queued" ? (
                     <div className="flex items-center gap-1 text-xs text-green-600">
@@ -231,7 +239,6 @@ export default function UploadPage() {
                       {pf.error ?? "Upload failed"}
                     </div>
                   ) : (
-                    /* Type selector */
                     <div className="relative inline-block">
                       <select
                         value={pf.docType}
@@ -247,7 +254,6 @@ export default function UploadPage() {
                   )}
                 </div>
 
-                {/* Remove */}
                 {pf.status === "pending" && (
                   <button
                     onClick={() => removeFile(pf.id)}
@@ -270,8 +276,8 @@ export default function UploadPage() {
         <p className="font-semibold text-blue-800 mb-1">How processing works</p>
         <ol className="space-y-1 text-blue-700 text-xs list-decimal list-inside">
           <li>File is stored securely in object storage</li>
-          <li>Text layer check — if found, OCR is skipped (faster & cheaper)</li>
-          <li>OCR via PaddleOCR for scanned documents</li>
+          <li>Text layer check — if found, OCR is skipped (faster &amp; cheaper)</li>
+          <li>OCR via LiteParse for scanned documents</li>
           <li>AI extraction (Qwen2.5-VL) for structured data on supported types</li>
           <li>Results indexed for full-text search</li>
         </ol>
@@ -285,11 +291,20 @@ export default function UploadPage() {
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {uploading ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Uploading…
+            </>
           ) : allDone ? (
-            <><CheckCircle2 className="w-4 h-4" /> All queued!</>
+            <>
+              <CheckCircle2 className="w-4 h-4" /> All queued!
+            </>
           ) : (
-            <><Upload className="w-4 h-4" /> Upload {pendingCount > 0 ? `${pendingCount} file${pendingCount > 1 ? "s" : ""}` : "files"}</>
+            <>
+              <Upload className="w-4 h-4" />{" "}
+              {pendingCount > 0
+                ? `Upload ${pendingCount} file${pendingCount > 1 ? "s" : ""}`
+                : "Upload files"}
+            </>
           )}
         </button>
         <button

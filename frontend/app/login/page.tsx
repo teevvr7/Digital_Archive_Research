@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Eye, EyeOff, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { apiBootstrap } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@majusb.com.my");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -20,9 +22,24 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    router.push("/dashboard");
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(`Supabase auth failed: ${authError.message}`);
+        return;
+      }
+      try {
+        await apiBootstrap();
+      } catch (apiErr: unknown) {
+        setError(`Backend bootstrap failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`);
+        return;
+      }
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      setError(`Supabase network error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -141,11 +158,6 @@ export default function LoginPage() {
               {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
-
-          <div className="mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-xs text-slate-500 font-medium mb-1">Demo credentials</p>
-            <p className="text-xs text-slate-600">admin@majusb.com.my / password</p>
-          </div>
 
           <p className="text-xs text-slate-400 text-center mt-8">
             © 2026 DataWiz. PDPA-compliant document processing.
