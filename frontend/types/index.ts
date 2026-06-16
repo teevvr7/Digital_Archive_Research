@@ -53,6 +53,7 @@ export interface Document {
   pageCount: number | null;
   hasTextLayer: boolean;
   ocrConfidence: number | null;
+  confidence: number | null;
   extractedData: Record<string, unknown> | null;
   extractedText: string | null;
   tags: string[];

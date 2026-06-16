@@ -1,13 +1,13 @@
 """IDP text-extraction orchestrator.
 
-Implements the cost cascade for Milestone C:
+Implements the cost cascade:
   1. PDF with text layer  → free PyMuPDF read (the ~85% case — no AI, no cost).
   2. PDF without text layer → rasterize each page → RapidOCR (CPU, no GPU).
   3. Image (JPEG/PNG/…) → RapidOCR directly, page_count = 1.
 
-Returns an :class:`ExtractionResult` dataclass that ``jobs.py`` persists to the DB.
-The VLM step (ai_extraction stage, next milestone) will consume ``.extracted_text``
-and the page images as inputs.
+After text extraction, :func:`run_ai_extraction` sends page images to the configured
+VLM endpoint for structured field extraction (Milestone E). It returns ``None`` when
+no endpoint is configured so the pipeline degrades gracefully.
 """
 
 import logging
@@ -17,6 +17,54 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 _IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/tiff"}
+
+
+def run_ai_extraction(
+    file_bytes: bytes,
+    mime_type: str,
+    extracted_text: str | None,
+    has_text_layer: bool,
+) -> "VlmOutcome":
+    """Run the VLM structured-extraction stage after text/OCR.
+
+    Returns a :class:`~app.modules.idp.extraction.VlmOutcome` carrying either the
+    extraction, or the reason it produced nothing (failure) / a clean skip.
+    Never raises. Digital docs go through text mode, scans through vision mode.
+    """
+    from app.core.config import settings
+
+    # Early exit: never import extraction/parsing when there's no endpoint —
+    # keeps tests offline and avoids loading PyMuPDF in the no-VLM path.
+    if not settings.vlm_base_url:
+        logger.debug("VLM_BASE_URL not set — ai_extraction stage skipped")
+        from app.modules.idp.extraction import VlmOutcome
+        return VlmOutcome(None, "skipped", None)
+
+    from app.modules.idp.extraction import extract_structured
+
+    t0 = time.perf_counter()
+    outcome = extract_structured(file_bytes, mime_type, extracted_text, has_text_layer)
+    elapsed = time.perf_counter() - t0
+
+    if outcome.extraction is None:
+        logger.info(
+            "AI extraction produced no data (mode=%s, reason=%s, %.2fs)",
+            outcome.mode, outcome.error, elapsed,
+        )
+    else:
+        ext = outcome.extraction
+        logger.info(
+            "AI extraction complete: mode=%s type=%s confidence=%.2f fields=%d (%.2fs)",
+            outcome.mode, ext.document_type, ext.confidence, len(ext.fields), elapsed,
+        )
+    return outcome
+
+
+# Forward-declare the type for the annotation above (avoids a circular import
+# at module level when extraction.py is not yet imported).
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.modules.idp.extraction import VlmOutcome
 
 
 @dataclass

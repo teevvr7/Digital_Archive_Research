@@ -39,10 +39,12 @@ def has_usable_text_layer(text: str, page_count: int) -> bool:
     return non_whitespace >= max(16, 8 * max(page_count, 1))
 
 
-def rasterize_page(page: fitz.Page) -> bytes:
-    """Render a single PDF page to PNG bytes at the OCR resolution.
+def rasterize_page(page: fitz.Page, dpi: int = _OCR_DPI) -> bytes:
+    """Render a single PDF page to PNG bytes at the given resolution.
 
-    Reused by the VLM milestone to produce page images.
+    Defaults to the OCR DPI. The VLM stage passes a lower ``dpi`` to keep image
+    tokens (and cost) down — it needs legible layout, not OCR-grade detail.
     """
-    pix = page.get_pixmap(matrix=fitz.Matrix(_ZOOM, _ZOOM))
+    zoom = dpi / 72.0  # PDF user space is 72 DPI
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
     return pix.tobytes("png")

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocument, apiDownloadUrl, apiRetryDocument } from "@/lib/api";
+import { apiDocument, apiDownloadUrl, apiExtractDocument, apiRetryDocument } from "@/lib/api";
 import type { Document } from "@/types";
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
@@ -143,6 +143,17 @@ export default function DocumentViewerPage({
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Retry failed");
+    }
+  };
+
+  const handleExtract = async () => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      const updated = await apiExtractDocument(doc.id);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Extraction request failed");
     }
   };
 
@@ -298,6 +309,14 @@ export default function DocumentViewerPage({
               <>
                 {doc.extractedData ? (
                   <div className="space-y-3">
+                    {doc.confidence != null && (
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-slate-400 capitalize">{doc.documentType}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${doc.confidence >= 0.7 ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                          {Math.round(doc.confidence * 100)}% confident
+                        </span>
+                      </div>
+                    )}
                     {Object.entries(doc.extractedData).map(([key, value]) => {
                       if (Array.isArray(value)) {
                         return (
@@ -353,9 +372,17 @@ export default function DocumentViewerPage({
                     <pre className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3 max-h-[28rem] overflow-y-auto">
                       {doc.extractedText}
                     </pre>
-                    <p className="text-xs text-slate-400">
-                      Structured data extraction (AI) has not run yet.
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-slate-400">
+                        Structured data extraction (AI) has not run yet.
+                      </p>
+                      <button
+                        onClick={handleExtract}
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <FileScan className="w-3 h-3" /> Re-run AI extraction
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-32 text-center">
@@ -401,6 +428,12 @@ export default function DocumentViewerPage({
                     "OCR confidence",
                     doc.ocrConfidence
                       ? `${Math.round(doc.ocrConfidence * 100)}%`
+                      : "—",
+                  ],
+                  [
+                    "AI confidence",
+                    doc.confidence != null
+                      ? `${Math.round(doc.confidence * 100)}%`
                       : "—",
                   ],
                   ["Uploaded by", doc.uploadedBy],

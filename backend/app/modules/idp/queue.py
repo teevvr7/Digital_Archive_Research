@@ -12,6 +12,18 @@ from rq.job import Retry
 from app.core.config import settings
 
 
+def enqueue_ai_extraction(doc_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+    """Enqueue a VLM-only re-extraction job for an already-completed document."""
+    conn = redis.from_url(settings.redis_url)
+    q = Queue(settings.idp_queue_name, connection=conn)
+    q.enqueue(
+        "app.modules.idp.jobs.ai_extract_document",
+        str(doc_id),
+        str(tenant_id),
+        retry=Retry(max=2, interval=[15, 60]),
+    )
+
+
 def enqueue_document(doc_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
     """Push a document-processing job onto the IDP queue.
 

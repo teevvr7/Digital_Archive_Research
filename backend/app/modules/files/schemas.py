@@ -33,6 +33,7 @@ class DocumentOut(CamelModel):
     page_count: int | None
     has_text_layer: bool
     ocr_confidence: float | None
+    confidence: float | None
     extracted_data: dict[str, Any] | None
     extracted_text: str | None
     tags: list[str]

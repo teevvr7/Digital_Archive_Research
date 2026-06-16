@@ -94,6 +94,29 @@ def retry_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
     return service.retry_document(db, doc_id)
 
 
+@router.post(
+    "/documents/{doc_id}/extract",
+    response_model=DocumentOut,
+    response_model_by_alias=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-run VLM structured extraction on one document",
+)
+def extract_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
+    db, _ = ctx
+    return service.extract_document(db, doc_id)
+
+
+@router.post(
+    "/documents/extract-missing",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Enqueue VLM extraction for all completed docs without structured data",
+)
+def extract_missing(ctx: _DbCtx) -> dict[str, int]:
+    db, _ = ctx
+    count = service.extract_missing(db)
+    return {"enqueued": count}
+
+
 # ---- Dashboard (separate prefix registered in main.py) ----
 
 

@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8001/api/health\" -Method Get | ConvertTo-Json)"
     ]
   }
 }

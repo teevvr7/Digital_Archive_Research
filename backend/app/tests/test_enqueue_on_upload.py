@@ -62,6 +62,7 @@ def _dummy_doc_out():
         page_count=None,
         has_text_layer=False,
         ocr_confidence=None,
+        confidence=None,
         extracted_data=None,
         extracted_text=None,
         tags=[],

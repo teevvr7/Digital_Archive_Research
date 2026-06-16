@@ -39,11 +39,19 @@ class Settings(BaseSettings):
     vlm_base_url: str = ""
     vlm_api_key: str = ""
     vlm_model: str = "Qwen2.5-VL-7B-Instruct"
+    # Total context window (input + output) the served model allows. The extraction
+    # stage budgets text/image chunks against this so a small-context model
+    # (e.g. Qwen2-VL-2B at 2048) never overflows. Raise to match a larger server.
+    vlm_max_model_len: int = 2048
+    vlm_max_output_tokens: int = 768  # tokens reserved for the JSON response per call
+    vlm_render_dpi: int = 120  # PDF→PNG DPI for the VLM (lower than OCR's 200 — legibility, not detail)
+    vlm_request_timeout: float = 90.0  # seconds per VLM HTTP call (cold Lightning endpoints are slow)
+    vlm_max_chunk_calls: int = 6  # hard cap on VLM calls per document (bounds cost on large docs)
 
     # ---- IDP tuning ----
     confidence_threshold: float = 0.7
     promote_after_n: int = 3
-    vlm_max_pages: int = 3
+    vlm_max_pages: int = 10  # overall page ceiling per doc; chunking + vlm_max_chunk_calls bound cost
     max_upload_mb: int = 50
 
     # ---- App ----

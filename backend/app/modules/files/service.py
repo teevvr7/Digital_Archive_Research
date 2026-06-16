@@ -26,7 +26,7 @@ from app.modules.files.schemas import (
     DocumentListOut,
     DocumentOut,
 )
-from app.modules.idp.queue import enqueue_document
+from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
 from app.modules.search.query import apply_text_search
 
 ALLOWED_MIMES: dict[str, str] = {
@@ -75,6 +75,7 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         page_count=doc.page_count,
         has_text_layer=doc.has_text_layer,
         ocr_confidence=doc.ocr_confidence,
+        confidence=doc.confidence,
         extracted_data=doc.extracted_data,
         extracted_text=doc.extracted_text,
         tags=doc.tags or [],
@@ -295,6 +296,35 @@ def retry_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     enqueue_document(doc.id, doc.tenant_id)
 
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def extract_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
+    """Enqueue a VLM-only re-extraction for one completed document.
+
+    Returns the document as-is (the extraction runs async). 404 if not found.
+    """
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    enqueue_ai_extraction(doc.id, doc.tenant_id)
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def extract_missing(db: Session) -> int:
+    """Enqueue VLM re-extraction for every completed doc without structured data.
+
+    RLS scopes the query to the current tenant. Returns the count enqueued.
+    """
+    rows = db.scalars(
+        select(Document).where(
+            Document.status == STATUS_COMPLETED,
+            Document.extracted_data.is_(None),
+        )
+    ).all()
+    for doc in rows:
+        enqueue_ai_extraction(doc.id, doc.tenant_id)
+    return len(rows)
 
 
 def get_dashboard(db: Session) -> DashboardOut:

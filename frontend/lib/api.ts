@@ -139,6 +139,12 @@ export const apiUploadDocument = (form: FormData) =>
 export const apiRetryDocument = (id: string) =>
   post<Document>(`/documents/${id}/retry`);
 
+export const apiExtractDocument = (id: string) =>
+  post<Document>(`/documents/${id}/extract`);
+
+export const apiExtractMissing = () =>
+  post<{ enqueued: number }>("/documents/extract-missing");
+
 // ---- Search (Milestone D) ------------------------------------------------
 
 export type SearchQuery = {

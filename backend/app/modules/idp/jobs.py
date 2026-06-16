@@ -16,6 +16,7 @@ import uuid
 from sqlalchemy import func, select, update
 
 from app.core import storage as object_storage
+from app.core.config import settings
 from app.core.tenant_context import tenant_session
 from app.models.activity_event import (
     ACT_PROCESSING_COMPLETE,
@@ -23,11 +24,18 @@ from app.models.activity_event import (
     ActivityEvent,
 )
 from app.models.document import (
+    STATUS_AI,
     STATUS_COMPLETED,
     STATUS_EXTRACTING_TEXT,
     STATUS_FAILED,
     STATUS_OCR,
     Document,
+)
+from app.models.extraction import (
+    EXTRACTION_ACCEPTED,
+    EXTRACTION_LOW_CONFIDENCE,
+    METHOD_VLM,
+    Extraction,
 )
 from app.models.processing_job import (
     JOB_COMPLETED,
@@ -35,7 +43,7 @@ from app.models.processing_job import (
     JOB_RUNNING,
     ProcessingJob,
 )
-from app.modules.idp.pipeline import run_extraction
+from app.modules.idp.pipeline import run_ai_extraction, run_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +94,68 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                 doc.status = STATUS_OCR
                 job.stage = "ocr_processing"
                 db.flush()
+
+            # --- AI structured extraction (isolated — never fails the document) ---
+            doc.status = STATUS_AI
+            job.stage = "ai_extraction"
+            db.flush()
+
+            try:
+                outcome = run_ai_extraction(
+                    file_bytes, doc.mime_type, result.text or None, result.has_text_layer
+                )
+                if outcome.extraction is not None:
+                    ai = outcome.extraction
+                    doc.extracted_data = ai.fields
+                    doc.confidence = ai.confidence
+                    doc.document_type = ai.document_type
+                    ext_status = (
+                        EXTRACTION_ACCEPTED
+                        if ai.confidence >= settings.confidence_threshold
+                        else EXTRACTION_LOW_CONFIDENCE
+                    )
+                    db.add(Extraction(
+                        tenant_id=tenant_uuid,
+                        document_id=doc_uuid,
+                        method=METHOD_VLM,
+                        model_name=ai.model_name,
+                        output=ai.fields,
+                        confidence=ai.confidence,
+                        status=ext_status,
+                    ))
+                    logger.info(
+                        "AI extraction persisted: doc=%s mode=%s type=%s confidence=%.2f status=%s",
+                        doc_id, outcome.mode, ai.document_type, ai.confidence, ext_status,
+                    )
+                elif outcome.error:
+                    # Failure (not a clean skip) — record the reason for the audit trail.
+                    logger.warning(
+                        "AI extraction produced no data (doc=%s mode=%s): %s",
+                        doc_id, outcome.mode, outcome.error,
+                    )
+                    db.add(Extraction(
+                        tenant_id=tenant_uuid,
+                        document_id=doc_uuid,
+                        method=METHOD_VLM,
+                        model_name=settings.vlm_model or None,
+                        output={"_error": outcome.error, "_mode": outcome.mode},
+                        confidence=None,
+                        status=EXTRACTION_LOW_CONFIDENCE,
+                    ))
+            except Exception as exc:
+                logger.warning(
+                    "AI extraction crashed (doc=%s) — document will complete without structured data: %s",
+                    doc_id, exc,
+                )
+                db.add(Extraction(
+                    tenant_id=tenant_uuid,
+                    document_id=doc_uuid,
+                    method=METHOD_VLM,
+                    model_name=settings.vlm_model or None,
+                    output={"_error": f"{type(exc).__name__}: {exc}"[:500], "_mode": "crash"},
+                    confidence=None,
+                    status=EXTRACTION_LOW_CONFIDENCE,
+                ))
 
             # Persist extraction results.
             doc.extracted_text = result.text or None
@@ -155,3 +225,84 @@ def process_document(doc_id: str, tenant_id: str) -> None:
 
             logger.error("IDP failed: doc=%s error=%s", doc_id, error_msg)
             raise  # let RQ record the failure and schedule a retry
+
+
+def ai_extract_document(doc_id: str, tenant_id: str) -> None:
+    """Re-run only the VLM structured-extraction stage on an already-completed doc.
+
+    Safe to enqueue multiple times (idempotent: overwrites ``extracted_data``).
+    The document stays ``completed`` regardless of the VLM outcome — text search
+    is unaffected. Used by the per-doc re-extract button and the bulk
+    ``extract-missing`` endpoint.
+    """
+    doc_uuid = uuid.UUID(doc_id)
+    t_start = time.perf_counter()
+    logger.info("AI re-extract start: doc=%s tenant=%s", doc_id, tenant_id)
+
+    with tenant_session(str(tenant_id)) as db:
+        doc = db.get(Document, doc_uuid)
+        if doc is None:
+            raise LookupError(f"Document {doc_id} not found under tenant {tenant_id}")
+
+        if not doc.extracted_text and doc.status != "completed":
+            logger.warning(
+                "AI re-extract skipped for doc=%s — not yet completed or no text", doc_id
+            )
+            return
+
+        try:
+            file_bytes = object_storage.download_file(doc.storage_key)
+            outcome = run_ai_extraction(
+                file_bytes, doc.mime_type, doc.extracted_text, bool(doc.has_text_layer)
+            )
+            if outcome.extraction is not None:
+                ai = outcome.extraction
+                doc.extracted_data = ai.fields
+                doc.confidence = ai.confidence
+                doc.document_type = ai.document_type
+                ext_status = (
+                    EXTRACTION_ACCEPTED
+                    if ai.confidence >= settings.confidence_threshold
+                    else EXTRACTION_LOW_CONFIDENCE
+                )
+                db.add(Extraction(
+                    tenant_id=doc.tenant_id,
+                    document_id=doc_uuid,
+                    method=METHOD_VLM,
+                    model_name=ai.model_name,
+                    output=ai.fields,
+                    confidence=ai.confidence,
+                    status=ext_status,
+                ))
+                logger.info(
+                    "AI re-extract complete: doc=%s mode=%s type=%s confidence=%.2f duration=%dms",
+                    doc_id,
+                    outcome.mode,
+                    ai.document_type,
+                    ai.confidence,
+                    int((time.perf_counter() - t_start) * 1000),
+                )
+            elif outcome.error:
+                logger.warning("AI re-extract no data: doc=%s mode=%s error=%s", doc_id, outcome.mode, outcome.error)
+                db.add(Extraction(
+                    tenant_id=doc.tenant_id,
+                    document_id=doc_uuid,
+                    method=METHOD_VLM,
+                    model_name=settings.vlm_model or None,
+                    output={"_error": outcome.error, "_mode": outcome.mode},
+                    confidence=None,
+                    status=EXTRACTION_LOW_CONFIDENCE,
+                ))
+            else:
+                logger.info("AI re-extract skipped (no endpoint): doc=%s", doc_id)
+        except Exception as exc:
+            logger.warning("AI re-extract crashed: doc=%s error=%s", doc_id, exc)
+            db.add(Extraction(
+                tenant_id=doc.tenant_id,
+                document_id=doc_uuid,
+                method=METHOD_VLM,
+                model_name=settings.vlm_model or None,
+                output={"_error": f"{type(exc).__name__}: {exc}"[:500], "_mode": "crash"},
+                confidence=None,
+                status=EXTRACTION_LOW_CONFIDENCE,
+            ))

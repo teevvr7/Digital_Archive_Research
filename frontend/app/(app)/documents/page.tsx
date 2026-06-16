@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocuments, apiDownloadUrl, apiRetryDocument, type DocumentListResponse } from "@/lib/api";
+import { apiDocuments, apiDownloadUrl, apiExtractMissing, apiRetryDocument, type DocumentListResponse } from "@/lib/api";
 import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
 const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "failed"]);
@@ -118,6 +118,19 @@ export default function DocumentsPage() {
     }
   };
 
+  const [extractingMissing, setExtractingMissing] = useState(false);
+  const handleExtractMissing = async () => {
+    setExtractingMissing(true);
+    try {
+      const { enqueued } = await apiExtractMissing();
+      alert(`Queued AI extraction for ${enqueued} document${enqueued !== 1 ? "s" : ""}.`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to queue extraction");
+    } finally {
+      setExtractingMissing(false);
+    }
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -128,13 +141,28 @@ export default function DocumentsPage() {
             {total} document{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <Link
-          href="/upload"
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Upload className="w-4 h-4" />
-          Upload
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExtractMissing}
+            disabled={extractingMissing}
+            className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            title="Queue AI extraction for all completed documents without structured data"
+          >
+            {extractingMissing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileScan className="w-4 h-4" />
+            )}
+            Extract structured data
+          </button>
+          <Link
+            href="/upload"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            Upload
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
