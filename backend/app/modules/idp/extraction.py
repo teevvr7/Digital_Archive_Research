@@ -40,16 +40,37 @@ _VALID_TYPES = {"invoice", "receipt", "contract", "report", "letter", "form", "o
 _TOTAL_KEYS = ("total", "amount_due", "grand_total", "balance_due", "amount_payable")
 
 _SYSTEM_PROMPT = (
-    "You are a document extraction engine. Read the document and return ONLY a JSON "
-    "object with keys documentType, confidence, and fields.\n"
-    "- documentType: one of invoice|receipt|contract|report|letter|form|other "
-    "(use \"other\" if unsure).\n"
-    "- confidence: a number from 0 to 1 reflecting how certain YOU are of the "
-    "extraction (e.g. 0.92 when clear, 0.4 when unsure). Compute it — do not copy any example.\n"
-    "- fields: every useful value with snake_case keys (vendor, invoice_number, date, "
-    "total_amount, currency, line_items, parties, ...). Amounts as numbers, dates as "
-    "ISO 8601, line_items compact.\n"
-    "Output the JSON object only — no prose, no code fences."
+    "You are a document extraction engine. Return ONLY a JSON object: "
+    "{\"documentType\":\"...\",\"confidence\":0.0,\"fields\":{...}}.\n"
+    "documentType: invoice|receipt|contract|report|letter|form|other.\n"
+    "confidence: 0.0-1.0 (your certainty).\n"
+    "fields rules:\n"
+    "- Header fields (vendor, invoice_number, invoice_date, total_amount, currency, "
+    "buyer, buyer_address, vendor_address, gst, grand_total, etc.) on first occurrence.\n"
+    "- line_items: extract EVERY product/service row visible — do not skip any. "
+    "Use compact keys only: code, description, qty, unit_price, amount. "
+    "Omit Chinese text, secondary descriptions, and empty fields.\n"
+    "Amounts as numbers. Dates as ISO 8601. Output JSON only — no prose, no fences."
+)
+
+# Two-phase prompts: split header extraction from line-item extraction so each
+# call's output budget is fully dedicated to its task.
+_HEADER_PROMPT = (
+    "Extract document header metadata ONLY — do NOT include line_items. "
+    "Return {\"documentType\":\"...\",\"confidence\":0.0,\"fields\":{...}}. "
+    "fields: vendor, invoice_number, invoice_date, total_amount, currency, "
+    "buyer, buyer_address, vendor_address, gst, grand_total, terms_conditions. "
+    "documentType: invoice|receipt|contract|report|letter|form|other. "
+    "JSON only — no prose, no fences."
+)
+
+_LINE_ITEMS_PROMPT = (
+    "Extract ALL line items from this document section. "
+    "Return {\"documentType\":\"invoice\",\"confidence\":0.9,\"fields\":{\"line_items\":[...]}}. "
+    "Each item: {\"code\":\"...\",\"description\":\"...\",\"qty\":N,\"unit_price\":N,\"amount\":N}. "
+    "Include EVERY product/service row visible — do not skip any. "
+    "Omit header fields, Chinese text, empty fields. "
+    "JSON only — no prose, no fences."
 )
 
 # --- Budget tuning (empirically measured on Qwen3-VL-4B against real invoice PDFs) ---
@@ -194,12 +215,16 @@ def _make_client() -> Any:
     )
 
 
-def _call_vlm(client: Any, content: list[dict[str, Any]]) -> str:
+def _call_vlm(
+    client: Any,
+    content: list[dict[str, Any]],
+    system_prompt: str | None = None,
+) -> str:
     """One chat completion. Raises on transport errors (caller handles)."""
     resp = client.chat.completions.create(
         model=settings.vlm_model,
         messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt if system_prompt is not None else _SYSTEM_PROMPT},
             {"role": "user", "content": content},
         ],
         max_tokens=settings.vlm_max_output_tokens,
@@ -329,8 +354,14 @@ def _repair_truncated_json(s: str) -> str | None:
     res = res.rstrip()
     # Drop a dangling comma or an incomplete trailing "key": pair / number.
     res = re.sub(r",\s*$", "", res)
+    # Drop "key": with no value yet.
     res = re.sub(r'[,{[]\s*"[^"]*"\s*:\s*$', lambda m: m.group(0)[0], res)
+    # Drop an unclosed key string (truncated before the closing quote).
     res = re.sub(r'[,{[]\s*"[^"]*$', lambda m: m.group(0)[0], res)
+    # Drop a closed key string with no colon+value (happens when in_str fix added the closing
+    # quote to a key that was truncated mid-name, e.g. ,"descriptio" or ,"amo").
+    res = re.sub(r'[,{[]\s*"[^"]*"\s*$', lambda m: m.group(0)[0], res)
+    res = re.sub(r",\s*$", "", res)  # second pass after key removal
     for ch in reversed(stack):
         res += "}" if ch == "{" else "]"
     return res or None
@@ -429,6 +460,69 @@ def _is_empty(value: Any) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Two-phase text extraction
+# ---------------------------------------------------------------------------
+
+def _extract_two_phase(
+    text: str, client: Any
+) -> tuple[VlmExtraction | None, str | None]:
+    """Header extraction in one call + exhaustive line-item extraction per chunk.
+
+    Separating the two concerns lets the full output-token budget go to
+    line items on Phase 2 calls, so a 70-item invoice doesn't get truncated
+    after the first 4 items.
+    """
+    parts: list[VlmExtraction] = []
+    last_err: str | None = None
+    chunks = _chunk_text(text)
+    remaining_calls = settings.vlm_max_chunk_calls
+
+    # Phase 1 — header fields (first chunk only, header-only prompt)
+    if chunks and remaining_calls > 0:
+        header_content = [{"type": "text", "text": (
+            f"Document text:\n{chunks[0]}\n\n"
+            "Extract header fields only (no line_items). Return the JSON object."
+        )}]
+        try:
+            raw = _call_vlm(client, header_content, _HEADER_PROMPT)
+            parsed = _tolerant_parse(raw)
+            if parsed:
+                ext = _to_extraction(parsed, raw)
+                if ext:
+                    ext.fields.pop("line_items", None)  # keep output budget free of items
+                    parts.append(ext)
+        except Exception as exc:  # noqa: BLE001
+            last_err = f"header: {exc}"[:200]
+            logger.warning("Header extraction failed: %s", exc)
+        remaining_calls -= 1
+
+    # Phase 2 — line items (all chunks, line-items-only prompt)
+    for idx, chunk in enumerate(chunks[:remaining_calls]):
+        item_content = [{"type": "text", "text": (
+            f"Invoice section:\n{chunk}\n\n"
+            "Extract ALL line items visible (every product/service row). "
+            "Return the JSON object."
+        )}]
+        try:
+            raw = _call_vlm(client, item_content, _LINE_ITEMS_PROMPT)
+        except Exception as exc:  # noqa: BLE001
+            last_err = f"items chunk {idx}: {exc}"[:200]
+            logger.warning("Line items chunk %d/%d failed: %s", idx + 1, len(chunks), exc)
+            break
+        parsed = _tolerant_parse(raw)
+        if parsed is None:
+            logger.warning("Unparseable line items output chunk %d", idx + 1)
+            continue
+        ext = _to_extraction(parsed, raw)
+        if ext is not None:
+            parts.append(ext)
+
+    if parts:
+        return _merge_extractions(parts), None
+    return None, last_err or "no output"
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -453,8 +547,7 @@ def extract_structured(
     try:
         client = _make_client()
         if use_text:
-            contents = [_text_content(c) for c in _chunk_text(text)]
-            extraction, err = _run_chunks(client, contents)
+            extraction, err = _extract_two_phase(text, client)
         else:
             images = render_page_images(file_bytes, mime_type, settings.vlm_max_pages)
             if not images:
@@ -470,7 +563,7 @@ def extract_structured(
     if extraction is None:
         return VlmOutcome(None, mode, err or "no output")
     logger.info(
-        "VLM %s-mode ok: type=%s confidence=%.2f fields=%d chunks=%d",
-        mode, extraction.document_type, extraction.confidence, len(extraction.fields), len(contents),
+        "VLM %s-mode ok: type=%s confidence=%.2f fields=%d",
+        mode, extraction.document_type, extraction.confidence, len(extraction.fields),
     )
     return VlmOutcome(extraction, mode, None)

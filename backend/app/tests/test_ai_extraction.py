@@ -133,26 +133,36 @@ class TestTextMode:
         assert outcome.extraction.fields["total_amount"] == 100
 
     def test_long_text_chunks_and_merges(self):
-        """Text over the per-call budget → multiple calls; line_items concatenate, total = last."""
-        resp1 = json.dumps({
+        """Two-phase: header call + per-chunk item calls; line_items concatenate, total = last."""
+        # Phase 1 (header): vendor + total, no line_items.
+        resp_header = json.dumps({
             "documentType": "invoice", "confidence": 0.9,
-            "fields": {"vendor": "ACME", "line_items": [{"d": "A"}], "total": 50},
+            "fields": {"vendor": "ACME", "total": 50},
         })
-        resp2 = json.dumps({
+        # Phase 2 chunk 1: first batch of line items.
+        resp_items1 = json.dumps({
+            "documentType": "invoice", "confidence": 0.9,
+            "fields": {"line_items": [{"d": "A"}], "total": 50},
+        })
+        # Phase 2 chunk 2: second batch of line items (total updated).
+        resp_items2 = json.dumps({
             "documentType": "invoice", "confidence": 0.7,
             "fields": {"line_items": [{"d": "B"}], "total": 200},
         })
         # Two ~600-char lines force two line-aligned chunks under a shrunk budget.
         big_text = ("A" * 600) + "\n" + ("B" * 600)
-        outcome, fake_client = self._call(resp1, resp2, text=big_text, vlm_max_model_len=1200)
+        # 3 calls: 1 header + 2 item chunks.
+        outcome, fake_client = self._call(
+            resp_header, resp_items1, resp_items2, text=big_text, vlm_max_model_len=1200
+        )
 
-        assert fake_client.chat.completions.create.call_count == 2
+        assert fake_client.chat.completions.create.call_count == 3
         ext = outcome.extraction
         assert ext is not None
-        assert ext.fields["line_items"] == [{"d": "A"}, {"d": "B"}]   # concatenated across pages
-        assert ext.fields["total"] == 200                            # last page wins for totals
-        assert ext.fields["vendor"] == "ACME"                        # first non-empty kept
-        assert ext.confidence == pytest.approx(0.8)                  # mean of chunk confidences
+        assert ext.fields["line_items"] == [{"d": "A"}, {"d": "B"}]  # concatenated across chunks
+        assert ext.fields["total"] == 200                             # last chunk wins for totals
+        assert ext.fields["vendor"] == "ACME"                        # from header call
+        assert ext.confidence == pytest.approx((0.9 + 0.9 + 0.7) / 3, rel=0.01)
 
 
 # ---------------------------------------------------------------------------
