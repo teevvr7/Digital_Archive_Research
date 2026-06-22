@@ -40,6 +40,7 @@ class DocumentTemplate(Base):
     examples_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     confidence: Mapped[float | None] = mapped_column(REAL, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    extraction_method: Mapped[str] = mapped_column(String, nullable=False, default="default")
     sample_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
     )

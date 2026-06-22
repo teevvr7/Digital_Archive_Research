@@ -67,6 +67,8 @@ body {
 .status-ai            { background: #faf5ff; color: #7c3aed; }
 .status-completed     { background: #f0fdf4; color: #15803d; }
 .status-failed        { background: #fef2f2; color: #dc2626; }
+.status-review        { background: #fffbeb; color: #d97706; }
+.status-success       { background: #f0fdf4; color: #15803d; }
 
 /* Cards */
 .stat-card {

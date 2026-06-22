@@ -171,3 +171,29 @@ export const apiSearch = (query: SearchQuery) => {
 export const apiOrganisation = () => get<unknown>("/settings/organisation");
 export const apiUsers = () => get<unknown>("/settings/users");
 export const apiApiKeys = () => get<unknown>("/settings/api-keys");
+
+// ---- IDP Config -----------------------------------------------------------
+
+export interface IDPConfig {
+  documentTypeId: string;
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, any> | null;
+  promptHints: Record<string, any> | null;
+  isCustomized: boolean;
+}
+
+export interface IDPConfigUpdateRequest {
+  extractionMethod: string;
+  jsonSchema?: Record<string, any> | null;
+  promptHints?: Record<string, any> | null;
+}
+
+export const apiGetIDPConfig = (documentTypeId: string) =>
+  get<IDPConfig>(`/idp/config/${documentTypeId}`);
+
+export const apiUpdateIDPConfig = (documentTypeId: string, body: IDPConfigUpdateRequest) =>
+  post<IDPConfig>(`/idp/config/${documentTypeId}`, body);
+
+export const apiListIDPConfigs = () =>
+  get<{ configs: IDPConfig[] }>("/idp/config");

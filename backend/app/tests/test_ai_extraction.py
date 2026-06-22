@@ -264,8 +264,15 @@ def test_run_ai_extraction_skips_when_no_endpoint():
     mock_settings = MagicMock()
     mock_settings.vlm_base_url = ""
 
+    mock_doc = MagicMock()
+    mock_doc.template_id = None
+    mock_doc.document_type_id = None
+    mock_doc.document_type = "invoice"
+    mock_doc.tenant_id = None
+    mock_db = MagicMock()
+
     with patch("app.core.config.settings", mock_settings):
-        outcome = run_ai_extraction(b"\xff\xd8\xff fake", "image/jpeg", "some text", False)
+        outcome = run_ai_extraction(mock_db, mock_doc, b"\xff\xd8\xff fake", "image/jpeg", "some text", False)
 
     assert outcome.extraction is None
     assert outcome.mode == "skipped"
