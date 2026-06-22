@@ -4,7 +4,9 @@ export type ProcessingStatus =
   | "ocr_processing"
   | "ai_extraction"
   | "completed"
-  | "failed";
+  | "failed"
+  | "needs_review"
+  | "success";
 
 export type DocumentType =
   | "invoice"

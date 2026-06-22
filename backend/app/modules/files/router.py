@@ -37,6 +37,23 @@ async def upload_documents(
     return service.create_documents(db, user, files, types)
 
 
+@router.post(
+    "/documents/single",
+    response_model=DocumentListOut,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a single document (with file browser button)",
+)
+async def upload_single_document(
+    ctx: _DbCtx,
+    file: UploadFile = File(description="File to upload"),
+    document_type: str | None = Form(None),
+) -> DocumentListOut:
+    db, user = ctx
+    types = [document_type or "other"]
+    return service.create_documents(db, user, [file], types)
+
+
 @router.get(
     "/documents",
     response_model=DocumentListOut,

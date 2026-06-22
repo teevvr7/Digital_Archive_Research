@@ -102,7 +102,7 @@ def process_document(doc_id: str, tenant_id: str) -> None:
 
             try:
                 outcome = run_ai_extraction(
-                    file_bytes, doc.mime_type, result.text or None, result.has_text_layer
+                    db, doc, file_bytes, doc.mime_type, result.text or None, result.has_text_layer
                 )
                 if outcome.extraction is not None:
                     ai = outcome.extraction
@@ -253,7 +253,7 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
         try:
             file_bytes = object_storage.download_file(doc.storage_key)
             outcome = run_ai_extraction(
-                file_bytes, doc.mime_type, doc.extracted_text, bool(doc.has_text_layer)
+                db, doc, file_bytes, doc.mime_type, doc.extracted_text, bool(doc.has_text_layer)
             )
             if outcome.extraction is not None:
                 ai = outcome.extraction

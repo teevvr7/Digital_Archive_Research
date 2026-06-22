@@ -20,6 +20,8 @@ _IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/tiff"}
 
 
 def run_ai_extraction(
+    db,
+    doc,
     file_bytes: bytes,
     mime_type: str,
     extracted_text: str | None,
@@ -27,14 +29,101 @@ def run_ai_extraction(
 ) -> "VlmOutcome":
     """Run the VLM structured-extraction stage after text/OCR.
 
-    Returns a :class:`~app.modules.idp.extraction.VlmOutcome` carrying either the
-    extraction, or the reason it produced nothing (failure) / a clean skip.
-    Never raises. Digital docs go through text mode, scans through vision mode.
+    Dispatches dynamically between the teammate's default cascade and your custom
+    paddle_qwen pipeline based on document configurations in the database.
     """
     from app.core.config import settings
+    from app.models.document_type import DocumentType
+    from app.models.document_template import DocumentTemplate
 
-    # Early exit: never import extraction/parsing when there's no endpoint —
-    # keeps tests offline and avoids loading PyMuPDF in the no-VLM path.
+    strategy = "default"
+    custom_prompt = None
+
+    if doc.template_id:
+        template = db.get(DocumentTemplate, doc.template_id)
+        if template:
+            strategy = template.extraction_method
+            custom_prompt = template.field_mappings.get("_prompt") if isinstance(template.field_mappings, dict) else None
+    elif doc.document_type_id:
+        doc_type = db.get(DocumentType, doc.document_type_id)
+        if doc_type:
+            strategy = doc_type.extraction_method
+            custom_prompt = doc_type.json_schema.get("_prompt") if isinstance(doc_type.json_schema, dict) else None
+    else:
+        doc_type = db.query(DocumentType).filter(
+            DocumentType.name == doc.document_type,
+            (DocumentType.tenant_id == doc.tenant_id) | (DocumentType.tenant_id.is_(None))
+        ).first()
+        if doc_type:
+            strategy = doc_type.extraction_method
+            custom_prompt = doc_type.json_schema.get("_prompt") if isinstance(doc_type.json_schema, dict) else None
+
+    if strategy == "paddle_qwen":
+        logger.info("Executing custom Paddle-Qwen IDP strategy for document %s", doc.id)
+        from app.modules.idp.paddle_qwen import run_paddle_ocr_prediction, extract_from_ocr_text, validate_extraction
+        from app.modules.idp.extraction import VlmExtraction, VlmOutcome
+        
+        t0 = time.perf_counter()
+        import tempfile
+        import os
+        from app.modules.idp.parsing import open_pdf, rasterize_page
+        
+        try:
+            ocr_text = ""
+            if mime_type == "application/pdf":
+                pdf_doc = open_pdf(file_bytes)
+                try:
+                    pages_to_render = min(pdf_doc.page_count, max(1, settings.vlm_max_pages))
+                    page_texts = []
+                    for i in range(pages_to_render):
+                        page = pdf_doc[i]
+                        png_bytes = rasterize_page(page, dpi=settings.vlm_render_dpi)
+                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                            tmp.write(png_bytes)
+                            tmp_path = tmp.name
+                        try:
+                            page_texts.append(run_paddle_ocr_prediction(tmp_path))
+                        finally:
+                            if os.path.exists(tmp_path):
+                                os.remove(tmp_path)
+                    ocr_text = "\n\n".join(page_texts)
+                finally:
+                    pdf_doc.close()
+            else:
+                with tempfile.NamedTemporaryFile(suffix=f".{mime_type.split('/')[-1]}", delete=False) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+                try:
+                    ocr_text = run_paddle_ocr_prediction(tmp_path)
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+            
+            from app.modules.idp.paddle_qwen import clean_ocr_text
+            cleaned_text = clean_ocr_text(ocr_text)
+            
+            extracted_json, raw_content = extract_from_ocr_text(cleaned_text, custom_prompt)
+            validated_json = validate_extraction(extracted_json)
+            
+            elapsed = time.perf_counter() - t0
+            
+            # Heuristic: 0.9 if validation is completely green
+            confidence = 0.9 if not validated_json.get("requires_human_review", False) else 0.4
+            
+            extraction = VlmExtraction(
+                document_type=validated_json.get("document_details", {}).get("document_type", "other"),
+                fields=validated_json,
+                confidence=confidence,
+                model_name=settings.qwen_llm_model,
+                raw=raw_content
+            )
+            return VlmOutcome(extraction, "text_via_paddle", None)
+            
+        except Exception as exc:
+            logger.exception("Custom Paddle-Qwen IDP strategy errored: %s", exc)
+            return VlmOutcome(None, "text_via_paddle", str(exc))
+
+    # Teammate's default cascade
     if not settings.vlm_base_url:
         logger.debug("VLM_BASE_URL not set — ai_extraction stage skipped")
         from app.modules.idp.extraction import VlmOutcome
@@ -58,6 +147,7 @@ def run_ai_extraction(
             outcome.mode, ext.document_type, ext.confidence, len(ext.fields), elapsed,
         )
     return outcome
+
 
 
 # Forward-declare the type for the annotation above (avoids a circular import

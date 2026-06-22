@@ -30,6 +30,8 @@ export default function LoginPage() {
       }
       try {
         await apiBootstrap();
+        // Force refresh session to load new app_metadata (tenant_id) claims into the JWT
+        await supabase.auth.refreshSession();
       } catch (apiErr: unknown) {
         setError(`Backend bootstrap failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`);
         return;
