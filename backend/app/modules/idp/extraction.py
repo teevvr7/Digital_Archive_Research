@@ -103,12 +103,17 @@ class VlmOutcome:
     """Result envelope so callers can persist *why* extraction produced nothing.
 
     Exactly one of ``extraction`` (success) or ``error`` (failure reason) is set;
-    ``error`` is ``None`` for a plain skip (no endpoint configured).
+    ``error`` is ``None`` for a plain skip (no endpoint configured). Token counts
+    are 0 when no VLM call was actually made (skip, or a pre-call error) — callers
+    use these to meter spend against the per-tenant budget (``app.core.ai_budget``).
     """
 
     extraction: VlmExtraction | None
     mode: str            # "text" | "vision" | "skipped"
     error: str | None    # failure reason when extraction is None (None == clean skip)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 class _VlmOut(BaseModel):
@@ -215,12 +220,43 @@ def _make_client() -> Any:
     )
 
 
+def _usage_tokens(resp: Any) -> dict[str, int]:
+    """Best-effort token usage from an OpenAI-style response.
+
+    Tolerant of a missing or mocked ``.usage`` (e.g. test doubles that don't set
+    it) — anything that isn't an int is treated as 0 rather than raising.
+    """
+    usage = getattr(resp, "usage", None)
+
+    def _int(value: Any) -> int:
+        return value if isinstance(value, int) else 0
+
+    return {
+        "prompt_tokens": _int(getattr(usage, "prompt_tokens", None)),
+        "completion_tokens": _int(getattr(usage, "completion_tokens", None)),
+        "total_tokens": _int(getattr(usage, "total_tokens", None)),
+    }
+
+
+def _empty_usage() -> dict[str, int]:
+    return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
+def _accumulate(total: dict[str, int], usage: dict[str, int]) -> None:
+    for key in total:
+        total[key] += usage[key]
+
+
 def _call_vlm(
     client: Any,
     content: list[dict[str, Any]],
     system_prompt: str | None = None,
-) -> str:
-    """One chat completion. Raises on transport errors (caller handles)."""
+) -> tuple[str, dict[str, int]]:
+    """One chat completion. Raises on transport errors (caller handles).
+
+    Returns ``(text, usage)`` — ``usage`` has ``prompt_tokens``/``completion_tokens``/
+    ``total_tokens`` (0 for any the server didn't report).
+    """
     resp = client.chat.completions.create(
         model=settings.vlm_model,
         messages=[
@@ -230,7 +266,8 @@ def _call_vlm(
         max_tokens=settings.vlm_max_output_tokens,
         temperature=0,
     )
-    return (resp.choices[0].message.content or "").strip()
+    text = (resp.choices[0].message.content or "").strip()
+    return text, _usage_tokens(resp)
 
 
 def _text_content(text_chunk: str) -> list[dict[str, Any]]:
@@ -371,21 +408,26 @@ def _repair_truncated_json(s: str) -> str | None:
 # Chunked extraction + merge
 # ---------------------------------------------------------------------------
 
-def _run_chunks(client: Any, contents: list[list[dict[str, Any]]]) -> tuple[VlmExtraction | None, str | None]:
+def _run_chunks(
+    client: Any, contents: list[list[dict[str, Any]]]
+) -> tuple[VlmExtraction | None, str | None, dict[str, int]]:
     """Call the VLM once per content chunk, parse each, merge successes.
 
-    Returns ``(merged_extraction, None)`` on any success, else ``(None, reason)``.
+    Returns ``(merged_extraction, None, usage)`` on any success, else
+    ``(None, reason, usage)``. ``usage`` totals tokens across every attempted call.
     Stops early on a transport error (it will only repeat against a dead endpoint).
     """
     parts: list[VlmExtraction] = []
     last_err: str | None = None
+    usage = _empty_usage()
     for idx, content in enumerate(contents):
         try:
-            raw = _call_vlm(client, content)
+            raw, call_usage = _call_vlm(client, content)
         except Exception as exc:  # noqa: BLE001 — transport/timeout; report and stop
             last_err = f"{type(exc).__name__}: {exc}"[:300]
             logger.warning("VLM call failed on chunk %d/%d: %s", idx + 1, len(contents), exc, exc_info=True)
             break
+        _accumulate(usage, call_usage)
         parsed = _tolerant_parse(raw)
         if parsed is None:
             last_err = "unparseable model output"
@@ -395,8 +437,8 @@ def _run_chunks(client: Any, contents: list[list[dict[str, Any]]]) -> tuple[VlmE
         if ext is not None:
             parts.append(ext)
     if parts:
-        return _merge_extractions(parts), None
-    return None, last_err or "no output"
+        return _merge_extractions(parts), None, usage
+    return None, last_err or "no output", usage
 
 
 def _chunk_text(text: str) -> list[str]:
@@ -465,15 +507,16 @@ def _is_empty(value: Any) -> bool:
 
 def _extract_two_phase(
     text: str, client: Any
-) -> tuple[VlmExtraction | None, str | None]:
+) -> tuple[VlmExtraction | None, str | None, dict[str, int]]:
     """Header extraction in one call + exhaustive line-item extraction per chunk.
 
     Separating the two concerns lets the full output-token budget go to
     line items on Phase 2 calls, so a 70-item invoice doesn't get truncated
-    after the first 4 items.
+    after the first 4 items. ``usage`` totals tokens across every attempted call.
     """
     parts: list[VlmExtraction] = []
     last_err: str | None = None
+    usage = _empty_usage()
     chunks = _chunk_text(text)
     remaining_calls = settings.vlm_max_chunk_calls
 
@@ -484,7 +527,8 @@ def _extract_two_phase(
             "Extract header fields only (no line_items). Return the JSON object."
         )}]
         try:
-            raw = _call_vlm(client, header_content, _HEADER_PROMPT)
+            raw, call_usage = _call_vlm(client, header_content, _HEADER_PROMPT)
+            _accumulate(usage, call_usage)
             parsed = _tolerant_parse(raw)
             if parsed:
                 ext = _to_extraction(parsed, raw)
@@ -504,7 +548,8 @@ def _extract_two_phase(
             "Return the JSON object."
         )}]
         try:
-            raw = _call_vlm(client, item_content, _LINE_ITEMS_PROMPT)
+            raw, call_usage = _call_vlm(client, item_content, _LINE_ITEMS_PROMPT)
+            _accumulate(usage, call_usage)
         except Exception as exc:  # noqa: BLE001
             last_err = f"items chunk {idx}: {exc}"[:200]
             logger.warning("Line items chunk %d/%d failed: %s", idx + 1, len(chunks), exc)
@@ -518,8 +563,8 @@ def _extract_two_phase(
             parts.append(ext)
 
     if parts:
-        return _merge_extractions(parts), None
-    return None, last_err or "no output"
+        return _merge_extractions(parts), None, usage
+    return None, last_err or "no output", usage
 
 
 # ---------------------------------------------------------------------------
@@ -543,27 +588,28 @@ def extract_structured(
     text = (extracted_text or "").strip()
     use_text = bool(has_text_layer and len(text) >= _MIN_TEXT_CHARS)
     mode = "text" if use_text else "vision"
+    usage = _empty_usage()
 
     try:
         client = _make_client()
         if use_text:
-            extraction, err = _extract_two_phase(text, client)
+            extraction, err, usage = _extract_two_phase(text, client)
         else:
             images = render_page_images(file_bytes, mime_type, settings.vlm_max_pages)
             if not images:
                 return VlmOutcome(None, mode, "no page images to send")
             batches = _batch_images(images)
             contents = [_vision_content(b, text if i == 0 else None) for i, b in enumerate(batches)]
-            extraction, err = _run_chunks(client, contents)
+            extraction, err, usage = _run_chunks(client, contents)
     except Exception as exc:  # noqa: BLE001 — isolate the whole stage
         reason = f"{type(exc).__name__}: {exc}"[:500]
         logger.warning("VLM %s-mode extraction errored: %s", mode, exc, exc_info=True)
-        return VlmOutcome(None, mode, reason)
+        return VlmOutcome(None, mode, reason, **usage)
 
     if extraction is None:
-        return VlmOutcome(None, mode, err or "no output")
+        return VlmOutcome(None, mode, err or "no output", **usage)
     logger.info(
         "VLM %s-mode ok: type=%s confidence=%.2f fields=%d",
         mode, extraction.document_type, extraction.confidence, len(extraction.fields),
     )
-    return VlmOutcome(extraction, mode, None)
+    return VlmOutcome(extraction, mode, None, **usage)

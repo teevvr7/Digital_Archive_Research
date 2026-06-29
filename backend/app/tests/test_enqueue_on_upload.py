@@ -52,6 +52,7 @@ def _dummy_doc_out():
         tenant_id=uuid.uuid4(),
         filename="test.pdf",
         original_filename="test.pdf",
+        title="test.pdf",
         document_type="other",
         mime_type="application/pdf",
         size_bytes=100,
@@ -59,6 +60,7 @@ def _dummy_doc_out():
         uploaded_by="Tester",
         uploaded_at=datetime.datetime.now(datetime.timezone.utc),
         processed_at=None,
+        document_date=None,
         page_count=None,
         has_text_layer=False,
         ocr_confidence=None,
@@ -67,6 +69,8 @@ def _dummy_doc_out():
         extracted_text=None,
         tags=[],
         storage_key="tenant/docs/id.pdf",
+        has_thumbnail=False,
+        deleted_at=None,
     )
 
 
@@ -80,7 +84,16 @@ def mock_db():
     added = []
     db.add.side_effect = lambda obj: added.append(obj)
     db.flush.return_value = None
-    db.execute.return_value = MagicMock(scalar=MagicMock(return_value=0))
+    # .first() -> None means "no Tenant row found", which is accurate here (these
+    # tests never create one) and makes _check_storage_quota's lookup a no-op.
+    # .all() -> [] means "no existing checksums for this tenant", so the new
+    # dedup query in create_documents never spuriously flags a test file as
+    # a duplicate (a bare MagicMock() is not iterable and would crash here).
+    db.execute.return_value = MagicMock(
+        scalar=MagicMock(return_value=0),
+        first=MagicMock(return_value=None),
+        all=MagicMock(return_value=[]),
+    )
     db._added = added
     return db
 
@@ -91,8 +104,9 @@ def test_enqueue_called_once_per_uploaded_file(mock_db):
     user_id = uuid.uuid4()
     token = _make_token(tenant_id, user_id)
 
-    upload1 = _make_upload("invoice.pdf")
-    upload2 = _make_upload("receipt.pdf")
+    # Distinct content: two genuinely different files, not a dedup-candidate pair.
+    upload1 = _make_upload("invoice.pdf", content=b"%PDF-1.4 invoice")
+    upload2 = _make_upload("receipt.pdf", content=b"%PDF-1.4 receipt")
 
     dummy = _dummy_doc_out()
 

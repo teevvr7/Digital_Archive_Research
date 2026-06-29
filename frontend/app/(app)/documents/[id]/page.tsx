@@ -7,6 +7,7 @@ import {
   Download,
   RefreshCw,
   FileScan,
+  FileX,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -15,11 +16,38 @@ import {
   Copy,
   Check,
   Loader2,
+  Trash2,
+  RotateCcw,
+  Pencil,
+  X,
+  Save,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocument, apiDownloadUrl, apiExtractDocument, apiRetryDocument } from "@/lib/api";
-import type { Document } from "@/types";
+import {
+  apiDocument,
+  apiDownloadUrl,
+  apiExtractDocument,
+  apiRetryDocument,
+  apiPatchDocument,
+  apiTrashDocument,
+  apiRestoreDocument,
+  type DocumentPatch,
+} from "@/lib/api";
+import type { Document, DocumentType } from "@/types";
+
+const NON_RENDERABLE_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "message/rfc822",
+]);
+
+const TEXT_MIMES = new Set(["text/plain", "text/csv", "text/markdown"]);
+
+const ALL_TYPES: DocumentType[] = [
+  "invoice", "receipt", "contract", "report", "letter", "form", "other",
+];
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   const [open, setOpen] = useState(depth < 2);
@@ -92,10 +120,18 @@ export default function DocumentViewerPage({
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw">(
-    "extracted"
-  );
+  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw">("extracted");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [textContent, setTextContent] = useState<string | null>(null);
+
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<{
+    title: string;
+    documentType: DocumentType;
+    documentDate: string;
+  }>({ title: "", documentType: "other", documentDate: "" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     apiDocument(id)
@@ -105,9 +141,9 @@ export default function DocumentViewerPage({
       );
   }, [id]);
 
-  // Poll while the document is still processing; stops at completed/failed.
+  // Poll while the document is still processing; stops at terminal states.
   useEffect(() => {
-    if (!doc || doc.status === "completed" || doc.status === "failed") return;
+    if (!doc || doc.status === "completed" || doc.status === "failed" || doc.status === "needs_review") return;
 
     const timerId = setInterval(() => {
       apiDocument(id).then(setDoc).catch(() => {});
@@ -121,8 +157,17 @@ export default function DocumentViewerPage({
     if (!doc) return;
     apiDownloadUrl(doc.id)
       .then(({ url }) => setPreviewUrl(url))
-      .catch(() => {}); // preview is best-effort; user can still click Download
+      .catch(() => {});
   }, [doc?.id]);
+
+  // For text/csv/md files, fetch the actual text content via the signed URL.
+  useEffect(() => {
+    if (!doc || !previewUrl || !TEXT_MIMES.has(doc.mimeType)) return;
+    fetch(previewUrl)
+      .then((r) => r.text())
+      .then(setTextContent)
+      .catch(() => {});
+  }, [doc?.mimeType, previewUrl]);
 
   const handleDownload = async () => {
     if (!doc) return;
@@ -165,6 +210,61 @@ export default function DocumentViewerPage({
     }
   };
 
+  const openEditMode = () => {
+    if (!doc) return;
+    setEditDraft({
+      title: doc.title,
+      documentType: doc.documentType,
+      documentDate: doc.documentDate
+        ? new Date(doc.documentDate).toISOString().split("T")[0]
+        : "",
+    });
+    setEditing(true);
+    setActiveTab("metadata");
+  };
+
+  const handleSave = async () => {
+    if (!doc) return;
+    setSaving(true);
+    setActionError("");
+    try {
+      const patch: DocumentPatch = {
+        title: editDraft.title || undefined,
+        documentType: editDraft.documentType || undefined,
+        documentDate: editDraft.documentDate || null,
+      };
+      const updated = await apiPatchDocument(doc.id, patch);
+      setDoc(updated);
+      setEditing(false);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTrash = async () => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      const updated = await apiTrashDocument(doc.id);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Move to trash failed");
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      const updated = await apiRestoreDocument(doc.id);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Restore failed");
+    }
+  };
+
   if (loadError) {
     return (
       <div className="p-8 text-center">
@@ -184,6 +284,8 @@ export default function DocumentViewerPage({
     );
   }
 
+  const isTrashed = doc.deletedAt != null;
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
@@ -198,21 +300,52 @@ export default function DocumentViewerPage({
           </Link>
           <span className="text-slate-300">/</span>
           <span className="text-slate-700 text-sm font-medium truncate max-w-xs">
-            {doc.originalFilename}
+            {doc.title || doc.originalFilename}
           </span>
+          {isTrashed && (
+            <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs font-medium">
+              In trash
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={doc.status} />
           {actionError && (
             <span className="text-xs text-red-500">{actionError}</span>
           )}
-          {doc.status === "failed" && (
+          {!editing && !isTrashed && (
+            <button
+              onClick={openEditMode}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
+          {doc.status === "failed" && !isTrashed && (
             <button
               onClick={handleRetry}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Retry
+            </button>
+          )}
+          {isTrashed ? (
+            <button
+              onClick={handleRestore}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 rounded-lg hover:bg-green-50 text-green-700 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Restore
+            </button>
+          ) : (
+            <button
+              onClick={handleTrash}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+              title="Move to trash"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
           <button
@@ -229,7 +362,18 @@ export default function DocumentViewerPage({
         {/* Document preview panel */}
         <div className="flex-1 bg-slate-100 flex flex-col items-center justify-center border-r border-slate-200 overflow-hidden">
           <div className="w-full h-full flex items-center justify-center">
-            {doc.mimeType.startsWith("image/") ? (
+            {TEXT_MIMES.has(doc.mimeType) ? (
+              textContent != null ? (
+                <pre className="w-full h-full p-6 text-xs text-slate-700 font-mono leading-relaxed whitespace-pre-wrap overflow-auto bg-white">
+                  {textContent}
+                </pre>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                  <p className="text-xs text-slate-400">Loading content…</p>
+                </div>
+              )
+            ) : doc.mimeType.startsWith("image/") ? (
               previewUrl ? (
                 <img
                   src={previewUrl}
@@ -242,6 +386,19 @@ export default function DocumentViewerPage({
                   <p className="text-xs text-slate-400">Loading preview…</p>
                 </div>
               )
+            ) : NON_RENDERABLE_MIMES.has(doc.mimeType) ? (
+              <div className="flex flex-col items-center gap-3 text-center px-6">
+                <FileX className="w-10 h-10 text-slate-300" />
+                <p className="text-sm text-slate-500">
+                  No inline preview for this file type yet.
+                </p>
+                <button
+                  onClick={handleDownload}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Download to view
+                </button>
+              </div>
             ) : previewUrl ? (
               <iframe
                 src={previewUrl}
@@ -281,7 +438,7 @@ export default function DocumentViewerPage({
           </div>
         </div>
 
-        {/* Right panel — extracted data */}
+        {/* Right panel */}
         <div className="w-96 flex flex-col bg-white flex-shrink-0 overflow-hidden">
           {/* Tabs */}
           <div className="border-b border-slate-200 flex flex-shrink-0">
@@ -386,12 +543,7 @@ export default function DocumentViewerPage({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-32 text-center">
-                    {[
-                      "queued",
-                      "extracting_text",
-                      "ocr_processing",
-                      "ai_extraction",
-                    ].includes(doc.status) ? (
+                    {["queued", "extracting_text", "ocr_processing", "ai_extraction"].includes(doc.status) ? (
                       <>
                         <Clock className="w-8 h-8 text-slate-300 mb-2" />
                         <p className="text-slate-400 text-sm">Extraction in progress…</p>
@@ -415,48 +567,125 @@ export default function DocumentViewerPage({
             )}
 
             {activeTab === "metadata" && (
-              <div className="space-y-2">
-                {[
-                  ["Document ID", doc.id],
-                  ["Original filename", doc.originalFilename],
-                  ["Type", doc.documentType],
-                  ["MIME type", doc.mimeType],
-                  ["Size", formatBytes(doc.sizeBytes)],
-                  ["Pages", doc.pageCount ?? "—"],
-                  ["Has text layer", doc.hasTextLayer ? "Yes" : "No"],
-                  [
-                    "OCR confidence",
-                    doc.ocrConfidence
-                      ? `${Math.round(doc.ocrConfidence * 100)}%`
-                      : "—",
-                  ],
-                  [
-                    "AI confidence",
-                    doc.confidence != null
-                      ? `${Math.round(doc.confidence * 100)}%`
-                      : "—",
-                  ],
-                  ["Uploaded by", doc.uploadedBy],
-                  ["Uploaded at", new Date(doc.uploadedAt).toLocaleString("en-MY")],
-                  [
-                    "Processed at",
-                    doc.processedAt
-                      ? new Date(doc.processedAt).toLocaleString("en-MY")
-                      : "—",
-                  ],
-                  ["Tags", doc.tags.join(", ") || "—"],
-                  ["Storage key", doc.storageKey],
-                ].map(([label, val]) => (
-                  <div
-                    key={String(label)}
-                    className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
-                  >
-                    <span className="text-xs text-slate-500 flex-shrink-0">{label}</span>
-                    <span className="text-xs font-medium text-slate-700 text-right break-all">
-                      {String(val)}
-                    </span>
+              <div className="space-y-3">
+                {editing ? (
+                  /* ---- Edit form ---- */
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Title</label>
+                      <input
+                        value={editDraft.title}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))}
+                        className="w-full px-2 py-1.5 rounded border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Type</label>
+                      <select
+                        value={editDraft.documentType}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, documentType: e.target.value as DocumentType }))
+                        }
+                        className="w-full px-2 py-1.5 rounded border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        {ALL_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Document date</label>
+                      <input
+                        type="date"
+                        value={editDraft.documentDate}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, documentDate: e.target.value }))}
+                        className="w-full px-2 py-1.5 rounded border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
+                      >
+                        {saving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditing(false)}
+                        disabled={saving}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs rounded-lg transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                ))}
+                ) : (
+                  /* ---- View mode ---- */
+                  <div className="space-y-2">
+                    {[
+                      ["Document ID", doc.id],
+                      ["Title", doc.title],
+                      ["Original filename", doc.originalFilename],
+                      ["Type", doc.documentType],
+                      ["MIME type", doc.mimeType],
+                      ["Size", formatBytes(doc.sizeBytes)],
+                      [
+                        "Document date",
+                        doc.documentDate
+                          ? new Date(doc.documentDate).toLocaleDateString("en-MY")
+                          : "—",
+                      ],
+                      ["Pages", doc.pageCount ?? "—"],
+                      ["Has text layer", doc.hasTextLayer ? "Yes" : "No"],
+                      [
+                        "OCR confidence",
+                        doc.ocrConfidence
+                          ? `${Math.round(doc.ocrConfidence * 100)}%`
+                          : "—",
+                      ],
+                      [
+                        "AI confidence",
+                        doc.confidence != null
+                          ? `${Math.round(doc.confidence * 100)}%`
+                          : "—",
+                      ],
+                      ["Uploaded by", doc.uploadedBy],
+                      ["Uploaded at", new Date(doc.uploadedAt).toLocaleString("en-MY")],
+                      [
+                        "Processed at",
+                        doc.processedAt
+                          ? new Date(doc.processedAt).toLocaleString("en-MY")
+                          : "—",
+                      ],
+                      [
+                        "In trash since",
+                        doc.deletedAt
+                          ? new Date(doc.deletedAt).toLocaleString("en-MY")
+                          : "—",
+                      ],
+                      ["Tags", doc.tags.join(", ") || "—"],
+                      ["Storage key", doc.storageKey],
+                    ].map(([label, val]) => (
+                      <div
+                        key={String(label)}
+                        className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
+                      >
+                        <span className="text-xs text-slate-500 flex-shrink-0">{label}</span>
+                        <span className="text-xs font-medium text-slate-700 text-right break-all">
+                          {String(val)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

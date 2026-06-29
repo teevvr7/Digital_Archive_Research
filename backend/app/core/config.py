@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     vlm_max_pages: int = 10  # overall page ceiling per doc; chunking + vlm_max_chunk_calls bound cost
     max_upload_mb: int = 50
 
+    # ---- LLM budget gate ----
+    # Per-tenant monthly VLM token cap used when tenants.llm_monthly_token_cap is NULL.
+    # The docs_llm/docs_total ratio breaker from CLAUDE.md is deferred until Phase 2
+    # (deterministic extraction) exists — see project memory for the rationale.
+    llm_monthly_token_cap_default: int = 2_000_000
+
     # ---- App ----
     cors_allow_origins: str = "http://localhost:3000"
     sentry_dsn: str = ""

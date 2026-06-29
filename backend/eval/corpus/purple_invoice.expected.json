@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "James Sharp Photography",
+    "invoiceNumber": "INV-1001",
+    "invoiceDate": "2024-10-07",
+    "dueDate": "2024-10-21",
+    "totalAmount": 2200.00,
+    "currency": "USD"
+  },
+  "notes": "Known extraction gap: the vendor name is a stylised cursive logo wordmark ('James Sharp PHOTOGRAPHY') that OCR misreads entirely (comes back as an unrelated short word). Invoice number, dates, and total are all correctly found from clearly-labelled plain text elsewhere on the page. Vendor extraction from a logo image is a known limitation of OCR text quality, not of the regex logic -- a layout-aware model or a logo-specific step would be needed to fix this, out of Tier 2's scope."
+}

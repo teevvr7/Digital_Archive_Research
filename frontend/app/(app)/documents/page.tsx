@@ -6,6 +6,9 @@ import {
   FileText,
   FileImage,
   FileScan,
+  FileSpreadsheet,
+  Presentation,
+  Mail,
   Search,
   Upload,
   Download,
@@ -13,13 +16,15 @@ import {
   RefreshCw,
   ChevronDown,
   Loader2,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocuments, apiDownloadUrl, apiExtractMissing, apiRetryDocument, type DocumentListResponse } from "@/lib/api";
+import { apiDocuments, apiDownloadUrl, apiExtractMissing, apiRetryDocument, apiTrashDocument, apiRestoreDocument, apiEmptyTrash, type DocumentListResponse } from "@/lib/api";
 import type { Document, DocumentType, ProcessingStatus } from "@/types";
 
-const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "failed"]);
+const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "needs_review", "failed"]);
 const POLL_INTERVAL_MS = 3000;
 
 const ALL_STATUSES: ProcessingStatus[] = [
@@ -28,6 +33,7 @@ const ALL_STATUSES: ProcessingStatus[] = [
   "ocr_processing",
   "ai_extraction",
   "completed",
+  "needs_review",
   "failed",
 ];
 const ALL_TYPES: DocumentType[] = [
@@ -43,7 +49,13 @@ const ALL_TYPES: DocumentType[] = [
 function DocIcon({ doc }: { doc: Document }) {
   if (doc.mimeType.startsWith("image/"))
     return <FileImage className="w-4 h-4 text-slate-400" />;
-  if (!doc.hasTextLayer) return <FileScan className="w-4 h-4 text-slate-400" />;
+  if (doc.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return <FileSpreadsheet className="w-4 h-4 text-slate-400" />;
+  if (doc.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return <Presentation className="w-4 h-4 text-slate-400" />;
+  if (doc.mimeType === "message/rfc822") return <Mail className="w-4 h-4 text-slate-400" />;
+  if (doc.mimeType === "application/pdf" && !doc.hasTextLayer)
+    return <FileScan className="w-4 h-4 text-slate-400" />;
   return <FileText className="w-4 h-4 text-slate-400" />;
 }
 
@@ -53,6 +65,7 @@ export default function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState<DocumentType | "all">("all");
   const [sortBy, setSortBy] = useState("date_desc");
   const [page, setPage] = useState(1);
+  const [trashed, setTrashed] = useState(false);
 
   const [data, setData] = useState<DocumentListResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,11 +80,12 @@ export default function DocumentsPage() {
       q: query || undefined,
       sort: sortBy,
       page,
+      trashed: trashed || undefined,
     })
       .then((d) => { setData(d); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [statusFilter, typeFilter, sortBy, page, query]);
+  }, [statusFilter, typeFilter, sortBy, page, query, trashed]);
 
   // Silent background poll while any visible document is still processing.
   // Stops automatically once all documents reach a terminal state.
@@ -86,13 +100,14 @@ export default function DocumentsPage() {
         q: query || undefined,
         sort: sortBy,
         page,
+        trashed: trashed || undefined,
       })
         .then(setData)
         .catch(() => {}); // silent — errors shown on next user-triggered fetch
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(timerId);
-  }, [data, statusFilter, typeFilter, sortBy, page, query]);
+  }, [data, statusFilter, typeFilter, sortBy, page, query, trashed]);
 
   const docs = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -111,10 +126,44 @@ export default function DocumentsPage() {
   const handleRetry = async (doc: Document) => {
     try {
       await apiRetryDocument(doc.id);
-      // Refresh list
       setPage((p) => p);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Retry failed");
+    }
+  };
+
+  const handleTrash = async (doc: Document) => {
+    try {
+      await apiTrashDocument(doc.id);
+      // Refresh: remove from list by re-fetching
+      setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Move to trash failed");
+    }
+  };
+
+  const handleRestore = async (doc: Document) => {
+    try {
+      await apiRestoreDocument(doc.id);
+      setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Restore failed");
+    }
+  };
+
+  const [emptyingTrash, setEmptyingTrash] = useState(false);
+  const handleEmptyTrash = async () => {
+    if (!confirm("Permanently delete all trashed documents? This cannot be undone.")) return;
+    setEmptyingTrash(true);
+    try {
+      const { deleted } = await apiEmptyTrash();
+      alert(`Permanently deleted ${deleted} document${deleted !== 1 ? "s" : ""}.`);
+      setData(null);
+      setPage(1);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to empty trash");
+    } finally {
+      setEmptyingTrash(false);
     }
   };
 
@@ -136,32 +185,61 @@ export default function DocumentsPage() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Documents</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {trashed ? "Trash" : "Documents"}
+          </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {total} document{total !== 1 ? "s" : ""}
+            {trashed && " in trash"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleExtractMissing}
-            disabled={extractingMissing}
-            className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            title="Queue AI extraction for all completed documents without structured data"
+            onClick={() => { setTrashed((v) => !v); setPage(1); }}
+            className={`inline-flex items-center gap-2 border px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              trashed
+                ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                : "border-slate-300 hover:bg-slate-50 text-slate-700"
+            }`}
+            title={trashed ? "Exit trash view" : "View trash"}
           >
-            {extractingMissing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileScan className="w-4 h-4" />
-            )}
-            Extract structured data
+            <Trash2 className="w-4 h-4" />
+            {trashed ? "Exit Trash" : "Trash"}
           </button>
-          <Link
-            href="/upload"
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Upload
-          </Link>
+          {trashed && (
+            <button
+              onClick={handleEmptyTrash}
+              disabled={emptyingTrash || total === 0}
+              className="inline-flex items-center gap-2 border border-red-300 hover:bg-red-50 text-red-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {emptyingTrash ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Empty trash
+            </button>
+          )}
+          {!trashed && (
+            <>
+              <button
+                onClick={handleExtractMissing}
+                disabled={extractingMissing}
+                className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                title="Queue AI extraction for all completed documents without structured data"
+              >
+                {extractingMissing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileScan className="w-4 h-4" />
+                )}
+                Extract structured data
+              </button>
+              <Link
+                href="/upload"
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Upload
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -310,21 +388,40 @@ export default function DocumentsPage() {
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </Link>
-                        <button
-                          onClick={() => handleDownload(doc)}
-                          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                          title="Download"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                        {doc.status === "failed" && (
+                        {trashed ? (
                           <button
-                            onClick={() => handleRetry(doc)}
-                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-red-600 transition-colors"
-                            title="Retry"
+                            onClick={() => handleRestore(doc)}
+                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
+                            title="Restore"
                           >
-                            <RefreshCw className="w-3.5 h-3.5" />
+                            <RotateCcw className="w-3.5 h-3.5" />
                           </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleDownload(doc)}
+                              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                              title="Download"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            {doc.status === "failed" && (
+                              <button
+                                onClick={() => handleRetry(doc)}
+                                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-red-600 transition-colors"
+                                title="Retry"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleTrash(doc)}
+                              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
+                              title="Move to trash"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

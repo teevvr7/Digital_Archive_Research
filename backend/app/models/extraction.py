@@ -22,6 +22,7 @@ METHOD_MANUAL = "manual"
 EXTRACTION_ACCEPTED = "accepted"
 EXTRACTION_LOW_CONFIDENCE = "low_confidence"
 EXTRACTION_CORRECTED = "corrected"
+EXTRACTION_SKIPPED_BUDGET = "skipped_budget"  # tenant over its monthly LLM token cap
 
 
 class Extraction(Base):

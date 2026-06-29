@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "mike",
+    "invoiceNumber": "100",
+    "invoiceDate": "2026-04-22",
+    "dueDate": null,
+    "totalAmount": 100.0,
+    "currency": "MYR"
+  },
+  "notes": "Simple single-item digital invoice (Invoice Home template). Clean text layer, no OCR. The single line item ('books for Drax  100.00') splits across two lines in the text layer so the line-item regex (same-line only) doesn't catch it -- header fields are all correct."
+}

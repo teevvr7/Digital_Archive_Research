@@ -12,6 +12,18 @@ from typing import Any
 from app.core.camel import CamelModel
 
 
+class DocumentPatchIn(CamelModel):
+    """Editable fields on a document (Phase 3).
+
+    All fields are optional — only those explicitly sent are updated.
+    Send ``null`` to clear a field (e.g. remove a document_date).
+    """
+
+    title: str | None = None
+    document_type: str | None = None
+    document_date: datetime.date | None = None
+
+
 class DocumentOut(CamelModel):
     """A single document as the UI consumes it.
 
@@ -23,6 +35,7 @@ class DocumentOut(CamelModel):
     tenant_id: uuid.UUID
     filename: str
     original_filename: str
+    title: str
     document_type: str
     mime_type: str
     size_bytes: int
@@ -30,6 +43,7 @@ class DocumentOut(CamelModel):
     uploaded_by: str
     uploaded_at: datetime.datetime
     processed_at: datetime.datetime | None
+    document_date: datetime.date | None
     page_count: int | None
     has_text_layer: bool
     ocr_confidence: float | None
@@ -38,6 +52,8 @@ class DocumentOut(CamelModel):
     extracted_text: str | None
     tags: list[str]
     storage_key: str
+    has_thumbnail: bool
+    deleted_at: datetime.datetime | None
 
 
 class DocumentListOut(CamelModel):
@@ -47,6 +63,9 @@ class DocumentListOut(CamelModel):
     total: int
     page: int
     page_size: int
+    # Filenames skipped because their content already exists for this tenant
+    # (sha256 dedup). Only ever non-empty on the upload response.
+    duplicates: list[str] = []
 
 
 class ActivityOut(CamelModel):

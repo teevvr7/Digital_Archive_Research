@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "Zylker Thread & Weave",
+    "invoiceNumber": "INV-000002",
+    "invoiceDate": "2024-08-05",
+    "dueDate": "2024-08-05",
+    "totalAmount": 65.06,
+    "currency": "USD"
+  },
+  "notes": "Known extraction gap (documented, not silently hidden): this template has a 2-column header (Bill-To block on the left, Invoice#/Date/Terms block on the right). OCR reading order interleaves the columns row-by-row, so the customer's name ('Scott, Melba R.') lands between the 'Invoice#' label and its real value 'INV-000002' -- the regex's one-line lookahead captures 'Scott' instead. The gate's format-validity check (a real invoice number almost always has a digit) catches this and lowers the score, but the document still clears 0.75 on the strength of its other correct fields. This is exactly the class of failure Tier 3 (layout-aware models) is meant to fix -- expected to need a human correction or VLM re-run in practice, even though the gate currently accepts it."
+}

@@ -4,6 +4,7 @@ export type ProcessingStatus =
   | "ocr_processing"
   | "ai_extraction"
   | "completed"
+  | "needs_review"
   | "failed";
 
 export type DocumentType =
@@ -43,6 +44,7 @@ export interface Document {
   tenantId: string;
   filename: string;
   originalFilename: string;
+  title: string;
   documentType: DocumentType;
   mimeType: string;
   sizeBytes: number;
@@ -50,6 +52,7 @@ export interface Document {
   uploadedBy: string;
   uploadedAt: string;
   processedAt: string | null;
+  documentDate: string | null;
   pageCount: number | null;
   hasTextLayer: boolean;
   ocrConfidence: number | null;
@@ -58,6 +61,8 @@ export interface Document {
   extractedText: string | null;
   tags: string[];
   storageKey: string;
+  hasThumbnail: boolean;
+  deletedAt: string | null;
 }
 
 export interface ActivityEvent {
@@ -68,7 +73,10 @@ export interface ActivityEvent {
     | "processing_failed"
     | "search"
     | "download"
-    | "user_added";
+    | "user_added"
+    | "edit"
+    | "trash"
+    | "restore";
   documentId?: string;
   documentName?: string;
   userId: string;

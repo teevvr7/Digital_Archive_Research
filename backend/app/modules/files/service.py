@@ -1,5 +1,7 @@
 """Files module — business logic for document ingestion, retrieval, and dashboard."""
 
+import datetime
+import hashlib
 import uuid
 
 from fastapi import HTTPException, UploadFile, status
@@ -9,10 +11,18 @@ from sqlalchemy.orm import Session
 from app.core import storage as object_storage
 from app.core.config import settings
 from app.core.security import TokenData
-from app.models.activity_event import ACT_DOWNLOAD, ACT_UPLOAD, ActivityEvent
+from app.models.activity_event import (
+    ACT_DOWNLOAD,
+    ACT_EDIT,
+    ACT_RESTORE,
+    ACT_TRASH,
+    ACT_UPLOAD,
+    ActivityEvent,
+)
 from app.models.document import (
     STATUS_COMPLETED,
     STATUS_FAILED,
+    STATUS_NEEDS_REVIEW,
     STATUS_QUEUED,
     Document,
 )
@@ -25,19 +35,18 @@ from app.modules.files.schemas import (
     DashboardStats,
     DocumentListOut,
     DocumentOut,
+    DocumentPatchIn,
 )
+from app.modules.idp import mimetype
 from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
 from app.modules.search.query import apply_text_search
 
-ALLOWED_MIMES: dict[str, str] = {
-    "application/pdf": "pdf",
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/tiff": "tif",
-}
+# Sniffed-mime -> storage extension. Source of truth lives in idp/mimetype.py
+# so the worker's parser registry and the upload allow-list never drift apart.
+ALLOWED_MIMES: dict[str, str] = mimetype.ALLOWED_MIMES
 
 _PAGE_SIZE = 20
+_EXTRACT_MISSING_BATCH_LIMIT = 100
 
 
 # ---------------------------------------------------------------------------
@@ -59,12 +68,37 @@ def _names_for_ids(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str
     return {row.id: row.name for row in rows}
 
 
+def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int) -> None:
+    """Reject the batch if it would push the tenant over its storage quota.
+
+    Free-tier tripwire: checked before any storage write or DB row for the
+    batch, so a rejected upload never leaves an orphaned object or partial batch.
+    """
+    if incoming_bytes <= 0:
+        return
+    row = db.execute(
+        select(Tenant.storage_used_bytes, Tenant.storage_limit_bytes).where(Tenant.id == tenant_id)
+    ).first()
+    if row is None:
+        return
+    used, limit = int(row[0]), int(row[1])
+    if used + incoming_bytes > limit:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"Storage quota exceeded: {used} of {limit} bytes used, "
+                f"this upload needs {incoming_bytes} more."
+            ),
+        )
+
+
 def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
     return DocumentOut(
         id=doc.id,
         tenant_id=doc.tenant_id,
         filename=doc.filename,
         original_filename=doc.original_filename,
+        title=doc.title or doc.original_filename,
         document_type=doc.document_type,
         mime_type=doc.mime_type,
         size_bytes=doc.size_bytes,
@@ -72,6 +106,7 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         uploaded_by=uploader_name,
         uploaded_at=doc.uploaded_at,
         processed_at=doc.processed_at,
+        document_date=doc.document_date,
         page_count=doc.page_count,
         has_text_layer=doc.has_text_layer,
         ocr_confidence=doc.ocr_confidence,
@@ -80,6 +115,8 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         extracted_text=doc.extracted_text,
         tags=doc.tags or [],
         storage_key=doc.storage_key,
+        has_thumbnail=doc.thumbnail_key is not None,
+        deleted_at=doc.deleted_at,
     )
 
 
@@ -118,22 +155,23 @@ def create_documents(
     uploader_id = uuid.UUID(user.user_id)
     uploader_name = _user_name(db, uploader_id)
 
-    created: list[Document] = []
-    total_size = 0
-
+    # Pass 1: sniff the real type from content (never the client-declared
+    # content-type or filename — see idp/mimetype.py), validate size, and
+    # compute a checksum for every file before writing anything, so a
+    # rejection never leaves an orphaned storage object.
+    validated: list[tuple[UploadFile, str, bytes, str, str, str]] = []
     for upload, type_hint in zip(uploads, type_hints):
-        content_type = (upload.content_type or "").split(";")[0].strip()
-        ext = ALLOWED_MIMES.get(content_type)
+        data = upload.file.read()
+        sniffed = mimetype.sniff_mime(data, upload.filename)
+        ext = ALLOWED_MIMES.get(sniffed) if sniffed else None
         if ext is None:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 detail=(
-                    f"File '{upload.filename}': unsupported type '{content_type}'. "
-                    f"Allowed: {', '.join(ALLOWED_MIMES)}"
+                    f"File '{upload.filename}': unrecognized or unsupported type. "
+                    f"Allowed: {', '.join(sorted(set(ALLOWED_MIMES.values())))}"
                 ),
             )
-
-        data = upload.file.read()
         if len(data) > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -141,12 +179,45 @@ def create_documents(
                     f"File '{upload.filename}' exceeds the {settings.max_upload_mb} MB limit."
                 ),
             )
+        checksum = hashlib.sha256(data).hexdigest()
+        validated.append((upload, type_hint, data, sniffed, ext, checksum))
 
+    # Dedup against this tenant's existing documents AND within the same
+    # batch (uploading the same file twice in one request). Duplicates are
+    # skipped, not rejected — the rest of the batch still archives normally.
+    checksums = [v[5] for v in validated]
+    existing_checksums: set[str] = set()
+    if checksums:
+        rows = db.execute(
+            select(Document.checksum).where(
+                Document.tenant_id == tenant_id,
+                Document.checksum.in_(checksums),
+            )
+        ).all()
+        existing_checksums = {row[0] for row in rows}
+
+    duplicates: list[str] = []
+    deduped: list[tuple[UploadFile, str, bytes, str, str, str]] = []
+    seen_in_batch: set[str] = set()
+    for upload, type_hint, data, sniffed, ext, checksum in validated:
+        if checksum in existing_checksums or checksum in seen_in_batch:
+            duplicates.append(upload.filename or "unnamed")
+            continue
+        seen_in_batch.add(checksum)
+        deduped.append((upload, type_hint, data, sniffed, ext, checksum))
+
+    incoming_total = sum(len(data) for _, _, data, _, _, _ in deduped)
+    _check_storage_quota(db, tenant_id, incoming_total)
+
+    created: list[Document] = []
+    total_size = 0
+
+    for upload, type_hint, data, sniffed, ext, checksum in deduped:
         doc_id = uuid.uuid4()
         safe_name = upload.filename or f"document_{doc_id}.{ext}"
         storage_key = f"{tenant_id}/docs/{doc_id}.{ext}"
 
-        object_storage.upload_file(storage_key, data, content_type)
+        object_storage.upload_file(storage_key, data, sniffed)
         total_size += len(data)
 
         doc = Document(
@@ -154,9 +225,11 @@ def create_documents(
             tenant_id=tenant_id,
             filename=safe_name,
             original_filename=safe_name,
-            mime_type=content_type,
+            title=safe_name,
+            mime_type=sniffed,
             size_bytes=len(data),
             storage_key=storage_key,
+            checksum=checksum,
             status=STATUS_QUEUED,
             document_type=type_hint or "other",
             uploaded_by=uploader_id,
@@ -195,7 +268,9 @@ def create_documents(
     for doc in created:
         enqueue_document(doc.id, tenant_id)
 
-    return DocumentListOut(items=items, total=len(items), page=1, page_size=len(items))
+    return DocumentListOut(
+        items=items, total=len(items), page=1, page_size=len(items), duplicates=duplicates
+    )
 
 
 def list_documents(
@@ -206,12 +281,20 @@ def list_documents(
     q: str | None = None,
     sort: str = "date_desc",
     page: int = 1,
+    trashed: bool = False,
 ) -> DocumentListOut:
     """Return a paginated, filtered page of documents for the current tenant.
 
     RLS automatically scopes the query to the tenant set by the GUC.
+    By default only live (non-trashed) documents are returned; pass
+    ``trashed=True`` to list the trash instead.
     """
     stmt = select(Document)
+
+    if trashed:
+        stmt = stmt.where(Document.deleted_at.is_not(None))
+    else:
+        stmt = stmt.where(Document.deleted_at.is_(None))
 
     if status_filter:
         stmt = stmt.where(Document.status == status_filter)
@@ -279,6 +362,125 @@ def get_download_url(db: Session, user: TokenData, doc_id: uuid.UUID) -> str:
     return url
 
 
+def get_thumbnail_url(db: Session, doc_id: uuid.UUID) -> str:
+    """Return a signed URL for a document's thumbnail. 404 if none was generated."""
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.thumbnail_key is None:
+        raise HTTPException(status_code=404, detail="No thumbnail available for this document.")
+    return object_storage.create_signed_url(doc.thumbnail_key)
+
+
+def patch_document(
+    db: Session, user: TokenData, doc_id: uuid.UUID, patch: DocumentPatchIn
+) -> DocumentOut:
+    """Update editable metadata fields on a document.
+
+    Only fields present in the request body are written — absent fields are left
+    unchanged.  Send an explicit ``null`` to clear an optional field such as
+    ``document_date``.
+    """
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    updated_fields = patch.model_fields_set
+    if "title" in updated_fields and patch.title is not None:
+        doc.title = patch.title
+    if "document_type" in updated_fields and patch.document_type is not None:
+        doc.document_type = patch.document_type
+    if "document_date" in updated_fields:
+        doc.document_date = patch.document_date  # may be None to clear
+
+    editor_id = uuid.UUID(user.user_id)
+    db.add(ActivityEvent(
+        tenant_id=doc.tenant_id,
+        type=ACT_EDIT,
+        document_id=doc.id,
+        document_name=doc.original_filename,
+        user_id=editor_id,
+        user_name=_user_name(db, editor_id),
+    ))
+    db.flush()
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def trash_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentOut:
+    """Soft-delete a document by setting ``deleted_at``.
+
+    409 if the document is already in the trash.
+    """
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.deleted_at is not None:
+        raise HTTPException(status_code=409, detail="Document is already in the trash.")
+
+    doc.deleted_at = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    actor_id = uuid.UUID(user.user_id)
+    db.add(ActivityEvent(
+        tenant_id=doc.tenant_id,
+        type=ACT_TRASH,
+        document_id=doc.id,
+        document_name=doc.original_filename,
+        user_id=actor_id,
+        user_name=_user_name(db, actor_id),
+    ))
+    db.flush()
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def restore_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentOut:
+    """Restore a soft-deleted document by clearing ``deleted_at``.
+
+    409 if the document is not in the trash.
+    """
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.deleted_at is None:
+        raise HTTPException(status_code=409, detail="Document is not in the trash.")
+
+    doc.deleted_at = None
+
+    actor_id = uuid.UUID(user.user_id)
+    db.add(ActivityEvent(
+        tenant_id=doc.tenant_id,
+        type=ACT_RESTORE,
+        document_id=doc.id,
+        document_name=doc.original_filename,
+        user_id=actor_id,
+        user_name=_user_name(db, actor_id),
+    ))
+    db.flush()
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def empty_trash(db: Session, user: TokenData) -> int:
+    """Hard-delete all trashed documents for the current tenant.
+
+    Storage objects are deleted first; any individual storage failure is
+    swallowed so a single orphaned object can't block the whole operation.
+    Returns the number of documents permanently deleted.
+    """
+    rows = db.scalars(
+        select(Document).where(Document.deleted_at.is_not(None))
+    ).all()
+
+    for doc in rows:
+        for key in filter(None, [doc.storage_key, doc.thumbnail_key]):
+            try:
+                object_storage.delete_file(key)
+            except Exception:
+                pass
+        db.delete(doc)
+
+    db.flush()
+    return len(rows)
+
+
 def retry_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     """Reset a failed document back to queued. 400 if not in failed state."""
     doc = db.get(Document, doc_id)
@@ -312,15 +514,24 @@ def extract_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
 
 
 def extract_missing(db: Session) -> int:
-    """Enqueue VLM re-extraction for every completed doc without structured data.
+    """Enqueue VLM re-extraction for docs without structured data.
 
-    RLS scopes the query to the current tenant. Returns the count enqueued.
+    Covers both ``completed`` (extraction never attempted/ran clean) and
+    ``needs_review`` (attempted, both tiers came up empty) — the latter are
+    exactly the backlog this endpoint exists to retry. Bounded to
+    ``_EXTRACT_MISSING_BATCH_LIMIT`` per call so a large backlog can't hold
+    the request handler open enqueueing thousands of jobs in one go — call
+    again to pick up the rest. RLS scopes the query to the current tenant.
+    Returns the count enqueued.
     """
     rows = db.scalars(
-        select(Document).where(
-            Document.status == STATUS_COMPLETED,
+        select(Document)
+        .where(
+            Document.status.in_((STATUS_COMPLETED, STATUS_NEEDS_REVIEW)),
             Document.extracted_data.is_(None),
+            Document.mime_type.in_(mimetype.VLM_ELIGIBLE_MIMES),
         )
+        .limit(_EXTRACT_MISSING_BATCH_LIMIT)
     ).all()
     for doc in rows:
         enqueue_ai_extraction(doc.id, doc.tenant_id)

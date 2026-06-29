@@ -53,6 +53,8 @@ export interface DocumentListResponse {
   total: number;
   page: number;
   pageSize: number;
+  /** Filenames skipped because identical content already exists for this tenant. */
+  duplicates: string[];
 }
 
 // ---- Internal fetch helpers ----------------------------------------------
@@ -78,6 +80,24 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`POST ${path} → ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
+async function patch_<T>(path: string, body?: unknown): Promise<T> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`PATCH ${path} → ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
+async function delete_<T>(path: string): Promise<T> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 }
 
@@ -114,6 +134,7 @@ export type DocumentsQuery = {
   sort?: string;
   q?: string;
   page?: number;
+  trashed?: boolean;
 };
 
 export const apiDocuments = (query: DocumentsQuery = {}) => {
@@ -133,6 +154,10 @@ export const apiDocument = (id: string) => get<Document>(`/documents/${id}`);
 export const apiDownloadUrl = (id: string) =>
   get<{ url: string }>(`/documents/${id}/download`);
 
+/** Returns a short-lived signed thumbnail URL. Rejects with 404 if none was generated. */
+export const apiThumbnailUrl = (id: string) =>
+  get<{ url: string }>(`/documents/${id}/thumbnail`);
+
 export const apiUploadDocument = (form: FormData) =>
   postForm<DocumentListResponse>("/documents", form);
 
@@ -144,6 +169,24 @@ export const apiExtractDocument = (id: string) =>
 
 export const apiExtractMissing = () =>
   post<{ enqueued: number }>("/documents/extract-missing");
+
+export type DocumentPatch = {
+  title?: string;
+  documentType?: string;
+  documentDate?: string | null;
+};
+
+export const apiPatchDocument = (id: string, patch: DocumentPatch) =>
+  patch_<Document>(`/documents/${id}`, patch);
+
+export const apiTrashDocument = (id: string) =>
+  delete_<Document>(`/documents/${id}`);
+
+export const apiRestoreDocument = (id: string) =>
+  post<Document>(`/documents/${id}/restore`);
+
+export const apiEmptyTrash = () =>
+  post<{ deleted: number }>("/documents/empty-trash");
 
 // ---- Search (Milestone D) ------------------------------------------------
 

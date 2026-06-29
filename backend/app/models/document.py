@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -27,6 +28,12 @@ STATUS_OCR = "ocr_processing"
 STATUS_AI = "ai_extraction"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
+# Pipeline finished (text/thumbnail/search all populated) but structured
+# extraction was attempted (content looked invoice/receipt-like) and NEITHER
+# the deterministic gate nor the VLM fallback produced an accepted result.
+# Never set for documents where structured extraction was never attempted
+# (e.g. contracts/letters/office files) — those are simply `completed`.
+STATUS_NEEDS_REVIEW = "needs_review"
 
 
 class Document(Base):
@@ -79,6 +86,17 @@ class Document(Base):
     # Organisation
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     search_tsv: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
+
+    # Universal ingestion baseline (Phase 1) — every file gets these regardless of type.
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    document_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    thumbnail_key: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Soft-delete / trash (Phase 3): NULL = live, non-NULL = in trash
+    deleted_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Ownership / timing
     uploaded_by: Mapped[uuid.UUID] = mapped_column(

@@ -1,6 +1,7 @@
 """SQLAlchemy models. Importing this package registers every table on Base.metadata."""
 
 from app.models.activity_event import ActivityEvent
+from app.models.ai_usage import AiUsage
 from app.models.api_key import ApiKey
 from app.models.base import Base
 from app.models.document import Document
@@ -22,4 +23,5 @@ __all__ = [
     "ProcessingJob",
     "ActivityEvent",
     "ApiKey",
+    "AiUsage",
 ]

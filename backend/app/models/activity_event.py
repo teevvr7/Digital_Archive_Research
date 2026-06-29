@@ -15,6 +15,9 @@ ACT_PROCESSING_FAILED = "processing_failed"
 ACT_SEARCH = "search"
 ACT_DOWNLOAD = "download"
 ACT_USER_ADDED = "user_added"
+ACT_EDIT = "edit"
+ACT_TRASH = "trash"
+ACT_RESTORE = "restore"
 
 
 class ActivityEvent(Base):

@@ -47,3 +47,7 @@ Thumbs.db
 *.pem
 .idea/
 .vscode/
+
+# ---- Local manual test scratch ----
+frontend/test_upload.mjs
+test_document/
