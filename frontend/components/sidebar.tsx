@@ -11,6 +11,8 @@ import {
   Archive,
   LogOut,
   Bell,
+  Tag,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
@@ -20,6 +22,11 @@ const NAV_ITEMS = [
   { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/upload", label: "Upload", icon: Upload },
   { href: "/search", label: "Search", icon: Search },
+];
+
+const ORG_ITEMS = [
+  { href: "/tags", label: "Tags", icon: Tag },
+  { href: "/correspondents", label: "Correspondents", icon: Users },
 ];
 
 export function Sidebar() {
@@ -72,6 +79,25 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        <div className="pt-4 border-t border-slate-700 mt-4 space-y-1">
+          <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Organize</p>
+          {ORG_ITEMS.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                  active ? "active" : ""
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
 
         <div className="pt-4 border-t border-slate-700 mt-4">
           <Link

@@ -12,6 +12,21 @@ from typing import Any
 from app.core.camel import CamelModel
 
 
+class TagOut(CamelModel):
+    """A tag as embedded in document responses (id + display fields only)."""
+
+    id: uuid.UUID
+    name: str
+    color: str
+
+
+class CorrespondentOut(CamelModel):
+    """A correspondent as embedded in document responses."""
+
+    id: uuid.UUID
+    name: str
+
+
 class DocumentPatchIn(CamelModel):
     """Editable fields on a document (Phase 3).
 
@@ -50,7 +65,8 @@ class DocumentOut(CamelModel):
     confidence: float | None
     extracted_data: dict[str, Any] | None
     extracted_text: str | None
-    tags: list[str]
+    tags: list[TagOut]
+    correspondent: CorrespondentOut | None
     storage_key: str
     has_thumbnail: bool
     deleted_at: datetime.datetime | None

@@ -21,6 +21,7 @@ import {
   Pencil,
   X,
   Save,
+  Plus,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
@@ -32,9 +33,12 @@ import {
   apiPatchDocument,
   apiTrashDocument,
   apiRestoreDocument,
+  apiTags,
+  apiAssignTag,
+  apiUnassignTag,
   type DocumentPatch,
 } from "@/lib/api";
-import type { Document, DocumentType } from "@/types";
+import type { Document, DocumentType, Tag } from "@/types";
 
 const NON_RENDERABLE_MIMES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -132,6 +136,14 @@ export default function DocumentViewerPage({
     documentDate: string;
   }>({ title: "", documentType: "other", documentDate: "" });
   const [saving, setSaving] = useState(false);
+
+  // Tag management state
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+
+  useEffect(() => {
+    apiTags().then(setAllTags).catch(() => {});
+  }, []);
 
   useEffect(() => {
     apiDocument(id)
@@ -262,6 +274,29 @@ export default function DocumentViewerPage({
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Restore failed");
+    }
+  };
+
+  const handleAssignTag = async (tagId: string) => {
+    if (!doc) return;
+    try {
+      await apiAssignTag(doc.id, tagId);
+      const refreshed = await apiDocument(doc.id);
+      setDoc(refreshed);
+      setShowTagPicker(false);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to assign tag");
+    }
+  };
+
+  const handleUnassignTag = async (tagId: string) => {
+    if (!doc) return;
+    try {
+      await apiUnassignTag(doc.id, tagId);
+      const refreshed = await apiDocument(doc.id);
+      setDoc(refreshed);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to remove tag");
     }
   };
 
@@ -671,7 +706,7 @@ export default function DocumentViewerPage({
                           ? new Date(doc.deletedAt).toLocaleString("en-MY")
                           : "—",
                       ],
-                      ["Tags", doc.tags.join(", ") || "—"],
+                      ["Correspondent", doc.correspondent?.name ?? "—"],
                       ["Storage key", doc.storageKey],
                     ].map(([label, val]) => (
                       <div
@@ -723,18 +758,53 @@ export default function DocumentViewerPage({
           {/* Tags footer */}
           <div className="px-4 py-3 border-t border-slate-100 flex-shrink-0">
             <p className="text-xs text-slate-400 mb-2">Tags</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 relative">
               {doc.tags.map((tag) => (
                 <span
-                  key={tag}
-                  className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs"
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                  style={{ background: tag.color + "22", color: tag.color }}
                 >
-                  {tag}
+                  {tag.name}
+                  <button
+                    onClick={() => handleUnassignTag(tag.id)}
+                    className="opacity-60 hover:opacity-100"
+                    title="Remove tag"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
                 </span>
               ))}
-              <button className="px-2 py-0.5 border border-dashed border-slate-300 text-slate-400 rounded text-xs hover:border-blue-400 hover:text-blue-600 transition-colors">
-                + Add tag
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowTagPicker((v) => !v)}
+                  className="px-2 py-0.5 border border-dashed border-slate-300 text-slate-400 rounded text-xs hover:border-blue-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add
+                </button>
+                {showTagPicker && allTags.length > 0 && (
+                  <div className="absolute bottom-full mb-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10 min-w-32 max-h-40 overflow-y-auto">
+                    {allTags
+                      .filter((t) => !doc.tags.some((dt) => dt.id === t.id))
+                      .map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => handleAssignTag(t.id)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs text-left"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: t.color }}
+                          />
+                          {t.name}
+                        </button>
+                      ))}
+                    {allTags.filter((t) => !doc.tags.some((dt) => dt.id === t.id)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-slate-400">All tags assigned</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

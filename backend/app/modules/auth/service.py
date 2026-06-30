@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.security import TokenData
+from app.core.tenant_context import set_tenant
 from app.models.tenant import Tenant
 from app.models.user import User
 
@@ -52,7 +53,9 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             # ---- Brand-new user: create tenant + sync app_metadata ----
             tenant = Tenant(name=_derive_tenant_name(token.email), plan="starter")
             db.add(tenant)
-            db.flush()  # get tenant.id before inserting user
+            db.flush()  # materialise tenant.id (Python-side uuid4 default)
+            # Set GUC so the INSERT passes the tenants + users RLS WITH CHECK.
+            set_tenant(db, str(tenant.id))
 
             # Update Supabase app_metadata so the JWT on next refresh has tenant_id + role.
             _supabase_admin().auth.admin.update_user_by_id(
@@ -63,6 +66,8 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             token.role = "admin"
         else:
             # Tenant already exists — fetch it (no RLS; direct by id).
+            # Set GUC first so SELECT + any INSERT both pass RLS.
+            set_tenant(db, token.tenant_id)
             tenant = db.get(Tenant, uuid.UUID(token.tenant_id))
             if tenant is None:
                 # Edge case: app_metadata set but tenant row missing (e.g. manual cleanup).
@@ -92,10 +97,14 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
             user.role = token.role  # keep in sync with app_metadata
 
+        # Capture the tenant id before commit — SQLAlchemy expires all attributes
+        # on commit, so accessing tenant.id after commit would re-query without
+        # the GUC and hit the RLS guard.
+        final_tenant_id = str(tenant.id)
         db.commit()
-        # Refresh both objects while session is still open so all column
-        # attributes are loaded into memory. They survive session.close()
-        # without triggering DetachedInstanceError in the router.
+        # Re-apply GUC: the transaction-local GUC reset at commit, so refresh
+        # SELECTs below need it set again to pass RLS.
+        set_tenant(db, final_tenant_id)
         db.refresh(user)
         db.refresh(tenant)
         return user, tenant

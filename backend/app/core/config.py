@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     llm_monthly_token_cap_default: int = 2_000_000
 
     # ---- App ----
-    cors_allow_origins: str = "http://localhost:3000"
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://[::1]:3000"
     sentry_dsn: str = ""
     env: str = "development"
 

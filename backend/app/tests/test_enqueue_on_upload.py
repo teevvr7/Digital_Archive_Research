@@ -68,6 +68,7 @@ def _dummy_doc_out():
         extracted_data=None,
         extracted_text=None,
         tags=[],
+        correspondent=None,
         storage_key="tenant/docs/id.pdf",
         has_thumbnail=False,
         deleted_at=None,

@@ -29,13 +29,17 @@ from app.models.document import (
 from app.models.processing_job import JOB_QUEUED, ProcessingJob
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.correspondent import Correspondent
+from app.models.tag import DocumentTag, Tag
 from app.modules.files.schemas import (
     ActivityOut,
+    CorrespondentOut,
     DashboardOut,
     DashboardStats,
     DocumentListOut,
     DocumentOut,
     DocumentPatchIn,
+    TagOut,
 )
 from app.modules.idp import mimetype
 from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
@@ -68,6 +72,39 @@ def _names_for_ids(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str
     return {row.id: row.name for row in rows}
 
 
+def _fetch_tags_for_docs(
+    db: Session, doc_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[TagOut]]:
+    """Batch-fetch tag assignments for a list of doc IDs (single query, no N+1)."""
+    if not doc_ids:
+        return {}
+    rows = db.execute(
+        select(DocumentTag.document_id, Tag.id, Tag.name, Tag.color)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .where(DocumentTag.document_id.in_(doc_ids))
+    ).all()
+    result: dict[uuid.UUID, list[TagOut]] = {}
+    for row in rows:
+        result.setdefault(row.document_id, []).append(
+            TagOut(id=row.id, name=row.name, color=row.color)
+        )
+    return result
+
+
+def _fetch_correspondents_for_ids(
+    db: Session, correspondent_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, CorrespondentOut]:
+    """Batch-fetch correspondents by id (single query)."""
+    if not correspondent_ids:
+        return {}
+    rows = db.execute(
+        select(Correspondent.id, Correspondent.name).where(
+            Correspondent.id.in_(correspondent_ids)
+        )
+    ).all()
+    return {row.id: CorrespondentOut(id=row.id, name=row.name) for row in rows}
+
+
 def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int) -> None:
     """Reject the batch if it would push the tenant over its storage quota.
 
@@ -92,7 +129,12 @@ def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int)
         )
 
 
-def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
+def _doc_to_out(
+    doc: Document,
+    uploader_name: str,
+    tags: list[TagOut] | None = None,
+    correspondent: CorrespondentOut | None = None,
+) -> DocumentOut:
     return DocumentOut(
         id=doc.id,
         tenant_id=doc.tenant_id,
@@ -113,7 +155,8 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         confidence=doc.confidence,
         extracted_data=doc.extracted_data,
         extracted_text=doc.extracted_text,
-        tags=doc.tags or [],
+        tags=tags or [],
+        correspondent=correspondent,
         storage_key=doc.storage_key,
         has_thumbnail=doc.thumbnail_key is not None,
         deleted_at=doc.deleted_at,
@@ -278,6 +321,7 @@ def list_documents(
     *,
     status_filter: str | None = None,
     type_filter: str | None = None,
+    tag_id: uuid.UUID | None = None,
     q: str | None = None,
     sort: str = "date_desc",
     page: int = 1,
@@ -300,6 +344,10 @@ def list_documents(
         stmt = stmt.where(Document.status == status_filter)
     if type_filter:
         stmt = stmt.where(Document.document_type == type_filter)
+    if tag_id is not None:
+        stmt = stmt.join(DocumentTag, DocumentTag.document_id == Document.id).where(
+            DocumentTag.tag_id == tag_id
+        )
 
     # When a query is present, match on full-text content OR fuzzy filename
     # (shared with /search so ranking is identical). Otherwise plain browse.
@@ -328,7 +376,20 @@ def list_documents(
     rows = db.scalars(stmt.offset(offset).limit(_PAGE_SIZE)).all()
 
     names = _names_for_ids(db, {doc.uploaded_by for doc in rows})
-    items = [_doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by))) for doc in rows]
+    doc_ids = [doc.id for doc in rows]
+    tags_by_doc = _fetch_tags_for_docs(db, doc_ids)
+    corresp_ids = {doc.correspondent_id for doc in rows if doc.correspondent_id}
+    corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
+
+    items = [
+        _doc_to_out(
+            doc,
+            names.get(doc.uploaded_by, str(doc.uploaded_by)),
+            tags=tags_by_doc.get(doc.id, []),
+            correspondent=corresp_by_id.get(doc.correspondent_id) if doc.correspondent_id else None,
+        )
+        for doc in rows
+    ]
 
     return DocumentListOut(items=items, total=total, page=page, page_size=_PAGE_SIZE)
 
@@ -338,7 +399,12 @@ def get_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     doc = db.get(Document, doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found.")
-    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+    tags_map = _fetch_tags_for_docs(db, [doc_id])
+    corresp: CorrespondentOut | None = None
+    if doc.correspondent_id:
+        corresp_map = _fetch_correspondents_for_ids(db, {doc.correspondent_id})
+        corresp = corresp_map.get(doc.correspondent_id)
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by), tags=tags_map.get(doc_id, []), correspondent=corresp)
 
 
 def get_download_url(db: Session, user: TokenData, doc_id: uuid.UUID) -> str:
@@ -403,7 +469,12 @@ def patch_document(
         user_name=_user_name(db, editor_id),
     ))
     db.flush()
-    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+    tags_map = _fetch_tags_for_docs(db, [doc.id])
+    corresp: CorrespondentOut | None = None
+    if doc.correspondent_id:
+        corresp_map = _fetch_correspondents_for_ids(db, {doc.correspondent_id})
+        corresp = corresp_map.get(doc.correspondent_id)
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by), tags=tags_map.get(doc.id, []), correspondent=corresp)
 
 
 def trash_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentOut:
@@ -429,7 +500,7 @@ def trash_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentO
         user_name=_user_name(db, actor_id),
     ))
     db.flush()
-    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))  # no tag refresh needed for trash
 
 
 def restore_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentOut:

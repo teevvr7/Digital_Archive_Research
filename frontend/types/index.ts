@@ -1,3 +1,25 @@
+export interface Tag {
+  id: string;
+  tenantId: string;
+  name: string;
+  color: string;
+  match: string;
+  matchingAlgorithm: string;
+  isInsensitive: boolean;
+  isInboxTag: boolean;
+  createdAt: string;
+}
+
+export interface Correspondent {
+  id: string;
+  tenantId: string;
+  name: string;
+  match: string;
+  matchingAlgorithm: string;
+  isInsensitive: boolean;
+  createdAt: string;
+}
+
 export type ProcessingStatus =
   | "queued"
   | "extracting_text"
@@ -59,7 +81,8 @@ export interface Document {
   confidence: number | null;
   extractedData: Record<string, unknown> | null;
   extractedText: string | null;
-  tags: string[];
+  tags: { id: string; name: string; color: string }[];
+  correspondent: { id: string; name: string } | null;
   storageKey: string;
   hasThumbnail: boolean;
   deletedAt: string | null;

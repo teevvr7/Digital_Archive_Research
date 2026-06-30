@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Document, ActivityEvent, SearchListResponse } from "@/types";
+import type { Correspondent, Document, ActivityEvent, SearchListResponse, Tag } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8001/api";
 
@@ -131,6 +131,7 @@ export const apiDashboard = () => get<DashboardResponse>("/dashboard");
 export type DocumentsQuery = {
   status?: string;
   type?: string;
+  tag_id?: string;
   sort?: string;
   q?: string;
   page?: number;
@@ -214,3 +215,44 @@ export const apiSearch = (query: SearchQuery) => {
 export const apiOrganisation = () => get<unknown>("/settings/organisation");
 export const apiUsers = () => get<unknown>("/settings/users");
 export const apiApiKeys = () => get<unknown>("/settings/api-keys");
+
+// ---- Tags (Phase 4) -------------------------------------------------------
+
+export type TagCreateInput = {
+  name: string;
+  color?: string;
+  match?: string;
+  matchingAlgorithm?: string;
+  isInsensitive?: boolean;
+  isInboxTag?: boolean;
+};
+
+export const apiTags = () => get<Tag[]>("/tags");
+export const apiCreateTag = (data: TagCreateInput) => post<Tag>("/tags", data);
+export const apiPatchTag = (id: string, data: Partial<TagCreateInput>) =>
+  patch_<Tag>(`/tags/${id}`, data);
+export const apiDeleteTag = (id: string) => delete_<void>(`/tags/${id}`);
+
+export const apiAssignTag = (docId: string, tagId: string) =>
+  post<void>(`/documents/${docId}/tags/${tagId}`);
+export const apiUnassignTag = (docId: string, tagId: string) =>
+  delete_<void>(`/documents/${docId}/tags/${tagId}`);
+
+// ---- Correspondents (Phase 4) --------------------------------------------
+
+export type CorrespondentCreateInput = {
+  name: string;
+  match?: string;
+  matchingAlgorithm?: string;
+  isInsensitive?: boolean;
+};
+
+export const apiCorrespondents = () => get<Correspondent[]>("/correspondents");
+export const apiCreateCorrespondent = (data: CorrespondentCreateInput) =>
+  post<Correspondent>("/correspondents", data);
+export const apiPatchCorrespondent = (
+  id: string,
+  data: Partial<CorrespondentCreateInput>
+) => patch_<Correspondent>(`/correspondents/${id}`, data);
+export const apiDeleteCorrespondent = (id: string) =>
+  delete_<void>(`/correspondents/${id}`);

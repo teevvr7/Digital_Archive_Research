@@ -59,6 +59,7 @@ def _make_doc(
     doc.extracted_data = None
     doc.extracted_text = None
     doc.tags = []
+    doc.correspondent_id = None
     doc.storage_key = "tenant/docs/test.pdf"
     doc.thumbnail_key = thumbnail_key
     doc.deleted_at = deleted_at

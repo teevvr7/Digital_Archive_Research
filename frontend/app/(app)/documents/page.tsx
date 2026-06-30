@@ -18,11 +18,12 @@ import {
   Loader2,
   Trash2,
   RotateCcw,
+  Tag as TagIcon,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocuments, apiDownloadUrl, apiExtractMissing, apiRetryDocument, apiTrashDocument, apiRestoreDocument, apiEmptyTrash, type DocumentListResponse } from "@/lib/api";
-import type { Document, DocumentType, ProcessingStatus } from "@/types";
+import { apiDocuments, apiDownloadUrl, apiExtractMissing, apiRetryDocument, apiTrashDocument, apiRestoreDocument, apiEmptyTrash, apiTags, type DocumentListResponse } from "@/lib/api";
+import type { Document, DocumentType, ProcessingStatus, Tag } from "@/types";
 
 const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "needs_review", "failed"]);
 const POLL_INTERVAL_MS = 3000;
@@ -63,6 +64,7 @@ export default function DocumentsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProcessingStatus | "all">("all");
   const [typeFilter, setTypeFilter] = useState<DocumentType | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState("date_desc");
   const [page, setPage] = useState(1);
   const [trashed, setTrashed] = useState(false);
@@ -70,6 +72,11 @@ export default function DocumentsPage() {
   const [data, setData] = useState<DocumentListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+
+  useEffect(() => {
+    apiTags().then(setAllTags).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -77,6 +84,7 @@ export default function DocumentsPage() {
     apiDocuments({
       status: statusFilter === "all" ? undefined : statusFilter,
       type: typeFilter === "all" ? undefined : typeFilter,
+      tag_id: tagFilter !== "all" ? tagFilter : undefined,
       q: query || undefined,
       sort: sortBy,
       page,
@@ -85,7 +93,7 @@ export default function DocumentsPage() {
       .then((d) => { setData(d); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [statusFilter, typeFilter, sortBy, page, query, trashed]);
+  }, [statusFilter, typeFilter, tagFilter, sortBy, page, query, trashed]);
 
   // Silent background poll while any visible document is still processing.
   // Stops automatically once all documents reach a terminal state.
@@ -97,6 +105,7 @@ export default function DocumentsPage() {
       apiDocuments({
         status: statusFilter === "all" ? undefined : statusFilter,
         type: typeFilter === "all" ? undefined : typeFilter,
+        tag_id: tagFilter !== "all" ? tagFilter : undefined,
         q: query || undefined,
         sort: sortBy,
         page,
@@ -107,7 +116,7 @@ export default function DocumentsPage() {
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(timerId);
-  }, [data, statusFilter, typeFilter, sortBy, page, query, trashed]);
+  }, [data, statusFilter, typeFilter, tagFilter, sortBy, page, query, trashed]);
 
   const docs = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -287,6 +296,23 @@ export default function DocumentsPage() {
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
         </div>
 
+        {allTags.length > 0 && (
+          <div className="relative">
+            <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <select
+              value={tagFilter}
+              onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
+              className="appearance-none pl-8 pr-8 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white cursor-pointer"
+            >
+              <option value="all">All Tags</option>
+              {allTags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          </div>
+        )}
+
         <div className="relative">
           <select
             value={sortBy}
@@ -353,8 +379,12 @@ export default function DocumentsPage() {
                           </Link>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {doc.tags.slice(0, 3).map((tag) => (
-                              <span key={tag} className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-xs">
-                                {tag}
+                              <span
+                                key={tag.id}
+                                className="px-1.5 py-0.5 rounded text-xs font-medium"
+                                style={{ background: tag.color + "22", color: tag.color }}
+                              >
+                                {tag.name}
                               </span>
                             ))}
                           </div>

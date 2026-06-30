@@ -298,6 +298,13 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             doc.status = STATUS_NEEDS_REVIEW if needs_review else STATUS_COMPLETED
             doc.processed_at = now
 
+            # Auto-tag + auto-link correspondent (deterministic, never raises).
+            try:
+                from app.modules.tags.matching import run_document_matching
+                run_document_matching(db, doc, result.text or "")
+            except Exception as _exc:
+                logger.warning("Auto-matching crashed (doc=%s): %s", doc_id, _exc)
+
             duration_ms = int((time.perf_counter() - t_start) * 1000)
             job.status = JOB_COMPLETED
             job.stage = None

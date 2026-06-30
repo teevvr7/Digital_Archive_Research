@@ -93,6 +93,11 @@ class Document(Base):
     document_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     thumbnail_key: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Organisation (Phase 4)
+    correspondent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("correspondents.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Soft-delete / trash (Phase 3): NULL = live, non-NULL = in trash
     deleted_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

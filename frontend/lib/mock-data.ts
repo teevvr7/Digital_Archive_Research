@@ -96,7 +96,8 @@ export const mockDocuments: Document[] = [
       ],
     },
     extractedText: null,
-    tags: ["utilities", "may-2026", "tnb"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_001.pdf",
   },
   {
@@ -129,7 +130,8 @@ export const mockDocuments: Document[] = [
       currency: "MYR",
     },
     extractedText: null,
-    tags: ["contract", "vendor", "2026"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_002.pdf",
   },
   {
@@ -161,7 +163,8 @@ export const mockDocuments: Document[] = [
       duration: "2.5 hours",
     },
     extractedText: null,
-    tags: ["receipt", "parking", "june-2026"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_003.jpg",
   },
   {
@@ -186,7 +189,8 @@ export const mockDocuments: Document[] = [
     confidence: null,
     extractedData: null,
     extractedText: null,
-    tags: ["report", "finance", "q1-2026"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_004.pdf",
   },
   {
@@ -211,7 +215,8 @@ export const mockDocuments: Document[] = [
     confidence: null,
     extractedData: null,
     extractedText: null,
-    tags: ["utilities", "telekom"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_005.pdf",
   },
   {
@@ -236,7 +241,8 @@ export const mockDocuments: Document[] = [
     confidence: null,
     extractedData: null,
     extractedText: null,
-    tags: ["hrdf", "levy", "q1-2026"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_006.pdf",
   },
   {
@@ -261,7 +267,8 @@ export const mockDocuments: Document[] = [
     confidence: null,
     extractedData: null,
     extractedText: null,
-    tags: ["fuel", "petronas"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_007.pdf",
   },
   {
@@ -286,7 +293,8 @@ export const mockDocuments: Document[] = [
     confidence: null,
     extractedData: null,
     extractedText: null,
-    tags: ["lhdn", "tax"],
+    tags: [],
+    correspondent: null,
     storageKey: "tenant_01/docs/doc_008.pdf",
   },
 ];
