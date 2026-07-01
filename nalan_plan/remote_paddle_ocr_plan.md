@@ -1,262 +1,426 @@
-# Plan: Decoupling PaddleOCR-VL Client Orchestration to Lightning AI
+# Plan: Decoupling PaddleOCR-VL & Qwen Orchestration to a Unified Remote GPU Endpoint (Option A)
 
-This plan outlines the architecture and implementation details for offloading the `paddleocr` library orchestration entirely to a remote GPU environment (e.g., your Lightning AI Studio). This eliminates the need to install or run compile-heavy machine learning libraries (`paddlepaddle`, `paddleocr`, PyTorch, CUDA, etc.) on local developer workstations or lightweight backend containers.
+This plan details **Option A (Unified Remote Execution - Single Round-Trip)**, which shifts the entire IDP strategy pipeline (image rasterization, OCR layout extraction, text cleaning, Qwen LLM extraction, and mathematical validation) to the remote Lightning AI GPU space.
 
 ---
 
 ## 1. Architecture Overview
 
-### Current Architecture
-Currently, the local python backend requires importing `paddleocr` to instantiate the `PaddleOCRVL` class, which manages formatting images and calling the remote model.
+### Option A (Single Round-Trip)
+Instead of back-and-forth network uploads, the local machine performs a single request. All computation, orchestration, and local GPU loopbacks are handled on the server.
+
 ```mermaid
 graph TD
     subgraph Local Machine
-        Worker[RQ Worker / Backend] -- Imports paddleocr --Locally--> Client[PaddleOCRVL Client]
+        Backend[Local Backend / RQ Worker] -- 1. Uploads File + Schema + Prompt --> RemoteServer[FastAPI microservice]
+        Backend <-- 4. Returns Final Validated JSON -- RemoteServer
     end
     subgraph Remote Lightning AI GPU
-        Client -- HTTP API Request --> VLLM[vLLM Model Server]
+        RemoteServer -- 2. Runs OCR on GPU --> Paddle[PaddleOCRVL Pipeline]
+        RemoteServer -- Cleans text & formats prompts --> RemoteServer
+        RemoteServer -- 3. Runs LLM extraction via localhost --> Qwen[Qwen vLLM Server]
     end
 ```
 
-### Proposed Target Architecture
-The entire orchestration moves to a lightweight API wrapper running directly on the GPU machine. The local backend only needs standard HTTP client calls.
-```mermaid
-graph TD
-    subgraph Local Machine
-        Worker[RQ Worker / Backend] -- Standard HTTP POST --> ClientRemote[HTTP API Client]
-    end
-    subgraph Remote Lightning AI GPU
-        Wrapper[FastAPI Wrapper on GPU] -- Imports paddleocr locally --> Pipeline[PaddleOCRVL Pipeline]
-        Pipeline -- Internal vLLM Request --> VLLM[vLLM Model Server]
-    end
-```
+### Key Benefits
+1. **Latency Reduction**: Cuts network round-trips from $N+1$ (for $N$-page PDFs) down to exactly **1** unified POST request.
+2. **Bandwidth Savings**: The document file is uploaded only once. 
+3. **No Local Dependencies**: Zero machine learning packages (`paddlepaddle`, `paddleocr`, `torch`, `cuda`, `fitz`) are required on developers' local machines.
+4. **Offloaded Computation**: Even CPU-heavy PDF page rasterization and text cleaning are offloaded to the GPU server.
 
 ---
 
-## 2. Remote Component: FastAPI Service on Lightning AI
+## 2. Remote Component: `remote_paddle_server.py`
 
-We will deploy a standalone, lightweight FastAPI microservice on the Lightning AI GPU environment. It will accept the uploaded image, execute `PaddleOCRVL` locally (on the GPU), and return clean OCR texts.
-
-### File: `remote_paddle_server.py`
-This file will be uploaded and run on your Lightning AI Studio:
+This standalone FastAPI microservice runs on the Lightning AI GPU space. It receives the document file, handles page rasterization (if PDF), extracts text, runs the Qwen extraction, validates results, and returns schema JSON.
 
 ```python
+# remote_paddle_server.py
 import os
+import re
+import json
 import tempfile
 import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from typing import Dict, Any, Tuple
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from bs4 import BeautifulSoup
+from openai import OpenAI
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("remote-paddle-ocr")
+logger = logging.getLogger("remote-idp-orchestrator")
 
 app = FastAPI(
-    title="Remote PaddleOCR-VL API", 
-    description="Exposes PaddleOCRVL layout parsing as an API"
+    title="Remote Paddle-Qwen IDP Orchestrator", 
+    description="Unified API doing both OCR and LLM extraction on GPU"
 )
 
-# Pipeline lazy load to allow server to boot instantly
-pipeline = None
+# Configuration settings (can be overridden via environment variables)
+QWEN_LLM_URL = os.environ.get("QWEN_LLM_URL", "http://localhost:8001/v1")
+QWEN_LLM_MODEL = os.environ.get("QWEN_LLM_MODEL", "Qwen2.5-1.5B")
+PADDLE_OCR_MODEL = os.environ.get("PADDLE_OCR_MODEL", "PaddlePaddle/PaddleOCR-VL")
+VLM_MAX_PAGES = int(os.environ.get("VLM_MAX_PAGES", "3"))
 
-def get_pipeline():
-    global pipeline
-    if pipeline is None:
+# Lazy loaded singleton
+_paddle_pipeline = None
+
+def get_paddle_pipeline():
+    global _paddle_pipeline
+    if _paddle_pipeline is None:
         from paddleocr import PaddleOCRVL
-        logger.info("Initializing PaddleOCRVL pipeline on GPU...")
-        pipeline = PaddleOCRVL(
+        logger.info("Initializing PaddleOCRVL (Model: %s)", PADDLE_OCR_MODEL)
+        _paddle_pipeline = PaddleOCRVL(
             vl_rec_backend="vllm-server",
-            vl_rec_server_url="http://localhost:8000/v1",  # Local port inside Lightning Studio
-            vl_rec_api_model_name="PaddlePaddle/PaddleOCR-VL"
+            vl_rec_server_url="http://localhost:8000/v1",  # Local port on Lightning AI Studio
+            vl_rec_api_model_name=PADDLE_OCR_MODEL
         )
-        logger.info("PaddleOCRVL pipeline successfully initialized.")
-    return pipeline
+    return _paddle_pipeline
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "message": "Remote PaddleOCR-VL microservice is ready"}
+# --- Helper Utilities ---
 
-@app.post("/v1/predict")
-async def predict(file: UploadFile = File(...)):
-    """Receives document image, runs OCR parsing on GPU, and returns layout text."""
-    logger.info("Received prediction request for file: %s", file.filename)
-    
-    # Save the uploaded file to a temporary location
-    suffix = os.path.splitext(file.filename)[1]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+def html_table_to_markdown(html_content: str) -> str:
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        tables = soup.find_all('table')
+        markdown_tables = []
+        for table in tables:
+            rows = table.find_all('tr')
+            if not rows: continue
+            md_rows = []
+            for i, row in enumerate(rows):
+                cols = row.find_all(['td', 'th'])
+                cols_text = [c.get_text(strip=True) for c in cols]
+                md_rows.append("| " + " | ".join(cols_text) + " |")
+                if i == 0:
+                    md_rows.append("| " + " | ".join(["---"] * len(cols)) + " |")
+            markdown_tables.append("\n".join(md_rows))
+        return "\n\n".join(markdown_tables) if markdown_tables else html_content
+    except Exception as e:
+        logger.warning("Failed to convert table: %s", e)
+        return html_content
+
+def clean_ocr_text(text: str) -> str:
+    text = re.sub(r'<img[^>]*>', '', text)
+    def table_replacer(match):
+        return html_table_to_markdown(match.group(0))
+    cleaned_text = re.sub(r'<table>.*?</table>', table_replacer, text, flags=re.DOTALL)
+    cleaned_text = re.sub(r'\n\s*\n', '\n\n', cleaned_text)
+    return cleaned_text.strip()
+
+def attempt_json_recovery(truncated_json_str: str) -> Dict[str, Any]:
+    temp_str = truncated_json_str.strip()
+    for _ in range(5):
         try:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = tmp.name
-        except Exception as e:
-            logger.error("Failed to write uploaded file: %s", e)
-            raise HTTPException(status_code=400, detail=f"Failed to process upload: {e}")
+            return json.loads(temp_str)
+        except json.JSONDecodeError:
+            if temp_str.endswith('"'): temp_str += ' }'
+            elif temp_str.endswith(','): temp_str = temp_str[:-1] + ' }'
+            else: temp_str += ' }'
+    return {"requires_human_review": True, "error": "JSON Truncated"}
+
+def validate_extraction(data: Dict[str, Any]) -> Dict[str, Any]:
+    # Ensure standard schema structure is present
+    defaults = {
+        "document_details": {}, "vendor_details": {}, "client_details": {},
+        "line_items": [], "financials": {}, "requires_human_review": False,
+        "validation_errors": []
+    }
+    for key, value in defaults.items():
+        if key not in data:
+            data[key] = value
+            
+    issues = []
+    financials = data.get("financials", {})
+    subtotal = financials.get("subtotal") or 0.0
+    tax = financials.get("tax_amount") or 0.0
+    total = financials.get("total_amount") or 0.0
+    
+    if abs((subtotal + tax) - total) > 0.02:
+        issues.append(f"Math mismatch: Subtotal({subtotal}) + Tax({tax}) != Total({total})")
+    if not data.get("vendor_details", {}).get("company_name"):
+        issues.append("Missing Vendor Name")
+        
+    if issues:
+        data["requires_human_review"] = True
+        data["validation_errors"] = issues
+    return data
+
+# --- Endpoint Routing ---
+
+@app.post("/v1/extract")
+async def extract(
+    file: UploadFile = File(...),
+    json_schema: str = Form(...),
+    custom_prompt: str = Form(None)
+):
+    """Unified endpoint to parse PDF/images, run OCR, clean text, query Qwen, and validate results."""
+    logger.info("Starting processing for file: %s", file.filename)
+    
+    # 1. Save uploaded file
+    file_suffix = os.path.splitext(file.filename)[1].lower()
+    with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as temp_file:
+        temp_file.write(await file.read())
+        temp_path = temp_file.name
 
     try:
-        # Run inference using the GPU pipeline
-        vl_pipeline = get_pipeline()
-        logger.info("Running PaddleOCRVL prediction...")
-        results = vl_pipeline.predict(tmp_path)
+        ocr_texts = []
+        pipeline = get_paddle_pipeline()
+
+        # 2. Extract OCR depending on file format
+        if file_suffix == ".pdf":
+            import fitz  # PyMuPDF (make sure it's installed on the GPU machine)
+            doc = fitz.open(temp_path)
+            try:
+                pages_to_process = min(doc.page_count, max(1, VLM_MAX_PAGES))
+                for idx in range(pages_to_process):
+                    page = doc[idx]
+                    # Render page to high-res PNG for OCR accuracy
+                    pix = page.get_pixmap(dpi=150)
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as page_file:
+                        pix.save(page_file.name)
+                        page_path = page_file.name
+                    try:
+                        results = pipeline.predict(page_path)
+                        # Extract parsed content text
+                        page_text = ""
+                        if results and 'parsing_res_list' in results[0]:
+                            page_text = "\n".join(
+                                item.get('content', '') if isinstance(item, dict) else getattr(item, 'content', '')
+                                for item in results[0]['parsing_res_list']
+                            )
+                        ocr_texts.append(page_text)
+                    finally:
+                        if os.path.exists(page_path):
+                            os.unlink(page_path)
+            finally:
+                doc.close()
+        else:
+            # Image formats
+            results = pipeline.predict(temp_path)
+            doc_text = ""
+            if results and 'parsing_res_list' in results[0]:
+                doc_text = "\n".join(
+                    item.get('content', '') if isinstance(item, dict) else getattr(item, 'content', '')
+                    for item in results[0]['parsing_res_list']
+                )
+            ocr_texts.append(doc_text)
+
+        # 3. Clean OCR outputs
+        full_ocr_text = "\n\n".join(ocr_texts)
+        cleaned_text = clean_ocr_text(full_ocr_text)
+
+        # 4. Prompt Qwen LLM
+        client = OpenAI(base_url=QWEN_LLM_URL, api_key="EMPTY")
         
-        # Parse output structure
-        combined_content = []
-        if isinstance(results, list) and results:
-            # Check for parsing result list (typical structure of PaddleOCRVL return value)
-            if 'parsing_res_list' in results[0]:
-                for item in results[0]['parsing_res_list']:
-                    content_str = item.get('content') if isinstance(item, dict) else getattr(item, 'content', None)
-                    if content_str:
-                        combined_content.append(content_str)
-        
-        extracted_text = "\n".join(combined_content)
-        logger.info("Prediction successful. Extracted %d chars.", len(extracted_text))
-        
+        system_instructions = (
+            "You are a precise data extraction assistant specialized in financial documents.\n"
+            "Extract information from the provided text and return it strictly as a JSON object matching the target structure.\n"
+            "Be as concise as possible to avoid truncation.\n\n"
+            f"TARGET JSON SCHEMA:\n{json_schema}"
+        )
+        if custom_prompt:
+            system_instructions += f"\n\nAdditional Instructions:\n{custom_prompt}"
+
+        logger.info("Calling Qwen model: %s", QWEN_LLM_MODEL)
+        response = client.chat.completions.create(
+            model=QWEN_LLM_MODEL,
+            messages=[
+                {"role": "system", "content": system_instructions},
+                {"role": "user", "content": f"Text to process:\n{cleaned_text}"}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+
+        raw_json_str = (response.choices[0].message.content or "").strip()
+        try:
+            extracted_json = json.loads(raw_json_str)
+        except json.JSONDecodeError:
+            extracted_json = attempt_json_recovery(raw_json_str)
+            extracted_json["requires_human_review"] = True
+            extracted_json.setdefault("validation_errors", []).append("LLM output was truncated/incomplete")
+
+        # 5. Run Mathematical Audits
+        validated_json = validate_extraction(extracted_json)
+
         return JSONResponse(content={
             "status": "success",
-            "text": extracted_text
+            "data": validated_json,
+            "raw_content": raw_json_str,
+            "ocr_text": cleaned_text,
+            "page_count": len(ocr_texts)
         })
-        
+
     except Exception as e:
-        logger.exception("Error during prediction execution: %s", e)
+        logger.exception("Error processing document extraction: %s", e)
         return JSONResponse(status_code=500, content={
             "status": "error",
             "detail": str(e)
         })
-        
     finally:
-        # Cleanup temporary files
-        if os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except Exception as e:
-                logger.warning("Failed to clean up temp file %s: %s", tmp_path, e)
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 if __name__ == "__main__":
     import uvicorn
-    # Start on port 8002 (or any port exposed by your Lightning Studio)
     uvicorn.run(app, host="0.0.0.0", port=8002)
 ```
 
 ---
 
-## 3. Local Component Changes (On Your Machine)
+## 3. Local Refactoring Changes
 
-We will remove the local dependencies of `paddleocr` and make the pipeline route through REST API calls.
+We modify the local files to consume this endpoint.
 
 ### File 1: [paddle_qwen.py](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/backend/app/modules/idp/paddle_qwen.py)
-We will rewrite `paddle_qwen.py` to completely eliminate local imports and instead issue HTTP POST requests:
+Replace all local extraction logic with a clean API client call:
 
 ```python
+# backend/app/modules/idp/paddle_qwen.py
 import os
-import re
 import json
 import logging
-from typing import Tuple, Dict, Any
 import httpx
-from bs4 import BeautifulSoup
-
+from typing import Tuple, Dict, Any
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Note: We completely remove _get_paddle_pipeline() and native paddleocr imports
-
-def run_paddle_ocr_prediction(image_path: str) -> str:
-    """Predicts OCR text on an image by executing a REST POST to the remote GPU server.
-    
-    Falls back gracefully to a Mock prediction if the remote URL is a localhost default,
-    offline, or during testing.
+def run_remote_paddle_qwen_extraction(
+    file_bytes: bytes, 
+    filename: str, 
+    json_schema: Dict[str, Any], 
+    custom_prompt: str | None
+) -> Tuple[Dict[str, Any], str, str, int]:
+    """Uploads the raw document file, prompt hints, and target schema to the remote GPU service
+    to extract fields. Fallbacks to mock values in offline/localhost settings.
     """
     
-    # 1. Check if mock mode is appropriate
+    # Check if mock mode should trigger in development
     is_localhost = "localhost" in settings.paddle_ocr_url or "127.0.0.1" in settings.paddle_ocr_url
     if is_localhost and settings.env == "development":
-        logger.info("[MOCK] Running mock PaddleOCRVL local fallback.")
-        return """
-        Invoice
-        Vendor: ACME Corp Ltd
-        Address: 123 Industrial Way, Tech City
-        Client: DataWiz Corp
-        Date: 2026-06-22
-        Invoice Number: INV-2026-PADDLE
-        
-        <table>
-            <tr>
-                <th>description</th>
-                <th>quantity</th>
-                <th>unit_price</th>
-                <th>line_total</th>
-            </tr>
-            <tr>
-                <td>Server Hosting (AWS)</td>
-                <td>1</td>
-                <td>800.00</td>
-                <td>800.00</td>
-            </tr>
-            <tr>
-                <td>Database Support Services</td>
-                <td>1</td>
-                <td>150.00</td>
-                <td>150.00</td>
-            </tr>
-        </table>
-        
-        Subtotal: 950.00
-        Tax Amount: 50.00
-        Total Amount: 1000.00
-        """
+        logger.info("[MOCK] Returning mock data extraction.")
+        mock_output = {
+            "document_details": {
+                "document_type": "invoice",
+                "invoice_number": "INV-2026-PADDLE",
+                "invoice_date": "2026-06-22",
+                "due_date": "2026-07-22"
+            },
+            "vendor_details": {
+                "company_name": "ACME Corp Ltd",
+                "address": "123 Industrial Way, Tech City"
+            },
+            "client_details": {"company_name": "DataWiz Corp"},
+            "line_items": [
+                {"description": "Server Hosting", "quantity": 1, "unit_price": 800, "line_total": 800},
+                {"description": "Database Support", "quantity": 1, "unit_price": 150, "line_total": 150}
+            ],
+            "financials": {
+                "subtotal": 950.0,
+                "tax_amount": 50.0,
+                "total_amount": 1000.0
+            },
+            "requires_human_review": False,
+            "validation_errors": []
+        }
+        return mock_output, json.dumps(mock_output), "mock ocr text", 1
 
-    # 2. Call the Remote GPU API endpoint
-    url = f"{settings.paddle_ocr_url}/v1/predict"
-    logger.info("Calling remote PaddleOCR-VL API: %s", url)
+    # Prepare multipart data
+    url = f"{settings.paddle_ocr_url}/v1/extract"
+    logger.info("Uploading file to unified extraction endpoint: %s", url)
     
     try:
-        with open(image_path, "rb") as f:
-            files = {"file": (os.path.basename(image_path), f, "image/png")}
-            # 120s timeout to allow remote model warm-up
-            response = httpx.post(url, files=files, timeout=120.0)
+        files = {"file": (filename, file_bytes, "application/octet-stream")}
+        data = {
+            "json_schema": json.dumps(json_schema),
+            "custom_prompt": custom_prompt or ""
+        }
+        
+        # 120s timeout to accommodate cold-starts on GPUs
+        with httpx.Client() as client:
+            response = client.post(url, files=files, data=data, timeout=120.0)
             
         response.raise_for_status()
-        result_data = response.json()
+        res_json = response.json()
         
-        if result_data.get("status") == "success":
-            return result_data["text"]
+        if res_json.get("status") == "success":
+            return (
+                res_json["data"], 
+                res_json["raw_content"], 
+                res_json.get("ocr_text", ""), 
+                res_json.get("page_count", 1)
+            )
         else:
-            detail = result_data.get("detail", "Unknown remote execution error")
-            raise RuntimeError(f"Remote server failed execution: {detail}")
+            detail = res_json.get("detail", "Unknown remote API error")
+            raise RuntimeError(f"Remote extraction failed: {detail}")
             
     except Exception as e:
-        logger.exception("Failed to contact or execute remote PaddleOCR-VL API: %s", e)
-        # Graceful fallback or propagation
-        raise RuntimeError(f"OCR Prediction failed: {e}")
+        logger.exception("HTTP call to remote PaddleOCR-Qwen pipeline failed: %s", e)
+        raise RuntimeError(f"IDP remote extraction failed: {e}")
 ```
 
-### File 2: [backend/.env](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/backend/.env)
-Add the target port 8002 Cloudspace URL to point to the new FastAPI service:
-```env
-# ==== Remote PaddleOCR-VL Service ====
-# Replace with the actual URL exposed by your Lightning AI Studio port 8002
-PADDLE_OCR_URL=https://8002-01ktwv34p98sx3n9n7crzkyezh.cloudspaces.litng.ai
+### File 2: [pipeline.py](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/backend/app/modules/idp/pipeline.py)
+We change `run_ai_extraction` so it skips local page rendering and files creation. It directly invokes `run_remote_paddle_qwen_extraction`:
+
+```python
+    # Inside pipeline.py: run_ai_extraction()
+    if strategy == "paddle_qwen":
+        logger.info("Executing custom remote Paddle-Qwen strategy for document %s", doc.id)
+        from app.modules.idp.paddle_qwen import run_remote_paddle_qwen_extraction
+        from app.modules.idp.extraction import VlmExtraction, VlmOutcome
+        
+        try:
+            # 1. Resolve schemas & targets
+            target_schema = {}
+            if doc.template_id:
+                template = db.get(DocumentTemplate, doc.template_id)
+                if template:
+                    target_schema = template.field_mappings
+            elif doc.document_type_id:
+                doc_type = db.get(DocumentType, doc.document_type_id)
+                if doc_type:
+                    target_schema = doc_type.json_schema
+
+            # Default fallback schema matching standard format
+            if not target_schema:
+                target_schema = {
+                    "document_details": {"document_type": "invoice", "invoice_number": "string"},
+                    "vendor_details": {"company_name": "string"},
+                    "financials": {"subtotal": "float", "tax_amount": "float", "total_amount": "float"}
+                }
+
+            # 2. Call unified remote server
+            filename = doc.filename or "document"
+            validated_json, raw_content = run_remote_paddle_qwen_extraction(
+                file_bytes=file_bytes,
+                filename=filename,
+                json_schema=target_schema,
+                custom_prompt=custom_prompt
+            )
+
+            # Heuristic check for human review flag
+            confidence = 0.9 if not validated_json.get("requires_human_review", False) else 0.4
+
+            extraction = VlmExtraction(
+                document_type=validated_json.get("document_details", {}).get("document_type", "other"),
+                fields=validated_json,
+                confidence=confidence,
+                model_name=settings.qwen_llm_model,
+                raw=raw_content
+            )
+            return VlmOutcome(extraction, "text_via_paddle", None)
+
+        except Exception as exc:
+            logger.exception("Unified remote Paddle-Qwen strategy errored: %s", exc)
+            return VlmOutcome(None, "text_via_paddle", str(exc))
 ```
 
 ---
 
-## 4. Tomorrow's Verification Steps
+## 4. Verification & Testing Actions
 
-When we meet tomorrow, we will run through these verification steps to ensure everything works perfectly:
-
-1. **Deploy Python Script to Lightning AI**:
-   - Access the Lightning AI GPU environment.
-   - Create a file `remote_paddle_server.py` with the code above.
-   - Run the server: `python remote_paddle_server.py`.
-   - Expose the HTTP Port `8002`.
-2. **Update Environment Variables**:
-   - Set the `PADDLE_OCR_URL` inside your local [backend/.env](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/backend/.env) to point to the newly exposed endpoint.
-3. **Execute Backend Test Suite**:
-   - Run local unit tests to verify the mock/integration pipeline is completely intact:
-     ```bash
-     cd backend
-     pytest app/tests/test_paddle_qwen.py
-     ```
-4. **End-to-End Document Upload Verification**:
-   - Fire up the Next.js frontend, select `"paddle_qwen"` in the IDP Control Center UI.
-   - Upload a test invoice document, and watch the local worker dispatch the image file to your remote Lightning AI GPU and return the extracted values.
+1. **Deploy script on Lightning AI**: Run `python remote_paddle_server.py` on the GPU server.
+2. **Expose port**: Keep port `8002` open.
+3. **Change env variable**: Add `PADDLE_OCR_URL=https://<lightning-url>-8002.cloudspaces.litng.ai` to local `backend/.env`.
+4. **Test run**: Trigger extraction on a document.

@@ -399,7 +399,8 @@ function IDPControlCenter() {
   // Form fields
   const [method, setMethod] = useState("default");
   const [schemaStr, setSchemaStr] = useState("");
-  const [hintsStr, setHintsStr] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [rules, setRules] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -418,7 +419,8 @@ function IDPControlCenter() {
         setSelectedConfigId(first.documentTypeId);
         setMethod(first.extractionMethod);
         setSchemaStr(first.jsonSchema ? JSON.stringify(first.jsonSchema, null, 2) : "{}");
-        setHintsStr(first.promptHints ? JSON.stringify(first.promptHints, null, 2) : "{}");
+        setInstruction(first.instruction || "");
+        setRules(first.rules || "");
       }
     } catch (err: any) {
       console.error(err);
@@ -432,7 +434,8 @@ function IDPControlCenter() {
     setSelectedConfigId(cfg.documentTypeId);
     setMethod(cfg.extractionMethod);
     setSchemaStr(cfg.jsonSchema ? JSON.stringify(cfg.jsonSchema, null, 2) : "{}");
-    setHintsStr(cfg.promptHints ? JSON.stringify(cfg.promptHints, null, 2) : "{}");
+    setInstruction(cfg.instruction || "");
+    setRules(cfg.rules || "");
     setSaveSuccess(false);
   };
 
@@ -448,23 +451,15 @@ function IDPControlCenter() {
         try {
           parsedSchema = JSON.parse(schemaStr);
         } catch {
-          throw new Error("Invalid JSON in Schema field");
-        }
-      }
-
-      let parsedHints = null;
-      if (hintsStr.trim()) {
-        try {
-          parsedHints = JSON.parse(hintsStr);
-        } catch {
-          throw new Error("Invalid JSON in Hints field");
+          throw new Error("Invalid JSON in Target JSON Schema field");
         }
       }
 
       const updated = await apiUpdateIDPConfig(selectedConfigId, {
         extractionMethod: method,
         jsonSchema: parsedSchema,
-        promptHints: parsedHints,
+        instruction: instruction.trim() || null,
+        rules: rules.trim() || null,
       });
 
       // Update local state list
@@ -502,7 +497,7 @@ function IDPControlCenter() {
           <div>
             <h2 className="font-semibold text-slate-900 text-lg">IDP Core Routing & Models</h2>
             <p className="text-slate-500 text-sm mt-0.5">
-              Dynamically select parsing strategies, schema rules, and prompt hints for document types. Customizations are isolated to your tenant.
+              Dynamically select parsing strategies, schema rules, and prompt instructions for document types. Customizations are isolated to your tenant.
             </p>
           </div>
         </div>
@@ -600,11 +595,45 @@ function IDPControlCenter() {
               </div>
             </div>
 
-            {/* JSON Schema Editor */}
+            {/* Instruction Editor */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="block text-sm font-medium text-slate-700">
-                  Target Field Extraction Schema (JSON)
+                  System Instruction (Plain Text)
+                </label>
+                <span className="text-slate-400 text-[10px]">Main instruction guiding the model</span>
+              </div>
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                rows={4}
+                placeholder="You are a precise data extraction assistant..."
+                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
+              />
+            </div>
+
+            {/* Rules Editor */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium text-slate-700">
+                  System Rules & Extraction Constraints (Plain Text)
+                </label>
+                <span className="text-slate-400 text-[10px]">Rules for formatting, nesting, and values</span>
+              </div>
+              <textarea
+                value={rules}
+                onChange={(e) => setRules(e.target.value)}
+                rows={6}
+                placeholder="RULES:&#10;1. DATES: All dates MUST be YYYY-MM-DD..."
+                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
+              />
+            </div>
+
+            {/* Target JSON Schema Editor */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium text-slate-700">
+                  Target JSON Schema (Structured JSON)
                 </label>
                 <span className="text-slate-400 text-[10px]">Must be valid JSON object</span>
               </div>
@@ -612,22 +641,7 @@ function IDPControlCenter() {
                 value={schemaStr}
                 onChange={(e) => setSchemaStr(e.target.value)}
                 rows={8}
-                className="w-full font-mono text-xs p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
-              />
-            </div>
-
-            {/* Prompt Hints Editor */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-slate-700">
-                  Prompt Extraction Hints / Instructions (JSON)
-                </label>
-                <span className="text-slate-400 text-[10px]">Hints for matching spatial labels</span>
-              </div>
-              <textarea
-                value={hintsStr}
-                onChange={(e) => setHintsStr(e.target.value)}
-                rows={4}
+                placeholder="{}"
                 className="w-full font-mono text-xs p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
               />
             </div>

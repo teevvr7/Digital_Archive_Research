@@ -28,5 +28,5 @@ class DocumentType(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     json_schema: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    extraction_method: Mapped[str] = mapped_column(String, nullable=False, default="default")
+    extraction_method: Mapped[str] = mapped_column(String, nullable=False, default="paddle_qwen")
 

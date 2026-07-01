@@ -179,14 +179,16 @@ export interface IDPConfig {
   name: string;
   extractionMethod: string;
   jsonSchema: Record<string, any> | null;
-  promptHints: Record<string, any> | null;
+  instruction: string;
+  rules: string;
   isCustomized: boolean;
 }
 
 export interface IDPConfigUpdateRequest {
   extractionMethod: string;
   jsonSchema?: Record<string, any> | null;
-  promptHints?: Record<string, any> | null;
+  instruction?: string | null;
+  rules?: string | null;
 }
 
 export const apiGetIDPConfig = (documentTypeId: string) =>

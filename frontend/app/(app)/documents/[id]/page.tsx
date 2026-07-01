@@ -322,7 +322,7 @@ export default function DocumentViewerPage({
                         return (
                           <div key={key} className="bg-slate-50 rounded-lg p-3">
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                              {key.replace(/([A-Z])/g, " $1").trim()}
+                              {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
                             </p>
                             <div className="space-y-2">
                               {(value as Record<string, unknown>[]).map((item, i) => (
@@ -333,7 +333,7 @@ export default function DocumentViewerPage({
                                   {Object.entries(item).map(([k, v]) => (
                                     <div key={k} className="flex items-center justify-between gap-2">
                                       <span className="text-slate-400 capitalize">
-                                        {k.replace(/([A-Z])/g, " $1")}
+                                        {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
                                       </span>
                                       <span className="font-medium text-slate-700 text-right">
                                         {String(v)}
@@ -346,13 +346,42 @@ export default function DocumentViewerPage({
                           </div>
                         );
                       }
+
+                      // Render nested objects (e.g. vendor_details, financials) inside cards
+                      if (typeof value === "object" && value !== null) {
+                        return (
+                          <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                              {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                            </p>
+                            <div className="space-y-1.5">
+                              {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
+                                <div
+                                  key={k}
+                                  className="flex items-start justify-between gap-3 py-1 border-b border-slate-100 last:border-b-0"
+                                >
+                                  <span className="text-xs text-slate-400 capitalize">
+                                    {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                                  </span>
+                                  <span className="text-xs font-medium text-slate-700 text-right">
+                                    {typeof v === "number" && k.toLowerCase().includes("amount")
+                                      ? `MYR ${(v as number).toFixed(2)}`
+                                      : String(v)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={key}
                           className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
                         >
                           <span className="text-xs text-slate-500 capitalize flex-shrink-0">
-                            {key.replace(/([A-Z])/g, " $1").trim()}
+                            {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
                           </span>
                           <span className="text-xs font-semibold text-slate-800 text-right">
                             {typeof value === "number" &&

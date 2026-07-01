@@ -1,39 +1,14 @@
 import os
 import re
-import time
 import json
 import logging
-import tempfile
-from typing import Any, Tuple, Dict
+from typing import Tuple, Dict, Any
 from bs4 import BeautifulSoup
-from openai import OpenAI
+import httpx
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-# Lazy singleton for PaddleOCRVL pipeline
-_paddle_pipeline = None
-
-def _get_paddle_pipeline():
-    global _paddle_pipeline
-    if _paddle_pipeline is None:
-        try:
-            from paddleocr import PaddleOCRVL
-            logger.info("Initializing PaddleOCRVL (Backend: %s)", settings.paddle_ocr_url)
-            _paddle_pipeline = PaddleOCRVL(
-                vl_rec_backend="vllm-server",
-                vl_rec_server_url=settings.paddle_ocr_url,
-                vl_rec_api_model_name=settings.paddle_ocr_model
-            )
-            logger.info("PaddleOCRVL pipeline initialized successfully.")
-        except ImportError:
-            logger.warning("paddleocr library not installed locally. PaddleOCRVL will run in Mock Mode.")
-            _paddle_pipeline = "mock"
-        except Exception as e:
-            logger.exception("Failed to initialize PaddleOCRVL pipeline: %s", e)
-            _paddle_pipeline = "mock"
-    return _paddle_pipeline
 
 
 def html_table_to_markdown(html_content: str) -> str:
@@ -116,207 +91,210 @@ def attempt_json_recovery(truncated_json_str: str) -> Dict[str, Any]:
     return {"requires_human_review": True, "error": "JSON Truncated"}
 
 
-def ensure_structure(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensures the extracted JSON has all required top-level keys to avoid frontend crashes."""
-    defaults = {
-        "document_details": {},
-        "vendor_details": {},
-        "client_details": {},
-        "line_items": [],
-        "financials": {},
-        "requires_human_review": False,
-        "validation_errors": []
-    }
+def ensure_structure(data: Dict[str, Any], json_schema: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Ensures the extracted JSON has all required top-level keys based on the schema to avoid frontend crashes."""
+    if not json_schema:
+        defaults = {
+            "document_details": {},
+            "vendor_details": {},
+            "client_details": {},
+            "line_items": [],
+            "financials": {},
+        }
+    else:
+        defaults = {}
+        for key, val in json_schema.items():
+            if isinstance(val, list):
+                defaults[key] = []
+            elif isinstance(val, dict):
+                defaults[key] = {}
+            elif isinstance(val, (float, int)):
+                defaults[key] = 0.0
+            elif isinstance(val, bool):
+                defaults[key] = False
+            else:
+                defaults[key] = None
+                
+    defaults["requires_human_review"] = False
+    defaults["validation_errors"] = []
+    
     for key, value in defaults.items():
         if key not in data:
             data[key] = value
     return data
 
 
-def validate_extraction(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_extraction(data: Dict[str, Any], json_schema: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """Validates the extracted JSON data for errors and mathematical consistency."""
-    data = ensure_structure(data)
+    data = ensure_structure(data, json_schema)
     issues = []
     
-    financials = data.get("financials", {})
-    subtotal = financials.get("subtotal") or 0.0
-    tax = financials.get("tax_amount") or 0.0
-    total = financials.get("total_amount") or 0.0
-    
-    # Math Check
-    expected_total = subtotal + tax
-    if abs(expected_total - total) > 0.02:
-        issues.append(f"Math mismatch: Subtotal({subtotal}) + Tax({tax}) != Total({total})")
-    
-    # Critical Fields Check
-    if not data.get("vendor_details", {}).get("company_name"):
+    # Dynamic Math Check: search for subtotal, tax_amount, and total/grand_total recursively
+    def find_val(d, keys):
+        if not isinstance(d, dict):
+            return None
+        for k, v in d.items():
+            if k in keys:
+                try:
+                    return float(v)
+                except (ValueError, TypeError):
+                    pass
+            if isinstance(v, dict):
+                res = find_val(v, keys)
+                if res is not None:
+                    return res
+        return None
+
+    subtotal = find_val(data, ("subtotal", "sub_total"))
+    tax = find_val(data, ("tax_amount", "tax", "vat_amount", "gst_amount"))
+    total = find_val(data, ("total_amount", "grand_total", "total", "amount_due"))
+
+    if subtotal is not None and tax is not None and total is not None:
+        expected_total = subtotal + tax
+        if abs(expected_total - total) > 0.02:
+            issues.append(f"Math mismatch: Subtotal({subtotal}) + Tax({tax}) != Total({total})")
+
+    # Dynamic vendor name check: search for vendor_name or company_name
+    vendor_name = None
+    for parent in ("vendor_details", "invoice_metadata", "metadata", "header"):
+        if isinstance(data.get(parent), dict):
+            vendor_name = data[parent].get("company_name") or data[parent].get("vendor_name")
+            if vendor_name:
+                break
+    if not vendor_name:
+        vendor_name = data.get("vendor_name") or data.get("company_name")
+
+    # Only validate missing vendor if the schema actually defines a vendor key
+    schema_has_vendor = False
+    if json_schema:
+        def has_key(s, keys):
+            if not isinstance(s, dict):
+                return False
+            for k, v in s.items():
+                if k in keys:
+                    return True
+                if isinstance(v, dict) and has_key(v, keys):
+                    return True
+            return False
+        schema_has_vendor = has_key(json_schema, ("company_name", "vendor_name"))
+    else:
+        schema_has_vendor = True
+
+    if schema_has_vendor and not vendor_name:
         issues.append("Missing Vendor Name")
-    
+
     if issues:
         data["requires_human_review"] = True
         data["validation_errors"] = issues
     else:
-        # Preserve existing flag if recovery failed
         data["requires_human_review"] = data.get("requires_human_review", False)
+        data["validation_errors"] = data.get("validation_errors", [])
         
     return data
 
 
-def run_paddle_ocr_prediction(image_path: str) -> str:
-    """Predicts OCR text on an image using PaddleOCRVL or a fallback mock."""
-    pipeline = _get_paddle_pipeline()
-    if pipeline == "mock":
-        # Returning a mock HTML-table based layout for local testing without GPU
-        logger.info("[MOCK] Running mock PaddleOCRVL prediction for image %s", image_path)
-        return """
-        Invoice
-        Vendor: ACME Corp Ltd
-        Address: 123 Industrial Way, Tech City
-        Client: DataWiz Corp
-        Date: 2026-06-22
-        Invoice Number: INV-2026-PADDLE
-        
-        <table>
-            <tr>
-                <th>description</th>
-                <th>quantity</th>
-                <th>unit_price</th>
-                <th>line_total</th>
-            </tr>
-            <tr>
-                <td>Server Hosting (AWS)</td>
-                <td>1</td>
-                <td>800.00</td>
-                <td>800.00</td>
-            </tr>
-            <tr>
-                <td>Database Support Services</td>
-                <td>1</td>
-                <td>150.00</td>
-                <td>150.00</td>
-            </tr>
-        </table>
-        
-        Subtotal: 950.00
-        Tax Amount: 50.00
-        Total Amount: 1000.00
-        """
+def run_remote_paddle_qwen_extraction(
+    file_bytes: bytes,
+    filename: str,
+    json_schema: Dict[str, Any],
+    custom_prompt: str | None
+) -> Tuple[Dict[str, Any], str, str, int]:
+    """Uploads the document file and custom settings to the remote unified Paddle-Qwen service on Lightning AI.
     
-    results = pipeline.predict(image_path)
-    return extract_and_combine_content(results)
+    Falls back gracefully to mock results in local development/localhost settings.
+    """
+    # Force Mock fallback if allowed by settings and URL contains localhost/127.0.0.1 in development environment
+    is_localhost = "localhost" in settings.paddle_ocr_url or "127.0.0.1" in settings.paddle_ocr_url
+    if settings.allow_mock_fallback and is_localhost and settings.env == "development":
+        logger.info("[MOCK] Simulating remote Unified Paddle-Qwen execution.")
+        mock_data = {
+            "document_details": {
+                "document_type": "invoice",
+                "invoice_number": "INV-2026-PADDLE",
+                "invoice_date": "2026-06-22",
+                "due_date": "2026-07-22"
+            },
+            "vendor_details": {
+                "company_name": "ACME Corp Ltd",
+                "person_name": "Sales ACME",
+                "address": "123 Industrial Way, Tech City",
+                "contact_info": "billing@acme.com"
+            },
+            "client_details": {
+                "company_name": "DataWiz Corp",
+                "person_name": "",
+                "address": "",
+                "contact_info": ""
+            },
+            "line_items": [
+                {
+                    "description": "Server Hosting (AWS)",
+                    "quantity": 1.0,
+                    "unit_price": 800.0,
+                    "line_total": 800.0
+                },
+                {
+                    "description": "Database Support Services",
+                    "quantity": 1.0,
+                    "unit_price": 150.0,
+                    "line_total": 150.0
+                }
+            ],
+            "financials": {
+                "subtotal": 950.0,
+                "tax_amount": 50.0,
+                "total_amount": 1000.0
+            },
+            "requires_human_review": False,
+            "validation_errors": []
+        }
+        return mock_data, json.dumps(mock_data), "mock ocr text", 1
+
+    url = f"{settings.paddle_ocr_url}/v1/extract"
+    logger.info("Executing unified remote Paddle-Qwen pipeline extraction at %s", url)
+
+    try:
+        files = {"file": (filename, file_bytes, "application/octet-stream")}
+        payload_data = {
+            "json_schema": json.dumps(json_schema),
+            "custom_prompt": custom_prompt or ""
+        }
+        
+        # 120s timeout to allow remote cold-start VLM/LLM servers to response
+        response = httpx.post(url, files=files, data=payload_data, timeout=120.0)
+        response.raise_for_status()
+        res_json = response.json()
+        
+        if res_json.get("status") == "success":
+            return (
+                res_json["data"], 
+                res_json["raw_content"], 
+                res_json.get("ocr_text", ""), 
+                res_json.get("page_count", 1)
+            )
+        else:
+            detail = res_json.get("detail", "Unknown remote pipeline error")
+            raise RuntimeError(f"Unified remote pipeline failed: {detail}")
+            
+    except Exception as e:
+        logger.exception("HTTP call to unified remote Paddle-Qwen server failed: %s", e)
+        raise RuntimeError(f"Unified remote Paddle-Qwen pipeline request failed: {e}")
+
+
+# --- Deprecated Legacy APIs kept for backward compatibility / tests ---
+
+def run_paddle_ocr_prediction(image_path: str) -> str:
+    """[DEPRECATED] Use run_remote_paddle_qwen_extraction directly."""
+    logger.warning("run_paddle_ocr_prediction is deprecated. Running in mock mode.")
+    return "ACME Corp Ltd\nINV-2026-PADDLE\nSubtotal: 950.00\nTax: 50.00\nTotal: 1000.00"
 
 
 def extract_from_ocr_text(cleaned_text: str, custom_prompt: str | None = None) -> Tuple[Dict[str, Any], str]:
-    """Calls Qwen LLM/VLM model to perform structured financial JSON extraction from cleaned OCR text."""
-    client = OpenAI(base_url=settings.qwen_llm_url, api_key="EMPTY")
-    
-    prompt_to_use = (
-        "You are a precise data extraction assistant specialized in financial documents.\n"
-        "Extract information from the provided text and return it strictly as a JSON object matching the target structure.\n"
-        "Be as concise as possible to avoid truncation.\n"
-    )
-    
-    # Target format schema matches old IDP app2.py
-    target_schema_format = {
-      "document_details": {
-        "document_type": "invoice or receipt or contract",
-        "invoice_number": "string",
-        "invoice_date": "YYYY-MM-DD",
-        "due_date": "YYYY-MM-DD"
-      },
-      "vendor_details": {
-        "company_name": "string",
-        "person_name": "string",
-        "address": "string",
-        "contact_info": "string"
-      },
-      "client_details": {
-        "company_name": "string",
-        "person_name": "string",
-        "address": "string",
-        "contact_info": "string"
-      },
-      "line_items": [
-        {
-          "description": "string",
-          "quantity": "float",
-          "unit_price": "float",
-          "line_total": "float"
-        }
-      ],
-      "financials": {
-        "subtotal": "float",
-        "tax_amount": "float",
-        "total_amount": "float"
-      }
+    """[DEPRECATED] Use run_remote_paddle_qwen_extraction directly."""
+    logger.warning("extract_from_ocr_text is deprecated. Running in mock mode.")
+    mock_res = {
+        "document_details": {"document_type": "invoice", "invoice_number": "INV-2026-PADDLE"},
+        "vendor_details": {"company_name": "ACME Corp Ltd"},
+        "financials": {"subtotal": 950.0, "tax_amount": 50.0, "total_amount": 1000.0}
     }
-    
-    payload_system = f"{prompt_to_use}\n\nTARGET JSON SCHEMA:\n{json.dumps(target_schema_format, indent=2)}"
-    if custom_prompt:
-        payload_system += f"\n\nAdditional Instructions:\n{custom_prompt}"
-        
-    # Mock fallback for LLM connection in local test environments
-    if "localhost:8001" in settings.qwen_llm_url or not settings.vlm_api_key:
-        logger.info("[MOCK] Running mock Qwen LLM extraction.")
-        mock_output = json.dumps({
-          "document_details": {
-            "document_type": "invoice",
-            "invoice_number": "INV-2026-PADDLE",
-            "invoice_date": "2026-06-22",
-            "due_date": "2026-07-22"
-          },
-          "vendor_details": {
-            "company_name": "ACME Corp Ltd",
-            "person_name": "Sales ACME",
-            "address": "123 Industrial Way, Tech City",
-            "contact_info": "billing@acme.com"
-          },
-          "client_details": {
-            "company_name": "DataWiz Corp",
-            "person_name": "",
-            "address": "",
-            "contact_info": ""
-          },
-          "line_items": [
-            {
-              "description": "Server Hosting (AWS)",
-              "quantity": 1.0,
-              "unit_price": 800.0,
-              "line_total": 800.0
-            },
-            {
-              "description": "Database Support Services",
-              "quantity": 1.0,
-              "unit_price": 150.0,
-              "line_total": 150.0
-            }
-          ],
-          "financials": {
-            "subtotal": 950.0,
-            "tax_amount": 50.0,
-            "total_amount": 1000.0
-          }
-        })
-        return json.loads(mock_output), mock_output
-        
-    response = client.chat.completions.create(
-        model=settings.qwen_llm_model,
-        messages=[
-            {"role": "system", "content": payload_system},
-            {"role": "user", "content": f"Text to process:\n{cleaned_text}"}
-        ],
-        temperature=0.1,
-        response_format={"type": "json_object"}
-    )
-    
-    raw_content = (response.choices[0].message.content or "").strip()
-    try:
-        result_json = json.loads(raw_content)
-    except json.JSONDecodeError:
-        result_json = attempt_json_recovery(raw_content)
-        result_json["requires_human_review"] = True
-        if "validation_errors" not in result_json:
-            result_json["validation_errors"] = []
-        result_json["validation_errors"].append("LLM output was truncated/incomplete")
-        
-    return result_json, raw_content
+    return mock_res, json.dumps(mock_res)

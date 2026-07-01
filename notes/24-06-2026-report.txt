@@ -1,0 +1,71 @@
+1. Daily Summary of Activities
+- Redesigned the IDP Control Center UI to decouple system instructions and extraction rules into distinct plain-text editors.
+- Implemented backend prompt serialization to dynamically build custom prompts and clean target schemas from database metadata.
+- Secured the background task worker against Windows-specific DLL load crashes in Microsoft ONNX Runtime using graceful error isolation.
+- Created and executed a database utility script to migrate all existing document type strategies to the remote GPU pipeline.
+- Verified the end-to-end processing pipeline, successfully unblocking the document queue.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Decoupled IDP Control Center & Prompt Serialization
+Description of Work Done: Updated frontend settings UI, types, and backend pipeline orchestrator to split prompts into Instructions and Rules, dynamically reconstructing them in `pipeline.py` while keeping target schemas clean.
+Status: Completed
+Remarks: Improves usability and prompt control for the end-user.
+
+Task Number: 2
+Task / Project Name: Local OCR Stabilization & DLL Isolation
+Description of Work Done: Wrapped local OCR engine loading and execution in robust try-except blocks to gracefully handle environment-specific binary initialization failures.
+Status: Completed
+Remarks: Prevents native dependency failures from crashing the background worker.
+
+Task Number: 3
+Task / Project Name: Database Strategy Migration
+Description of Work Done: Developed and ran `migrate_strategies.py` to update all 8 existing document types in the database to `"paddle_qwen"`.
+Status: Completed
+Remarks: Routes queued documents to the remote GPU, unblocking the worker.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+User / Project: Task Queue Worker (Windows Dev)
+Issue Description: ImportError: DLL load failed while importing onnxruntime_pybind11_state: A dynamic link library (DLL) initialization routine failed.
+Root Cause: Pre-existing database rows for document types defaulted to the `"default"` strategy, overriding local defaults and forcing the worker to run local OCR, which failed due to missing C++ runtimes or CPU architecture incompatibilities.
+Resolution Provided: Isolated the local OCR loading process to handle DLL failures gracefully, and ran a script to migrate all database document type strategies to `"paddle_qwen"`.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, TypeScript, React, FastAPI, SQLAlchemy, RQ (Redis Queue), Tailwind CSS.
+Infrastructure: Supabase (PostgreSQL, Storage), Redis.
+IDE / Tools: VS Code, PowerShell.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Pre-existing database rows overriding local strategy code defaults and causing background crashes.
+Solution: Created a targeted SQLAlchemy script to update all existing table rows to the correct strategy in a single transaction.
+
+Challenge: Windows environment DLL load failures in third-party C-extensions blocking the entire worker thread.
+Solution: Applied import-level try-except isolation to disable local OCR gracefully and return empty text instead of throwing unhandled exceptions.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- UI/UX design patterns for prompt engineering and schema visualization.
+- Prompt serialization and metadata cleaning techniques for LLM/VLM APIs.
+- Relational database strategy migration and SQLAlchemy session scripting.
+- Environment isolation and fail-safe fallback design in Python background workers.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Trace the data processing flow and inspect GPU environment input/output payloads to verify exactly what is sent to the VLM.
+- Investigate and resolve issues where the remote JSON extraction output does not change based on user instructions and rules.
+- Polish the overall IDP system for accuracy and performance.
