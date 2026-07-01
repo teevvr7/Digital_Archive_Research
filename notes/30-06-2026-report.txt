@@ -1,0 +1,81 @@
+1. Daily Summary of Activities
+- Refactored backend validation rules to be schema-aware and dynamic rather than hardcoded.
+- Implemented recursive key-sorting logic in the API to preserve the dynamic key sequence in the frontend.
+- Added clock skew tolerance to the authentication token decoder to resolve login validation failures.
+- Restricted client-side router layout access to authenticated users to prevent private details from flashing.
+- Ran tests to verify all 61 baseline checks pass successfully.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Dynamic Extraction Sorting
+Description of Work Done: Integrated backend dictionary re-sorting matching the custom template schema, bypassing database-level JSON sorting.
+Status: Completed
+Remarks: Both visual cards and raw JSON now display in the correct sequence.
+
+Task Number: 2
+Task / Project Name: Decoupled Schema Validation
+Description of Work Done: Updated extraction checks to scan dynamic patterns recursively, avoiding the injection of obsolete keys.
+Status: Completed
+Remarks: Decouples extraction validation from default hardcoded schemas.
+
+Task Number: 3
+Task / Project Name: JWT Clock Leeway
+Description of Work Done: Added verification leeway to resolve authentication errors triggered by clock differences.
+Status: Completed
+Remarks: Successfully logs users in without timing errors.
+
+Task Number: 4
+Task / Project Name: Router Gatekeeper Security Fix
+Description of Work Done: Configured the frontend authentication provider to hide layout elements for unauthenticated routes.
+Status: Completed
+Remarks: Blocks unauthorized route leakage during page redirections.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+User / Project: Login Failure / Token Validation
+Issue Description: Users receive invalid token errors on login.
+Root Cause: Differences between local server and remote provider clocks made tokens appear issued in the future.
+Resolution Provided: Added clock skew leeway parameter to the verification function.
+
+Issue Number: 2
+User / Project: Security Leak / Layout Leakage
+Issue Description: Unauthenticated users can temporarily see document views during login redirects.
+Root Cause: Next.js layouts render children components asynchronously before the client router completes redirection.
+Resolution Provided: Conditionally blocked rendering private components when user authentication is missing.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, FastAPI, Next.js, React, TailwindCSS.
+Infrastructure: Database and Storage (Supabase).
+IDE / Tools: VS Code, PowerShell.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Database normalisation rules overriding dynamic extraction sequences.
+Solution: Re-ordered fields on retrieval using the schema definition before sending data to the client.
+
+Challenge: Local execution environments throwing errors due to typing imports.
+Solution: Cleaned up type hints inside localized helper scopes to ensure smooth module imports.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Formatting JSON payloads dynamically matching database configuration definitions.
+- Managing clock drifts and verifying JWT signatures across authentication endpoints.
+- Managing client-side layout gates during Next.js router transitions.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Improve the validation error in the extracted data, which is still showing vendor name missing.
+- Test system with various documents.

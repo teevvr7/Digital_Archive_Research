@@ -18,6 +18,7 @@ from app.modules.idp.paddle_qwen import (
     validate_extraction,
     run_paddle_ocr_prediction,
     extract_from_ocr_text,
+    run_remote_paddle_qwen_extraction,
 )
 from app.modules.idp.pipeline import run_ai_extraction
 
@@ -125,25 +126,61 @@ def test_validate_extraction_missing_vendor():
 # 2. Mock Prediction / LLM Runs
 # ---------------------------------------------------------------------------
 
-def test_run_paddle_ocr_prediction_mock():
-    # Force _paddle_pipeline to be mock or simulate it
-    with patch("app.modules.idp.paddle_qwen._paddle_pipeline", "mock"):
-        res = run_paddle_ocr_prediction("fake_image.png")
-        assert "ACME Corp Ltd" in res
-        assert "INV-2026-PADDLE" in res
-
-
-def test_extract_from_ocr_text_mock():
-    # Force mock mode by having "localhost:8001" in settings.qwen_llm_url
+def test_run_remote_paddle_qwen_extraction_mock():
+    # Test local mock mode triggering when URL contains localhost/127.0.0.1
     with patch("app.modules.idp.paddle_qwen.settings") as mock_settings:
-        mock_settings.qwen_llm_url = "http://localhost:8001/v1"
-        mock_settings.vlm_api_key = ""
-        mock_settings.qwen_llm_model = "Qwen-VL"
+        mock_settings.paddle_ocr_url = "http://localhost:8000/v1"
+        mock_settings.env = "development"
+        mock_settings.allow_mock_fallback = True
         
-        result_json, raw = extract_from_ocr_text("some text")
+        result_json, raw, ocr, pages = run_remote_paddle_qwen_extraction(
+            file_bytes=b"fake_bytes",
+            filename="invoice.png",
+            json_schema={"some": "schema"},
+            custom_prompt="hints"
+        )
         assert result_json["vendor_details"]["company_name"] == "ACME Corp Ltd"
         assert result_json["financials"]["total_amount"] == 1000.0
         assert "INV-2026-PADDLE" in raw
+        assert ocr == "mock ocr text"
+        assert pages == 1
+
+
+def test_run_remote_paddle_qwen_extraction_api():
+    # Test remote REST API call with httpx mock
+    with patch("app.modules.idp.paddle_qwen.settings") as mock_settings, \
+         patch("httpx.post") as mock_post:
+        
+        mock_settings.paddle_ocr_url = "https://remote-gpu-server/v1"
+        mock_settings.env = "production"
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "success",
+            "data": {
+                "document_details": {"document_type": "invoice"},
+                "vendor_details": {"company_name": "ACME Remote"},
+                "financials": {"subtotal": 100.0, "tax_amount": 10.0, "total_amount": 110.0}
+            },
+            "raw_content": '{"vendor_details": {"company_name": "ACME Remote"}}',
+            "ocr_text": "extracted remote text",
+            "page_count": 2
+        }
+        mock_post.return_value = mock_response
+        
+        result_json, raw, ocr, pages = run_remote_paddle_qwen_extraction(
+            file_bytes=b"fake_bytes",
+            filename="invoice.png",
+            json_schema={"some": "schema"},
+            custom_prompt="hints"
+        )
+        
+        assert result_json["vendor_details"]["company_name"] == "ACME Remote"
+        assert "ACME Remote" in raw
+        assert ocr == "extracted remote text"
+        assert pages == 2
+        mock_post.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -155,20 +192,17 @@ def test_run_ai_extraction_dispatches_paddle_qwen():
     mock_doc = MagicMock()
     mock_doc.id = uuid.uuid4()
     mock_doc.template_id = None
+    mock_doc.filename = "test_doc.png"
     
     mock_doc_type = MagicMock(spec=DocumentType)
     mock_doc_type.extraction_method = "paddle_qwen"
-    mock_doc_type.json_schema = {"_prompt": "Force math validation!"}
+    mock_doc_type.json_schema = {"_instruction": "Force math validation!", "_rules": "No negatives"}
     mock_db.get.return_value = mock_doc_type
 
     # Mock settings
     with patch("app.core.config.settings") as mock_settings, \
-         patch("app.modules.idp.parsing.open_pdf") as mock_open_pdf, \
-         patch("app.modules.idp.paddle_qwen.run_paddle_ocr_prediction", return_value="Some text") as mock_predict, \
-         patch("app.modules.idp.paddle_qwen.extract_from_ocr_text") as mock_extract:
+         patch("app.modules.idp.paddle_qwen.run_remote_paddle_qwen_extraction") as mock_extract:
         
-        mock_settings.vlm_max_pages = 2
-        mock_settings.vlm_render_dpi = 120
         mock_settings.qwen_llm_model = "Qwen-VL"
         
         # Setup mock extract response
@@ -178,7 +212,9 @@ def test_run_ai_extraction_dispatches_paddle_qwen():
                 "vendor_details": {"company_name": "ACME"},
                 "financials": {"subtotal": 100.0, "tax_amount": 0.0, "total_amount": 100.0}
             },
-            "raw response json"
+            "raw response json",
+            "remote ocr text",
+            1
         )
         
         outcome = run_ai_extraction(
@@ -194,8 +230,12 @@ def test_run_ai_extraction_dispatches_paddle_qwen():
         assert outcome.extraction.document_type == "invoice"
         assert outcome.extraction.confidence == 0.9
         assert outcome.mode == "text_via_paddle"
-        mock_predict.assert_called_once()
-        mock_extract.assert_called_once_with("Some text", "Force math validation!")
+        mock_extract.assert_called_once_with(
+            file_bytes=b"fake_bytes",
+            filename="test_doc.png",
+            json_schema={},
+            custom_prompt="Force math validation!\n\nNo negatives"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -298,17 +338,18 @@ def test_post_idp_config_router_creates_template(mock_auth_ctx):
     
     # Mock template lookup returns None (create new one)
     db.query.return_value.filter.return_value.first.return_value = None
-
+ 
     def override_get_tenant_db():
         yield db, token
-
+ 
     app.dependency_overrides[get_tenant_db] = override_get_tenant_db
     client = TestClient(app)
     
     payload = {
         "extractionMethod": "paddle_qwen",
         "jsonSchema": {"type": "object"},
-        "promptHints": {"subtotal": "Look for subtotal"}
+        "instruction": "Test instruction",
+        "rules": "Test rules"
     }
     
     response = client.post(f"/api/idp/config/{doc_type_id}", json=payload)
@@ -316,7 +357,8 @@ def test_post_idp_config_router_creates_template(mock_auth_ctx):
     data = response.json()
     
     assert data["extractionMethod"] == "paddle_qwen"
-    assert data["promptHints"] == {"subtotal": "Look for subtotal"}
+    assert data["instruction"] == "Test instruction"
+    assert data["rules"] == "Test rules"
     assert data["isCustomized"] is True
     
     # Assert DB additions

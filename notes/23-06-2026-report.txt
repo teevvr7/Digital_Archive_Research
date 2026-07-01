@@ -1,0 +1,63 @@
+1. Daily Summary of Activities
+- Designed a single-hop remote VLM microservice architecture to offload both PaddleOCR-VL and Qwen-VL.
+- Refactored local backend client and pipeline orchestrator to run unified REST POST calls.
+- Fixed Windows background worker queue crashes caused by local DLL initialization errors in ONNX Runtime.
+- Updated unit tests and verified the entire backend test suite locally.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Option A Remote Service & Client Refactoring
+Description of Work Done: Re-implemented `paddle_qwen.py` and `pipeline.py` to route logic through a single remote HTTP POST call. Documented script code in `remote_paddle_ocr_plan.md`.
+Status: Completed
+Remarks: Bypasses local ML libraries on dev laptops.
+
+Task Number: 2
+Task / Project Name: Early Strategy Resolution & DLL Bypass
+Description of Work Done: Refactored `jobs.py` worker process to resolve database strategy early and skip local OCR if set to `"paddle_qwen"`.
+Status: Completed
+Remarks: Bypasses local `onnxruntime` import crashes on Windows.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+User / Project: Task Queue Worker (Windows Dev)
+Issue Description: ImportError: DLL load failed while importing onnxruntime_pybind11_state. Document stayed in queue.
+Root Cause: Worker executed local OCR (which imports onnxruntime) before checking strategy. ONNX Runtime had broken C++ DLL bindings on the Windows machine.
+Resolution Provided: Resolved database strategy early in `process_document()` and bypassed local `run_extraction()` for `"paddle_qwen"`.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, FastAPI, RQ (Redis Queue), httpx, Pytest.
+Infrastructure: Supabase (PostgreSQL, Storage), Redis.
+IDE / Tools: VS Code, PowerShell.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: High latency and bandwidth usage from multiple image upload round-trips.
+Solution: Consolidated the orchestration into a single-hop endpoint running directly in the remote GPU space.
+
+Challenge: Broken local dependencies (`onnxruntime` DLL crash) blocking the entire worker pipeline.
+Solution: Modified the job dispatcher to bypass local extraction steps entirely for remote-delegated strategies.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Client-server decoupling patterns for vision-language pipelines.
+- Async queue task orchestration and SQLAlchemy state persistence.
+- Debugging native binary loading issues in Python virtual environments on Windows.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Deploy and start `remote_paddle_server.py` on the active GPU space.
+- Run end-to-end integration tests using real images via UI uploads.
+- Troubleshoot any outstanding connection or queue issues for default cascades.

@@ -85,6 +85,7 @@ def verify_token(token: str) -> TokenData:
             key,
             algorithms=[alg],
             audience=AUDIENCE,
+            leeway=60,
         )
     except jwt.ExpiredSignatureError:
         raise _unauthorized("Token has expired")

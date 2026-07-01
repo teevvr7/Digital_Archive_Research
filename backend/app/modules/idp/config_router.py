@@ -11,21 +11,79 @@ from app.models.document_template import DocumentTemplate
 
 router = APIRouter(prefix="/idp/config", tags=["IDP Configuration"])
 
+from uuid import UUID
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.camel import CamelModel
+from sqlalchemy.orm import Session
+
+from app.core.deps import get_tenant_db
+from app.core.security import TokenData
+from app.models.document_type import DocumentType
+from app.models.document_template import DocumentTemplate
+
+router = APIRouter(prefix="/idp/config", tags=["IDP Configuration"])
+
+DEFAULT_INSTRUCTION = (
+    "You are a precise data extraction assistant specialized in financial documents.\n"
+    "Extract information from the provided text and return it strictly as a JSON object matching the target structure.\n"
+    "Be as concise as possible to avoid truncation."
+)
+
+DEFAULT_RULES = (
+    "RULES:\n"
+    "1. DATES: All dates MUST be converted to YYYY-MM-DD format.\n"
+    "2. NUMBERS: Convert currency and quantities to float numbers (e.g., 1,200.50 -> 1200.50).\n"
+    "3. NULLS: If a field is not present in the text, use null.\n"
+    "4. NESTING: Follow the exact nested structure provided below to separate Vendor vs Client details.\n"
+    "5. LINE ITEMS: Extract every row from tables into the line_items array."
+)
+
+
 class IDPConfigResponse(CamelModel):
     document_type_id: UUID
     name: str
     extraction_method: str
     json_schema: Optional[Dict[str, Any]] = None
-    prompt_hints: Optional[Dict[str, Any]] = None
+    instruction: str
+    rules: str
     is_customized: bool
+
 
 class IDPConfigUpdateRequest(CamelModel):
     extraction_method: str  # "default" or "paddle_qwen"
     json_schema: Optional[Dict[str, Any]] = None
-    prompt_hints: Optional[Dict[str, Any]] = None
+    instruction: Optional[str] = None
+    rules: Optional[str] = None
+
 
 class IDPConfigListResponse(CamelModel):
     configs: List[IDPConfigResponse]
+
+
+def split_schema_payload(payload: Optional[Dict[str, Any]]) -> tuple[Optional[Dict[str, Any]], str, str]:
+    """Helper to separate instruction and rules from the target JSON schema dictionary."""
+    if not payload:
+        return None, DEFAULT_INSTRUCTION, DEFAULT_RULES
+    
+    import json
+    clean_schema = dict(payload)
+    instruction = clean_schema.pop("_instruction", DEFAULT_INSTRUCTION)
+    rules = clean_schema.pop("_rules", DEFAULT_RULES)
+    
+    # Restore original user-defined key order if present in metadata
+    original_schema_str = clean_schema.pop("_original_schema_str", None)
+    if original_schema_str:
+        try:
+            clean_schema = json.loads(original_schema_str)
+        except Exception as e:
+            logger.warning("Failed to parse _original_schema_str: %s", e)
+            
+    # Clean up any legacy metadata keys if present
+    clean_schema.pop("_hints", None)
+    clean_schema.pop("_prompt", None)
+    
+    return clean_schema, instruction, rules
 
 
 @router.get("", response_model=IDPConfigListResponse)
@@ -52,21 +110,25 @@ def list_idp_configurations(
         ).first()
         
         if template:
+            clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
             configs.append(IDPConfigResponse(
                 document_type_id=doc_type.id,
                 name=doc_type.name,
                 extraction_method=template.extraction_method,
-                json_schema=template.field_mappings,
-                prompt_hints=template.field_mappings.get("_hints") if isinstance(template.field_mappings, dict) else None,
+                json_schema=clean_schema,
+                instruction=instruction,
+                rules=rules,
                 is_customized=True
             ))
         else:
+            clean_schema, instruction, rules = split_schema_payload(doc_type.json_schema)
             configs.append(IDPConfigResponse(
                 document_type_id=doc_type.id,
                 name=doc_type.name,
                 extraction_method=doc_type.extraction_method,
-                json_schema=doc_type.json_schema,
-                prompt_hints=None,
+                json_schema=clean_schema,
+                instruction=instruction,
+                rules=rules,
                 is_customized=False
             ))
             
@@ -101,22 +163,26 @@ def get_idp_configuration(
     ).first()
     
     if template:
+        clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
         return IDPConfigResponse(
             document_type_id=document_type_id,
             name=doc_type.name,
             extraction_method=template.extraction_method,
-            json_schema=template.field_mappings,
-            prompt_hints=template.field_mappings.get("_hints") if isinstance(template.field_mappings, dict) else None,
+            json_schema=clean_schema,
+            instruction=instruction,
+            rules=rules,
             is_customized=True
         )
         
     # 3. Fall back to the system default DocumentType definition
+    clean_schema, instruction, rules = split_schema_payload(doc_type.json_schema)
     return IDPConfigResponse(
         document_type_id=document_type_id,
         name=doc_type.name,
         extraction_method=doc_type.extraction_method,
-        json_schema=doc_type.json_schema,
-        prompt_hints=None,
+        json_schema=clean_schema,
+        instruction=instruction,
+        rules=rules,
         is_customized=False
     )
 
@@ -154,9 +220,14 @@ def update_idp_configuration(
         DocumentTemplate.status == "promoted"
     ).first()
     
-    schema_payload = request.json_schema or {}
-    if request.prompt_hints:
-        schema_payload["_hints"] = request.prompt_hints
+    schema_payload = dict(request.json_schema) if request.json_schema else {}
+    schema_payload["_instruction"] = request.instruction if request.instruction is not None else DEFAULT_INSTRUCTION
+    schema_payload["_rules"] = request.rules if request.rules is not None else DEFAULT_RULES
+    
+    # Store the exact ordered schema string as metadata to bypass PostgreSQL JSONB key sorting
+    if request.json_schema:
+        import json
+        schema_payload["_original_schema_str"] = json.dumps(request.json_schema)
         
     if template:
         # Update existing customization
@@ -178,11 +249,14 @@ def update_idp_configuration(
     db.commit()
     db.refresh(template)
     
+    clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
     return IDPConfigResponse(
         document_type_id=document_type_id,
         name=doc_type.name,
         extraction_method=template.extraction_method,
-        json_schema=template.field_mappings,
-        prompt_hints=request.prompt_hints,
+        json_schema=clean_schema,
+        instruction=instruction,
+        rules=rules,
         is_customized=True
     )
+

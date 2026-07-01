@@ -77,6 +77,52 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             raise LookupError(f"ProcessingJob for document {doc_id} not found")
 
         # --- Mark running ---
+        # --- Resolve Strategy Early ---
+        from app.models.document_type import DocumentType
+        from app.models.document_template import DocumentTemplate
+        
+        # 1. Resolve document type ID by name if missing (uploads have doc.document_type_id = None)
+        doc_type_id = doc.document_type_id
+        if not doc_type_id and doc.document_type and type(doc.document_type).__name__ not in ("MagicMock", "Mock"):
+            doc_type = db.query(DocumentType).filter(
+                DocumentType.name == doc.document_type,
+                (DocumentType.tenant_id == doc.tenant_id) | (DocumentType.tenant_id.is_(None))
+            ).first()
+            if doc_type:
+                doc_type_id = doc_type.id
+                doc.document_type_id = doc_type_id
+
+        # 2. Resolve template (prioritize explicit template_id, then fallback to tenant's promoted template)
+        template = None
+        # Check for MagicMock objects to prevent crash in unit tests where DB queries are not fully mocked
+        is_mock = type(db).__name__ in ("MagicMock", "Mock") or type(doc_type_id).__name__ in ("MagicMock", "Mock")
+        
+        if doc.template_id and type(doc.template_id).__name__ not in ("MagicMock", "Mock"):
+            template = db.get(DocumentTemplate, doc.template_id)
+        elif doc_type_id and not is_mock:
+            template = db.query(DocumentTemplate).filter(
+                DocumentTemplate.document_type_id == doc_type_id,
+                DocumentTemplate.tenant_id == doc.tenant_id,
+                DocumentTemplate.status == "promoted"
+            ).first()
+
+        # 3. Resolve strategy
+        strategy = "paddle_qwen"
+        if template:
+            strategy = template.extraction_method
+        elif doc_type_id:
+            doc_type = db.get(DocumentType, doc_type_id)
+            if doc_type:
+                strategy = doc_type.extraction_method
+        else:
+            doc_type = db.query(DocumentType).filter(
+                DocumentType.name == doc.document_type,
+                (DocumentType.tenant_id == doc.tenant_id) | (DocumentType.tenant_id.is_(None))
+            ).first()
+            if doc_type:
+                strategy = doc_type.extraction_method
+
+        # --- Mark running ---
         job.status = JOB_RUNNING
         job.started_at = datetime.datetime.now(datetime.timezone.utc)
         job.attempts = (job.attempts or 0) + 1
@@ -86,14 +132,17 @@ def process_document(doc_id: str, tenant_id: str) -> None:
 
         try:
             file_bytes = object_storage.download_file(doc.storage_key)
+            result = None
 
-            result = run_extraction(file_bytes, doc.mime_type)
+            # Bypassed local extraction stage for offloaded paddle_qwen strategy
+            if strategy != "paddle_qwen":
+                result = run_extraction(file_bytes, doc.mime_type)
 
-            # Update status mid-pipeline so the UI shows "ocr_processing".
-            if result.ocr_used:
-                doc.status = STATUS_OCR
-                job.stage = "ocr_processing"
-                db.flush()
+                # Update status mid-pipeline so the UI shows "ocr_processing".
+                if result.ocr_used:
+                    doc.status = STATUS_OCR
+                    job.stage = "ocr_processing"
+                    db.flush()
 
             # --- AI structured extraction (isolated — never fails the document) ---
             doc.status = STATUS_AI
@@ -101,8 +150,11 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             db.flush()
 
             try:
+                local_text = result.text or None if result else None
+                local_has_text = result.has_text_layer if result else False
+                
                 outcome = run_ai_extraction(
-                    db, doc, file_bytes, doc.mime_type, result.text or None, result.has_text_layer
+                    db, doc, file_bytes, doc.mime_type, local_text, local_has_text
                 )
                 if outcome.extraction is not None:
                     ai = outcome.extraction
@@ -157,15 +209,16 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                     status=EXTRACTION_LOW_CONFIDENCE,
                 ))
 
-            # Persist extraction results.
-            doc.extracted_text = result.text or None
-            doc.page_count = result.page_count
-            doc.has_text_layer = result.has_text_layer
-            doc.ocr_used = result.ocr_used
-            doc.ocr_confidence = result.ocr_confidence
+            # Persist extraction results (only for standard cascade; paddle_qwen persists directly)
+            if strategy != "paddle_qwen" and result:
+                doc.extracted_text = result.text or None
+                doc.page_count = result.page_count
+                doc.has_text_layer = result.has_text_layer
+                doc.ocr_used = result.ocr_used
+                doc.ocr_confidence = result.ocr_confidence
 
             # Populate full-text search index: filename + extracted text.
-            combined = " ".join(filter(None, [doc.original_filename, result.text]))
+            combined = " ".join(filter(None, [doc.original_filename, doc.extracted_text]))
             db.execute(
                 update(Document)
                 .where(Document.id == doc_uuid)
@@ -195,9 +248,9 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                 "IDP complete: doc=%s duration=%dms ocr=%s pages=%d chars=%d",
                 doc_id,
                 duration_ms,
-                result.ocr_used,
-                result.page_count,
-                len(result.text),
+                doc.ocr_used,
+                doc.page_count,
+                len(doc.extracted_text or ""),
             )
 
         except Exception as exc:

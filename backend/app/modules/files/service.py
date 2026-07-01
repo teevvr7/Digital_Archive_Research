@@ -60,6 +60,45 @@ def _names_for_ids(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str
 
 
 def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
+    from sqlalchemy.orm import object_session
+    from app.models.document_template import DocumentTemplate
+    from app.modules.idp.config_router import split_schema_payload
+
+    extracted_data = doc.extracted_data
+    if extracted_data and isinstance(extracted_data, dict):
+        db = object_session(doc)
+        if db:
+            template = None
+            if doc.template_id:
+                template = db.get(DocumentTemplate, doc.template_id)
+            elif doc.document_type_id:
+                template = db.query(DocumentTemplate).filter(
+                    DocumentTemplate.document_type_id == doc.document_type_id,
+                    DocumentTemplate.tenant_id == doc.tenant_id,
+                    DocumentTemplate.status == "promoted"
+                ).first()
+            
+            if template:
+                clean_schema, _, _ = split_schema_payload(template.field_mappings)
+                if clean_schema and isinstance(clean_schema, dict):
+                    def sort_dict_by_schema(data, schema):
+                        if not isinstance(data, dict) or not isinstance(schema, dict):
+                            return data
+                        
+                        sorted_data = {}
+                        for key in schema.keys():
+                            if key in data:
+                                sorted_data[key] = sort_dict_by_schema(data[key], schema[key])
+                        for key in data.keys():
+                            if key not in sorted_data:
+                                if isinstance(data[key], dict):
+                                    sorted_data[key] = sort_dict_by_schema(data[key], {})
+                                else:
+                                    sorted_data[key] = data[key]
+                        return sorted_data
+                    
+                    extracted_data = sort_dict_by_schema(extracted_data, clean_schema)
+
     return DocumentOut(
         id=doc.id,
         tenant_id=doc.tenant_id,
@@ -76,7 +115,7 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         has_text_layer=doc.has_text_layer,
         ocr_confidence=doc.ocr_confidence,
         confidence=doc.confidence,
-        extracted_data=doc.extracted_data,
+        extracted_data=extracted_data,
         extracted_text=doc.extracted_text,
         tags=doc.tags or [],
         storage_key=doc.storage_key,

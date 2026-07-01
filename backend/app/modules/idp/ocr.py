@@ -1,13 +1,7 @@
-"""OCR fallback (RapidOCR / ONNXRuntime).
+import logging
+import io
 
-Used ONLY when a document has no usable text layer (scanned PDFs, images) — the
-expensive path the cost cascade tries to avoid. The model is loaded lazily as a
-process-wide singleton because initialisation is heavy; one worker process pays
-that cost once.
-
-Heavy imports are deferred so this module can be imported in environments that
-don't have the worker extras installed — tests mock :func:`ocr_image`.
-"""
+logger = logging.getLogger(__name__)
 
 _engine = None
 
@@ -15,9 +9,17 @@ _engine = None
 def _get_engine():
     global _engine
     if _engine is None:
-        from rapidocr_onnxruntime import RapidOCR
-        _engine = RapidOCR()
-    return _engine
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _engine = RapidOCR()
+        except Exception as e:
+            logger.warning(
+                "Failed to initialize local OCR engine (ONNX Runtime / RapidOCR): %s. "
+                "Local OCR will be disabled.",
+                e
+            )
+            _engine = False
+    return _engine if _engine is not False else None
 
 
 def ocr_image(png_bytes: bytes) -> tuple[str, float]:
@@ -26,13 +28,21 @@ def ocr_image(png_bytes: bytes) -> tuple[str, float]:
     Returns ``(text, confidence)`` where ``confidence`` is the mean per-line score
     in ``[0.0, 1.0]`` (``0.0`` when nothing is detected).
     """
-    import io
-
     import numpy as np
     from PIL import Image
 
+    engine = _get_engine()
+    if engine is None:
+        logger.warning("Local OCR requested but engine is unavailable. Returning empty text.")
+        return "", 0.0
+
     image = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-    result, _elapsed = _get_engine()(np.array(image))
+    try:
+        result, _elapsed = engine(np.array(image))
+    except Exception as e:
+        logger.error("Error during local OCR execution: %s", e)
+        return "", 0.0
+
     if not result:
         return "", 0.0
 
@@ -42,3 +52,4 @@ def ocr_image(png_bytes: bytes) -> tuple[str, float]:
     text = "\n".join(lines)
     confidence = sum(scores) / len(scores) if scores else 0.0
     return text, confidence
+

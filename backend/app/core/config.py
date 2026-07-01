@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     paddle_ocr_model: str = "PaddlePaddle/PaddleOCR-VL"
     qwen_llm_url: str = "http://localhost:8001/v1"
     qwen_llm_model: str = "Qwen2.5-1.5B"
+    allow_mock_fallback: bool = False
 
     # ---- App ----
     cors_allow_origins: str = "http://localhost:3000"
