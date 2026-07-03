@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { apiUploadDocument } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { DocumentType } from "@/types";
 
 interface PendingFile {
@@ -85,6 +86,7 @@ function formatSize(bytes: number) {
 
 export default function UploadPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
@@ -127,6 +129,7 @@ export default function UploadPage() {
     if (pending.length === 0) return;
     setUploading(true);
 
+    let anyStored = false;
     for (const pf of pending) {
       setFiles((prev) =>
         prev.map((f) => (f.id === pf.id ? { ...f, status: "uploading" } : f))
@@ -138,6 +141,7 @@ export default function UploadPage() {
         form.append("document_type", pf.docType);
         const result = await apiUploadDocument(form);
         const isDuplicate = result.duplicates.length > 0;
+        if (!isDuplicate) anyStored = true;
         setFiles((prev) =>
           prev.map((f) =>
             f.id === pf.id ? { ...f, status: isDuplicate ? "duplicate" : "queued" } : f
@@ -152,6 +156,9 @@ export default function UploadPage() {
     }
 
     setUploading(false);
+    // A new file bumped tenant storage server-side — refresh so the sidebar
+    // storage meter reflects it (duplicates don't change usage).
+    if (anyStored) await refresh();
   };
 
   const isTerminal = (s: PendingFile["status"]) => s === "queued" || s === "duplicate";

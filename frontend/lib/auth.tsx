@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiMe, type AuthUser, type AuthTenant } from "@/lib/api";
@@ -9,12 +9,15 @@ interface AuthState {
   user: AuthUser | null;
   tenant: AuthTenant | null;
   signOut: () => Promise<void>;
+  /** Re-fetch the current user + tenant (e.g. to refresh the storage meter after an upload). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null,
   tenant: null,
   signOut: async () => {},
+  refresh: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -64,6 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  /** Re-fetch user + tenant so live-changing fields (e.g. storage usage) stay current. */
+  const refresh = useCallback(async () => {
+    try {
+      const me = await apiMe();
+      setUser(me.user);
+      setTenant(me.tenant);
+    } catch {
+      // Keep the last known values on a transient failure — don't blank the UI.
+    }
+  }, []);
+
   const signOut = async () => {
     await supabase.auth.signOut();
     // onAuthStateChange handles the redirect
@@ -78,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, tenant, signOut }}>
+    <AuthContext.Provider value={{ user, tenant, signOut, refresh }}>
       {children}
     </AuthContext.Provider>
   );

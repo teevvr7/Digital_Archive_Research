@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "datawiz-backend"
 version = "0.1.0"
@@ -46,6 +50,9 @@ dev = [
     "ruff>=0.5",
     "black>=24.4",
 ]
+
+[tool.setuptools]
+packages = ["app"]
 
 [tool.ruff]
 line-length = 100

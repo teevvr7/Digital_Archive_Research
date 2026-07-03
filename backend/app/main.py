@@ -8,8 +8,10 @@ from app.modules.auth.router import router as auth_router
 from app.modules.correspondents.router import router as correspondents_router
 from app.modules.files.router import dashboard_router
 from app.modules.files.router import router as files_router
+from app.modules.metadata.router import router as metadata_router
 from app.modules.search.router import router as search_router
 from app.modules.tags.router import router as tags_router
+from app.modules.views.router import router as views_router
 
 app = FastAPI(
     title="DataWiz Digital Archive API",
@@ -35,6 +37,8 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(tags_router, prefix="/api")
 app.include_router(correspondents_router, prefix="/api")
+app.include_router(metadata_router, prefix="/api")
+app.include_router(views_router, prefix="/api")
 
 
 @app.get("/api/health")

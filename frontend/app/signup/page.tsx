@@ -1,54 +1,64 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Archive, Eye, EyeOff, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { apiBootstrap } from "@/lib/api";
+import { apiBootstrap, apiSignup } from "@/lib/api";
 
-function LoginForm() {
+export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const emailParam = searchParams.get("email");
-    if (emailParam) {
-      setEmail(decodeURIComponent(emailParam));
-    }
-  }, [searchParams]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!email || !password) {
-      setError("Please enter your email and password.");
+
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields.");
       return;
     }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) {
-        setError(`Supabase auth failed: ${authError.message}`);
+      // 1. Create the (pre-confirmed) account via the backend admin endpoint.
+      await apiSignup(email, password);
+
+      // 2. Sign in against Supabase to obtain a session/access token.
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        // Account exists but auto sign-in failed — send them to login pre-filled.
+        router.push(`/login?email=${encodeURIComponent(email)}`);
         return;
       }
-      try {
-        await apiBootstrap();
-      } catch (apiErr: unknown) {
-        setError(`Backend bootstrap failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`);
-        return;
-      }
-      // First-time users: bootstrap just set app_metadata.tenant_id. Refresh the
-      // session so the token carries tenant_id before any tenant-scoped call.
+
+      // 3. Provision the tenant/user rows on the backend (idempotent). This sets
+      //    app_metadata.tenant_id on the Supabase user server-side.
+      await apiBootstrap();
+
+      // 4. Refresh the session so the new access token carries the tenant_id claim
+      //    — without this, every tenant-scoped API call would 403.
       await supabase.auth.refreshSession();
+
       router.push("/dashboard");
     } catch (err: unknown) {
-      setError(`Supabase network error: ${err instanceof Error ? err.message : String(err)}`);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -102,7 +112,7 @@ function LoginForm() {
         </p>
       </div>
 
-      {/* Right panel — login form */}
+      {/* Right panel — signup form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
@@ -113,8 +123,8 @@ function LoginForm() {
             <span className="font-semibold text-slate-900">DataWiz Digital Archive</span>
           </div>
 
-          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Sign in</h1>
-          <p className="text-slate-500 text-sm mb-8">Enter your credentials to access your archive.</p>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Create account</h1>
+          <p className="text-slate-500 text-sm mb-8">Sign up to start organizing your documents.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -131,12 +141,7 @@ function LoginForm() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-slate-700">Password</label>
-                <button type="button" className="text-xs text-blue-600 hover:text-blue-700">
-                  Forgot password?
-                </button>
-              </div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
               <div className="relative">
                 <input
                   type={showPw ? "text" : "password"}
@@ -155,6 +160,17 @@ function LoginForm() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
+              <input
+                type={showPw ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+
             {error && (
               <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {error}
@@ -167,14 +183,14 @@ function LoginForm() {
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
 
           <p className="text-xs text-slate-600 text-center mt-6">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Sign up
+            Already have an account?{" "}
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign in
             </Link>
           </p>
 
@@ -184,18 +200,5 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Next 16 requires any `useSearchParams()` consumer to sit under a Suspense
- * boundary, otherwise the route de-opts to full client rendering (and the build
- * errors). Wrapping the form keeps the page stable.
- */
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
   );
 }

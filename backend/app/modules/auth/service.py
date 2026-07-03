@@ -32,6 +32,21 @@ def _supabase_admin():
     return create_client(settings.supabase_url, settings.supabase_service_role_key)
 
 
+def _admin_tenant_id(user_id: str) -> dict | None:
+    """Return ``{'tenant_id', 'role'}`` from Supabase app_metadata, or None if unset.
+
+    The source of truth for an already-bootstrapped user. Used to guard against a
+    stale token (issued in the first-login window, before app_metadata was set)
+    re-triggering tenant creation.
+    """
+    resp = _supabase_admin().auth.admin.get_user_by_id(user_id)
+    meta = getattr(resp.user, "app_metadata", None) or {}
+    tid = meta.get("tenant_id")
+    if tid:
+        return {"tenant_id": str(tid), "role": meta.get("role", "user")}
+    return None
+
+
 def _initials(name: str) -> str:
     parts = name.strip().split()
     return "".join(p[0].upper() for p in parts[:2]) if parts else "?"
@@ -49,13 +64,28 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
     try:
         db.begin()
 
+        # A token minted in the first-login window carries no tenant_id yet. Before
+        # treating this as a brand-new user, consult Supabase so a stale/replayed
+        # token can never spawn a second tenant for an already-bootstrapped user.
+        if not token.tenant_id:
+            existing = _admin_tenant_id(token.user_id)
+            if existing:
+                token.tenant_id = existing["tenant_id"]
+                token.role = existing["role"]
+
         if not token.tenant_id:
             # ---- Brand-new user: create tenant + sync app_metadata ----
-            tenant = Tenant(name=_derive_tenant_name(token.email), plan="starter")
+            # Pre-generate the id and set the GUC BEFORE the INSERT so the tenants
+            # RLS WITH CHECK (id = app.current_tenant) passes on the insert itself.
+            # (uuid_pk uses a column default, so tenant.id is otherwise only
+            # populated at flush — too late for the WITH CHECK.)
+            new_tenant_id = uuid.uuid4()
+            set_tenant(db, str(new_tenant_id))
+            tenant = Tenant(
+                id=new_tenant_id, name=_derive_tenant_name(token.email), plan="starter"
+            )
             db.add(tenant)
-            db.flush()  # materialise tenant.id (Python-side uuid4 default)
-            # Set GUC so the INSERT passes the tenants + users RLS WITH CHECK.
-            set_tenant(db, str(tenant.id))
+            db.flush()
 
             # Update Supabase app_metadata so the JWT on next refresh has tenant_id + role.
             _supabase_admin().auth.admin.update_user_by_id(

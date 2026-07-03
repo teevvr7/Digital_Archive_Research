@@ -36,9 +36,12 @@ import {
   apiTags,
   apiAssignTag,
   apiUnassignTag,
+  apiCustomFields,
+  apiSetFieldValue,
+  apiDeleteFieldValue,
   type DocumentPatch,
 } from "@/lib/api";
-import type { Document, DocumentType, Tag } from "@/types";
+import type { CustomField, Document, DocumentType, FieldValue, Tag } from "@/types";
 
 const NON_RENDERABLE_MIMES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -141,8 +144,21 @@ export default function DocumentViewerPage({
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showTagPicker, setShowTagPicker] = useState(false);
 
+  // Extraction correction state
+  const [extractionEditing, setExtractionEditing] = useState(false);
+  const [extractionDraft, setExtractionDraft] = useState<Record<string, string>>({});
+  const [savingExtraction, setSavingExtraction] = useState(false);
+
+  // Custom field state
+  const [allCustomFields, setAllCustomFields] = useState<CustomField[]>([]);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [fieldDraft, setFieldDraft] = useState<string>("");
+  const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
+  const [showFieldPicker, setShowFieldPicker] = useState(false);
+
   useEffect(() => {
     apiTags().then(setAllTags).catch(() => {});
+    apiCustomFields().then(setAllCustomFields).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -274,6 +290,71 @@ export default function DocumentViewerPage({
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Restore failed");
+    }
+  };
+
+  const openExtractionEdit = () => {
+    if (!doc?.extractedData) return;
+    const draft: Record<string, string> = {};
+    for (const [k, v] of Object.entries(doc.extractedData)) {
+      if (!Array.isArray(v) && v !== null && typeof v !== "object") {
+        draft[k] = String(v);
+      }
+    }
+    setExtractionDraft(draft);
+    setExtractionEditing(true);
+  };
+
+  const handleSaveExtraction = async () => {
+    if (!doc) return;
+    setSavingExtraction(true);
+    setActionError("");
+    try {
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(extractionDraft)) {
+        const original = doc.extractedData?.[k];
+        if (typeof original === "number") {
+          const n = parseFloat(v);
+          patch[k] = isNaN(n) ? v : n;
+        } else {
+          patch[k] = v;
+        }
+      }
+      const updated = await apiPatchDocument(doc.id, { extractedDataPatch: patch });
+      setDoc(updated);
+      setExtractionEditing(false);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingExtraction(false);
+    }
+  };
+
+  const handleSetFieldValue = async (fieldId: string, value: unknown) => {
+    if (!doc) return;
+    setSavingFieldId(fieldId);
+    setActionError("");
+    try {
+      await apiSetFieldValue(doc.id, fieldId, value);
+      const refreshed = await apiDocument(doc.id);
+      setDoc(refreshed);
+      setEditingFieldId(null);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to save field value");
+    } finally {
+      setSavingFieldId(null);
+    }
+  };
+
+  const handleClearFieldValue = async (fieldId: string) => {
+    if (!doc) return;
+    setActionError("");
+    try {
+      await apiDeleteFieldValue(doc.id, fieldId);
+      const refreshed = await apiDocument(doc.id);
+      setDoc(refreshed);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to clear field value");
     }
   };
 
@@ -498,80 +579,121 @@ export default function DocumentViewerPage({
 
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "extracted" && (
-              <>
+              <div className="space-y-4">
+                {/* ---- Extracted structured data ---- */}
                 {doc.extractedData ? (
                   <div className="space-y-3">
-                    {doc.confidence != null && (
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-400 capitalize">{doc.documentType}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${doc.confidence >= 0.7 ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                          {Math.round(doc.confidence * 100)}% confident
-                        </span>
+                    <div className="flex items-center justify-between">
+                      {doc.confidence != null && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 capitalize">{doc.documentType}</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${doc.confidence >= 0.7 ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                            {Math.round(doc.confidence * 100)}% confident
+                          </span>
+                        </div>
+                      )}
+                      {!extractionEditing && !isTrashed && (
+                        <button
+                          onClick={openExtractionEdit}
+                          className="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors ml-auto"
+                          title="Correct extracted fields"
+                        >
+                          <Pencil className="w-3 h-3" /> Correct
+                        </button>
+                      )}
+                    </div>
+
+                    {extractionEditing ? (
+                      /* ---- Correction form ---- */
+                      <div className="space-y-2">
+                        {Object.entries(extractionDraft).map(([key]) => (
+                          <div key={key}>
+                            <label className="text-xs text-slate-500 capitalize block mb-0.5">
+                              {key.replace(/_/g, " ")}
+                            </label>
+                            <input
+                              value={extractionDraft[key]}
+                              onChange={(e) =>
+                                setExtractionDraft((d) => ({ ...d, [key]: e.target.value }))
+                              }
+                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        ))}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={handleSaveExtraction}
+                            disabled={savingExtraction}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs rounded-lg"
+                          >
+                            {savingExtraction ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Save className="w-3 h-3" />
+                            )}
+                            Save corrections
+                          </button>
+                          <button
+                            onClick={() => setExtractionEditing(false)}
+                            disabled={savingExtraction}
+                            className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs rounded-lg"
+                          >
+                            <X className="w-3 h-3" /> Cancel
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    {Object.entries(doc.extractedData).map(([key, value]) => {
-                      if (Array.isArray(value)) {
-                        return (
-                          <div key={key} className="bg-slate-50 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                              {key.replace(/([A-Z])/g, " $1").trim()}
-                            </p>
-                            <div className="space-y-2">
-                              {(value as Record<string, unknown>[]).map((item, i) => (
-                                <div
-                                  key={i}
-                                  className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
-                                >
-                                  {Object.entries(item).map(([k, v]) => (
-                                    <div key={k} className="flex items-center justify-between gap-2">
-                                      <span className="text-slate-400 capitalize">
-                                        {k.replace(/([A-Z])/g, " $1")}
-                                      </span>
-                                      <span className="font-medium text-slate-700 text-right">
-                                        {String(v)}
-                                      </span>
+                    ) : (
+                      /* ---- Read-only view ---- */
+                      <>
+                        {Object.entries(doc.extractedData).map(([key, value]) => {
+                          if (Array.isArray(value)) {
+                            return (
+                              <div key={key} className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                                  {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                                </p>
+                                <div className="space-y-2">
+                                  {(value as Record<string, unknown>[]).map((item, i) => (
+                                    <div key={i} className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1">
+                                      {Object.entries(item).map(([k, v]) => (
+                                        <div key={k} className="flex items-center justify-between gap-2">
+                                          <span className="text-slate-400 capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
+                                          <span className="font-medium text-slate-700 text-right">{String(v)}</span>
+                                        </div>
+                                      ))}
                                     </div>
                                   ))}
                                 </div>
-                              ))}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={key} className="flex items-start justify-between gap-3 py-2 border-b border-slate-50">
+                              <span className="text-xs text-slate-500 capitalize flex-shrink-0">
+                                {key.replace(/_/g, " ")}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-800 text-right">
+                                {typeof value === "number" && key.toLowerCase().includes("amount")
+                                  ? `MYR ${(value as number).toFixed(2)}`
+                                  : String(value)}
+                              </span>
                             </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div
-                          key={key}
-                          className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
-                        >
-                          <span className="text-xs text-slate-500 capitalize flex-shrink-0">
-                            {key.replace(/([A-Z])/g, " $1").trim()}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-800 text-right">
-                            {typeof value === "number" &&
-                            key.toLowerCase().includes("amount")
-                              ? `MYR ${(value as number).toFixed(2)}`
-                              : String(value)}
-                          </span>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
                 ) : doc.extractedText ? (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                       Extracted Text
                     </p>
-                    <pre className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3 max-h-[28rem] overflow-y-auto">
+                    <pre className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3 max-h-[20rem] overflow-y-auto">
                       {doc.extractedText}
                     </pre>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-slate-400">
-                        Structured data extraction (AI) has not run yet.
-                      </p>
-                      <button
-                        onClick={handleExtract}
-                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                      >
+                      <p className="text-xs text-slate-400">Structured extraction has not run yet.</p>
+                      <button onClick={handleExtract} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                         <FileScan className="w-3 h-3" /> Re-run AI extraction
                       </button>
                     </div>
@@ -588,17 +710,127 @@ export default function DocumentViewerPage({
                       <>
                         <AlertCircle className="w-8 h-8 text-red-300 mb-2" />
                         <p className="text-slate-400 text-sm">Extraction failed</p>
-                        <button
-                          onClick={handleRetry}
-                          className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1"
-                        >
+                        <button onClick={handleRetry} className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1">
                           <RefreshCw className="w-3 h-3" /> Retry processing
                         </button>
                       </>
                     )}
                   </div>
                 )}
-              </>
+
+                {/* ---- Custom fields section ---- */}
+                {allCustomFields.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Custom Fields
+                    </p>
+                    <div className="space-y-2">
+                      {allCustomFields.map((field) => {
+                        const existing = doc.customFieldValues?.find(
+                          (v: FieldValue) => v.fieldId === field.id
+                        );
+                        const isEditing = editingFieldId === field.id;
+
+                        return (
+                          <div key={field.id} className="flex items-center gap-2 py-1.5 border-b border-slate-50">
+                            <span className="text-xs text-slate-500 flex-shrink-0 w-28 truncate">{field.name}</span>
+                            {isEditing ? (
+                              <>
+                                {field.fieldType === "boolean" ? (
+                                  <select
+                                    value={fieldDraft}
+                                    onChange={(e) => setFieldDraft(e.target.value)}
+                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                  >
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                  </select>
+                                ) : field.fieldType === "select" ? (
+                                  <select
+                                    value={fieldDraft}
+                                    onChange={(e) => setFieldDraft(e.target.value)}
+                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                  >
+                                    <option value="">— pick one —</option>
+                                    {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={field.fieldType === "number" ? "number" : field.fieldType === "date" ? "date" : "text"}
+                                    value={fieldDraft}
+                                    onChange={(e) => setFieldDraft(e.target.value)}
+                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  />
+                                )}
+                                <button
+                                  onClick={() => {
+                                    const parsed =
+                                      field.fieldType === "number"
+                                        ? parseFloat(fieldDraft)
+                                        : field.fieldType === "boolean"
+                                        ? fieldDraft === "true"
+                                        : fieldDraft;
+                                    handleSetFieldValue(field.id, parsed);
+                                  }}
+                                  disabled={savingFieldId === field.id}
+                                  className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                >
+                                  {savingFieldId === field.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Save className="w-3 h-3" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => setEditingFieldId(null)}
+                                  className="p-1 text-slate-400 hover:text-slate-600"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex-1 text-xs text-slate-700 font-medium">
+                                  {existing != null
+                                    ? field.fieldType === "boolean"
+                                      ? existing.value ? "Yes" : "No"
+                                      : String(existing.value)
+                                    : <span className="text-slate-300">—</span>}
+                                </span>
+                                {!isTrashed && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingFieldId(field.id);
+                                        setFieldDraft(
+                                          existing != null ? String(existing.value) : ""
+                                        );
+                                      }}
+                                      className="p-1 text-slate-300 hover:text-blue-500"
+                                      title="Edit"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    {existing != null && (
+                                      <button
+                                        onClick={() => handleClearFieldValue(field.id)}
+                                        className="p-1 text-slate-300 hover:text-red-500"
+                                        title="Clear"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {activeTab === "metadata" && (

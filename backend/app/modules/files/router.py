@@ -1,5 +1,6 @@
 """Files module router — document ingestion and retrieval endpoints."""
 
+import datetime
 import uuid
 from typing import Annotated
 
@@ -9,7 +10,15 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_tenant_db
 from app.core.security import TokenData
 from app.modules.files import service
-from app.modules.files.schemas import DashboardOut, DocumentListOut, DocumentOut, DocumentPatchIn
+from app.modules.files.schemas import (
+    BulkSetTypeIn,
+    BulkTagIn,
+    BulkTrashIn,
+    DashboardOut,
+    DocumentListOut,
+    DocumentOut,
+    DocumentPatchIn,
+)
 
 router = APIRouter(tags=["documents"])
 dashboard_router = APIRouter(tags=["dashboard"])
@@ -48,6 +57,10 @@ def list_documents(
     status_q: Annotated[str | None, Query(alias="status")] = None,
     type_q: Annotated[str | None, Query(alias="type")] = None,
     tag_id: uuid.UUID | None = None,
+    correspondent_id: uuid.UUID | None = None,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    inbox: bool = False,
     q: str | None = None,
     sort: str = "date_desc",
     page: int = 1,
@@ -59,6 +72,10 @@ def list_documents(
         status_filter=status_q,
         type_filter=type_q,
         tag_id=tag_id,
+        correspondent_id=correspondent_id,
+        date_from=date_from,
+        date_to=date_to,
+        inbox=inbox,
         q=q,
         sort=sort,
         page=max(1, page),
@@ -140,6 +157,43 @@ def empty_trash(ctx: _DbCtx) -> dict[str, int]:
     db, user = ctx
     deleted = service.empty_trash(db, user)
     return {"deleted": deleted}
+
+
+@router.post(
+    "/documents/bulk-trash",
+    status_code=status.HTTP_200_OK,
+    summary="Soft-delete multiple documents in one call",
+)
+def bulk_trash(ctx: _DbCtx, body: BulkTrashIn) -> dict[str, int]:
+    db, user = ctx
+    count = service.bulk_trash(db, user, body.document_ids)
+    return {"updated": count}
+
+
+@router.post(
+    "/documents/bulk-tag",
+    status_code=status.HTTP_200_OK,
+    summary="Assign or remove a tag on multiple documents",
+)
+def bulk_tag(ctx: _DbCtx, body: BulkTagIn) -> dict[str, int]:
+    db, user = ctx
+    tenant_id = uuid.UUID(user.tenant_id)
+    if body.action == "assign":
+        count = service.bulk_tag_assign(db, tenant_id, body.document_ids, body.tag_id)
+    else:
+        count = service.bulk_tag_remove(db, body.document_ids, body.tag_id)
+    return {"updated": count}
+
+
+@router.post(
+    "/documents/bulk-set-type",
+    status_code=status.HTTP_200_OK,
+    summary="Set document_type on multiple documents",
+)
+def bulk_set_type(ctx: _DbCtx, body: BulkSetTypeIn) -> dict[str, int]:
+    db, _ = ctx
+    count = service.bulk_set_type(db, body.document_ids, body.document_type)
+    return {"updated": count}
 
 
 @router.patch(

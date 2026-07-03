@@ -1,3 +1,27 @@
+export interface SavedView {
+  id: string;
+  name: string;
+  filterState: Record<string, unknown>;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface CustomField {
+  id: string;
+  name: string;
+  fieldType: string; // text | number | date | boolean | select
+  options: string[];
+  position: number;
+  createdAt: string;
+}
+
+export interface FieldValue {
+  fieldId: string;
+  fieldName: string;
+  fieldType: string;
+  value: unknown;
+}
+
 export interface Tag {
   id: string;
   tenantId: string;
@@ -83,6 +107,7 @@ export interface Document {
   extractedText: string | null;
   tags: { id: string; name: string; color: string }[];
   correspondent: { id: string; name: string } | null;
+  customFieldValues: FieldValue[];
   storageKey: string;
   hasThumbnail: boolean;
   deletedAt: string | null;

@@ -98,6 +98,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_001.pdf",
   },
   {
@@ -132,6 +133,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_002.pdf",
   },
   {
@@ -165,6 +167,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_003.jpg",
   },
   {
@@ -191,6 +194,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_004.pdf",
   },
   {
@@ -217,6 +221,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_005.pdf",
   },
   {
@@ -243,6 +248,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_006.pdf",
   },
   {
@@ -269,6 +275,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_007.pdf",
   },
   {
@@ -295,6 +302,7 @@ export const mockDocuments: Document[] = [
     extractedText: null,
     tags: [],
     correspondent: null,
+    customFieldValues: [],
     storageKey: "tenant_01/docs/doc_008.pdf",
   },
 ];

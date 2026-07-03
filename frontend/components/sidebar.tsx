@@ -13,6 +13,9 @@ import {
   Bell,
   Tag,
   Users,
+  SlidersHorizontal,
+  Bookmark,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
@@ -20,6 +23,7 @@ import { formatBytes } from "@/lib/format";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/documents", label: "Documents", icon: FolderOpen },
+  { href: "/documents?inbox=true", label: "Inbox", icon: Inbox },
   { href: "/upload", label: "Upload", icon: Upload },
   { href: "/search", label: "Search", icon: Search },
 ];
@@ -27,6 +31,8 @@ const NAV_ITEMS = [
 const ORG_ITEMS = [
   { href: "/tags", label: "Tags", icon: Tag },
   { href: "/correspondents", label: "Correspondents", icon: Users },
+  { href: "/custom-fields", label: "Custom Fields", icon: SlidersHorizontal },
+  { href: "/views", label: "Saved Views", icon: Bookmark },
 ];
 
 export function Sidebar() {

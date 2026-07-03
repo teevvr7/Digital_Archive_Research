@@ -5,7 +5,8 @@ import hashlib
 import uuid
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core import storage as object_storage
@@ -39,8 +40,10 @@ from app.modules.files.schemas import (
     DocumentListOut,
     DocumentOut,
     DocumentPatchIn,
+    FieldValueOut,
     TagOut,
 )
+from app.modules.metadata.service import fetch_field_values_for_docs
 from app.modules.idp import mimetype
 from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
 from app.modules.search.query import apply_text_search
@@ -134,6 +137,7 @@ def _doc_to_out(
     uploader_name: str,
     tags: list[TagOut] | None = None,
     correspondent: CorrespondentOut | None = None,
+    custom_field_values: list[FieldValueOut] | None = None,
 ) -> DocumentOut:
     return DocumentOut(
         id=doc.id,
@@ -157,6 +161,7 @@ def _doc_to_out(
         extracted_text=doc.extracted_text,
         tags=tags or [],
         correspondent=correspondent,
+        custom_field_values=custom_field_values or [],
         storage_key=doc.storage_key,
         has_thumbnail=doc.thumbnail_key is not None,
         deleted_at=doc.deleted_at,
@@ -322,6 +327,10 @@ def list_documents(
     status_filter: str | None = None,
     type_filter: str | None = None,
     tag_id: uuid.UUID | None = None,
+    correspondent_id: uuid.UUID | None = None,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    inbox: bool = False,
     q: str | None = None,
     sort: str = "date_desc",
     page: int = 1,
@@ -348,6 +357,18 @@ def list_documents(
         stmt = stmt.join(DocumentTag, DocumentTag.document_id == Document.id).where(
             DocumentTag.tag_id == tag_id
         )
+    if correspondent_id is not None:
+        stmt = stmt.where(Document.correspondent_id == correspondent_id)
+    if date_from is not None:
+        stmt = stmt.where(Document.document_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Document.document_date <= date_to)
+    if inbox:
+        # Subquery avoids join conflict with tag_id filter
+        inbox_subq = select(DocumentTag.document_id).join(
+            Tag, Tag.id == DocumentTag.tag_id
+        ).where(Tag.is_inbox_tag.is_(True))
+        stmt = stmt.where(Document.id.in_(inbox_subq))
 
     # When a query is present, match on full-text content OR fuzzy filename
     # (shared with /search so ranking is identical). Otherwise plain browse.
@@ -380,6 +401,7 @@ def list_documents(
     tags_by_doc = _fetch_tags_for_docs(db, doc_ids)
     corresp_ids = {doc.correspondent_id for doc in rows if doc.correspondent_id}
     corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
+    field_values_by_doc = fetch_field_values_for_docs(db, doc_ids)
 
     items = [
         _doc_to_out(
@@ -387,6 +409,7 @@ def list_documents(
             names.get(doc.uploaded_by, str(doc.uploaded_by)),
             tags=tags_by_doc.get(doc.id, []),
             correspondent=corresp_by_id.get(doc.correspondent_id) if doc.correspondent_id else None,
+            custom_field_values=field_values_by_doc.get(doc.id, []),
         )
         for doc in rows
     ]
@@ -404,7 +427,14 @@ def get_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     if doc.correspondent_id:
         corresp_map = _fetch_correspondents_for_ids(db, {doc.correspondent_id})
         corresp = corresp_map.get(doc.correspondent_id)
-    return _doc_to_out(doc, _user_name(db, doc.uploaded_by), tags=tags_map.get(doc_id, []), correspondent=corresp)
+    field_values_map = fetch_field_values_for_docs(db, [doc_id])
+    return _doc_to_out(
+        doc,
+        _user_name(db, doc.uploaded_by),
+        tags=tags_map.get(doc_id, []),
+        correspondent=corresp,
+        custom_field_values=field_values_map.get(doc_id, []),
+    )
 
 
 def get_download_url(db: Session, user: TokenData, doc_id: uuid.UUID) -> str:
@@ -458,6 +488,12 @@ def patch_document(
         doc.document_type = patch.document_type
     if "document_date" in updated_fields:
         doc.document_date = patch.document_date  # may be None to clear
+    if "extracted_data_patch" in updated_fields and patch.extracted_data_patch is not None:
+        # Shallow-merge: only the supplied keys are overwritten; all other
+        # keys in the existing JSONB are preserved.
+        merged = dict(doc.extracted_data or {})
+        merged.update(patch.extracted_data_patch)
+        doc.extracted_data = merged
 
     editor_id = uuid.UUID(user.user_id)
     db.add(ActivityEvent(
@@ -474,7 +510,14 @@ def patch_document(
     if doc.correspondent_id:
         corresp_map = _fetch_correspondents_for_ids(db, {doc.correspondent_id})
         corresp = corresp_map.get(doc.correspondent_id)
-    return _doc_to_out(doc, _user_name(db, doc.uploaded_by), tags=tags_map.get(doc.id, []), correspondent=corresp)
+    field_values_map = fetch_field_values_for_docs(db, [doc.id])
+    return _doc_to_out(
+        doc,
+        _user_name(db, doc.uploaded_by),
+        tags=tags_map.get(doc.id, []),
+        correspondent=corresp,
+        custom_field_values=field_values_map.get(doc.id, []),
+    )
 
 
 def trash_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentOut:
@@ -607,6 +650,99 @@ def extract_missing(db: Session) -> int:
     for doc in rows:
         enqueue_ai_extraction(doc.id, doc.tenant_id)
     return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# Bulk operations (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+def bulk_trash(
+    db: Session, user: TokenData, document_ids: list[uuid.UUID]
+) -> int:
+    """Soft-delete multiple live documents in one call. Returns count trashed."""
+    if not document_ids:
+        return 0
+    rows = db.scalars(
+        select(Document).where(
+            Document.id.in_(document_ids),
+            Document.deleted_at.is_(None),
+        )
+    ).all()
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    actor_id = uuid.UUID(user.user_id)
+    actor_name = _user_name(db, actor_id)
+    for doc in rows:
+        doc.deleted_at = now
+        db.add(ActivityEvent(
+            tenant_id=doc.tenant_id,
+            type=ACT_TRASH,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=actor_id,
+            user_name=actor_name,
+        ))
+    db.flush()
+    return len(rows)
+
+
+def bulk_tag_assign(
+    db: Session,
+    tenant_id: uuid.UUID,
+    document_ids: list[uuid.UUID],
+    tag_id: uuid.UUID,
+) -> int:
+    """Assign a tag to multiple documents (idempotent). Returns count attempted."""
+    if not document_ids:
+        return 0
+    tag = db.get(Tag, tag_id)
+    if tag is None:
+        raise HTTPException(status_code=404, detail="Tag not found.")
+    for doc_id in document_ids:
+        stmt = pg_insert(DocumentTag).values(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            document_id=doc_id,
+            tag_id=tag_id,
+        ).on_conflict_do_nothing(index_elements=["document_id", "tag_id"])
+        db.execute(stmt)
+    db.flush()
+    return len(document_ids)
+
+
+def bulk_tag_remove(
+    db: Session,
+    document_ids: list[uuid.UUID],
+    tag_id: uuid.UUID,
+) -> int:
+    """Remove a tag from multiple documents. Returns count attempted."""
+    if not document_ids:
+        return 0
+    db.execute(
+        delete(DocumentTag).where(
+            DocumentTag.document_id.in_(document_ids),
+            DocumentTag.tag_id == tag_id,
+        )
+    )
+    db.flush()
+    return len(document_ids)
+
+
+def bulk_set_type(
+    db: Session,
+    document_ids: list[uuid.UUID],
+    document_type: str,
+) -> int:
+    """Set document_type on multiple documents. Returns count updated."""
+    if not document_ids:
+        return 0
+    result = db.execute(
+        update(Document)
+        .where(Document.id.in_(document_ids))
+        .values(document_type=document_type)
+    )
+    db.flush()
+    return result.rowcount
 
 
 def get_dashboard(db: Session) -> DashboardOut:

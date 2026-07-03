@@ -6,9 +6,9 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Correspondent, Document, ActivityEvent, SearchListResponse, Tag } from "@/types";
+import type { Correspondent, CustomField, Document, ActivityEvent, FieldValue, SavedView, SearchListResponse, Tag } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8001/api";
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
 // ---- Shared types --------------------------------------------------------
 
@@ -98,7 +98,10 @@ async function delete_<T>(path: string): Promise<T> {
   const headers = await authHeaders();
   const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status} ${await res.text()}`);
-  return res.json() as Promise<T>;
+  // 204 No Content — return undefined (typed as T via void callers)
+  if (res.status === 204) return undefined as unknown as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 async function postForm<T>(path: string, form: FormData): Promise<T> {
@@ -116,6 +119,27 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
 
 // ---- Auth ----------------------------------------------------------------
 
+/**
+ * Create a new account via the backend (Supabase admin API, pre-confirmed).
+ * Unauthenticated — no session exists yet, so this bypasses `authHeaders()`.
+ */
+export async function apiSignup(email: string, password: string): Promise<void> {
+  const res = await fetch(`${BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = (JSON.parse(detail).detail as string) ?? detail;
+    } catch {
+      /* non-JSON body — keep raw text */
+    }
+    throw new Error(detail || `Sign up failed (${res.status})`);
+  }
+}
+
 export const apiBootstrap = () =>
   post<{ user: AuthUser; tenant: AuthTenant }>("/auth/bootstrap");
 
@@ -132,6 +156,10 @@ export type DocumentsQuery = {
   status?: string;
   type?: string;
   tag_id?: string;
+  correspondent_id?: string;
+  date_from?: string;
+  date_to?: string;
+  inbox?: boolean;
   sort?: string;
   q?: string;
   page?: number;
@@ -175,6 +203,8 @@ export type DocumentPatch = {
   title?: string;
   documentType?: string;
   documentDate?: string | null;
+  /** Shallow merge into extracted_data — only listed keys are overwritten. */
+  extractedDataPatch?: Record<string, unknown>;
 };
 
 export const apiPatchDocument = (id: string, patch: DocumentPatch) =>
@@ -256,3 +286,56 @@ export const apiPatchCorrespondent = (
 ) => patch_<Correspondent>(`/correspondents/${id}`, data);
 export const apiDeleteCorrespondent = (id: string) =>
   delete_<void>(`/correspondents/${id}`);
+
+// ---- Custom Fields (Phase 5) ---------------------------------------------
+
+export type CustomFieldCreateInput = {
+  name: string;
+  fieldType: string;
+  options?: string[];
+  position?: number;
+};
+
+export const apiCustomFields = () => get<CustomField[]>("/custom-fields");
+export const apiCreateCustomField = (data: CustomFieldCreateInput) =>
+  post<CustomField>("/custom-fields", data);
+export const apiPatchCustomField = (id: string, data: Partial<CustomFieldCreateInput>) =>
+  patch_<CustomField>(`/custom-fields/${id}`, data);
+export const apiDeleteCustomField = (id: string) => delete_<void>(`/custom-fields/${id}`);
+
+export const apiSetFieldValue = (docId: string, fieldId: string, value: unknown) =>
+  post<FieldValue>(`/documents/${docId}/fields/${fieldId}`, { value });
+export const apiDeleteFieldValue = (docId: string, fieldId: string) =>
+  delete_<void>(`/documents/${docId}/fields/${fieldId}`);
+
+// ---- Saved Views (Phase 6) -----------------------------------------------
+
+export type SavedViewCreateInput = {
+  name: string;
+  filterState: Record<string, unknown>;
+  isDefault?: boolean;
+};
+
+export const apiSavedViews = () => get<SavedView[]>("/saved-views");
+export const apiCreateSavedView = (data: SavedViewCreateInput) =>
+  post<SavedView>("/saved-views", data);
+export const apiPatchSavedView = (
+  id: string,
+  data: Partial<SavedViewCreateInput>
+) => patch_<SavedView>(`/saved-views/${id}`, data);
+export const apiDeleteSavedView = (id: string) =>
+  delete_<void>(`/saved-views/${id}`);
+
+// ---- Bulk operations (Phase 6) -------------------------------------------
+
+export const apiBulkTrash = (documentIds: string[]) =>
+  post<{ updated: number }>("/documents/bulk-trash", { documentIds });
+
+export const apiBulkTag = (
+  documentIds: string[],
+  tagId: string,
+  action: "assign" | "remove"
+) => post<{ updated: number }>("/documents/bulk-tag", { documentIds, tagId, action });
+
+export const apiBulkSetType = (documentIds: string[], documentType: string) =>
+  post<{ updated: number }>("/documents/bulk-set-type", { documentIds, documentType });

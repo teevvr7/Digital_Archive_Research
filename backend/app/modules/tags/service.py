@@ -3,7 +3,8 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import insert, select
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.security import TokenData
@@ -101,7 +102,7 @@ def assign_tag(db: Session, user: TokenData, doc_id: uuid.UUID, tag_id: uuid.UUI
     db.execute(
         insert(DocumentTag)
         .values(id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, tag_id=tag_id)
-        .prefix_with("ON CONFLICT (document_id, tag_id) DO NOTHING")
+        .on_conflict_do_nothing(index_elements=["document_id", "tag_id"])
     )
     db.flush()
 

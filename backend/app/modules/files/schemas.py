@@ -10,6 +10,7 @@ import uuid
 from typing import Any
 
 from app.core.camel import CamelModel
+from app.modules.metadata.schemas import FieldValueOut  # noqa: F401 — re-exported for callers
 
 
 class TagOut(CamelModel):
@@ -28,15 +29,20 @@ class CorrespondentOut(CamelModel):
 
 
 class DocumentPatchIn(CamelModel):
-    """Editable fields on a document (Phase 3).
+    """Editable fields on a document.
 
     All fields are optional — only those explicitly sent are updated.
-    Send ``null`` to clear a field (e.g. remove a document_date).
+    Send ``null`` to clear an optional field (e.g. remove a document_date).
+
+    ``extracted_data_patch`` is a shallow-merge partial update for the
+    ``extracted_data`` JSONB column: only the listed keys are overwritten;
+    all other keys in the existing JSON are preserved.
     """
 
     title: str | None = None
     document_type: str | None = None
     document_date: datetime.date | None = None
+    extracted_data_patch: dict[str, Any] | None = None
 
 
 class DocumentOut(CamelModel):
@@ -67,6 +73,7 @@ class DocumentOut(CamelModel):
     extracted_text: str | None
     tags: list[TagOut]
     correspondent: CorrespondentOut | None
+    custom_field_values: list[FieldValueOut] = []
     storage_key: str
     has_thumbnail: bool
     deleted_at: datetime.datetime | None
@@ -115,3 +122,23 @@ class DashboardOut(CamelModel):
     stats: DashboardStats
     recent_documents: list[DocumentOut]
     activity: list[ActivityOut]
+
+
+# ---------------------------------------------------------------------------
+# Bulk operation request bodies (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+class BulkTrashIn(CamelModel):
+    document_ids: list[uuid.UUID]
+
+
+class BulkTagIn(CamelModel):
+    document_ids: list[uuid.UUID]
+    tag_id: uuid.UUID
+    action: str  # "assign" | "remove"
+
+
+class BulkSetTypeIn(CamelModel):
+    document_ids: list[uuid.UUID]
+    document_type: str
