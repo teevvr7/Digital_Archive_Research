@@ -31,15 +31,15 @@ const STATUS_CONFIG: Record<
     className: "status-completed",
     dot: "bg-green-500",
   },
+  needs_review: {
+    label: "Needs Review",
+    className: "status-needs-review",
+    dot: "bg-amber-500",
+  },
   failed: {
     label: "Failed",
     className: "status-failed",
     dot: "bg-red-500",
-  },
-  needs_review: {
-    label: "Needs Review",
-    className: "status-review",
-    dot: "bg-amber-500",
   },
   success: {
     label: "Success",

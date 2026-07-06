@@ -1,18 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Archive, Eye, EyeOff, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiBootstrap } from "@/lib/api";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam) {
+      setEmail(decodeURIComponent(emailParam));
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +45,9 @@ export default function LoginPage() {
         setError(`Backend bootstrap failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`);
         return;
       }
+      // First-time users: bootstrap just set app_metadata.tenant_id. Refresh the
+      // session so the token carries tenant_id before any tenant-scoped call.
+      await supabase.auth.refreshSession();
       router.push("/dashboard");
     } catch (err: unknown) {
       setError(`Supabase network error: ${err instanceof Error ? err.message : String(err)}`);
@@ -161,11 +173,31 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <p className="text-xs text-slate-600 text-center mt-6">
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign up
+            </Link>
+          </p>
+
           <p className="text-xs text-slate-400 text-center mt-8">
             © 2026 DataWiz. PDPA-compliant document processing.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Next 16 requires any `useSearchParams()` consumer to sit under a Suspense
+ * boundary, otherwise the route de-opts to full client rendering (and the build
+ * errors). Wrapping the form keeps the page stable.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

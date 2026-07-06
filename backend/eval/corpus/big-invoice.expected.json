@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "SALE ASIAN GROCERIES/TRARALGON ASIAN GROCERIES",
+    "invoiceNumber": null,
+    "invoiceDate": "2026-04-01",
+    "dueDate": null,
+    "totalAmount": 5260.56,
+    "currency": null
+  },
+  "notes": "4-page 'Proforma Invoice' wholesale order with a dense multi-column item table (Code/Description/Qty/Price/Amount/GST). PyMuPDF's text-layer reading order breaks each table row into separate per-cell lines, so line items and (legitimately) the invoice number are not recoverable by this tier -- it uses 'Ref:' instead of a labelled invoice number, and has no explicit currency code (it's an Australian document with no AUD/RM token anywhere in the text). Header fields that ARE clearly labelled ('Doc Date:', 'GRAND TOTAL:') are correctly found. This is the intended hard-case example: a real document where Tier 2 gets the header right but line items wrong, which the gate currently still accepts on header strength alone -- a good case to revisit once Tier 3 table-structure models exist."
+}

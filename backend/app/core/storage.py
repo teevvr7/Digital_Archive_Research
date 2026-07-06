@@ -32,6 +32,11 @@ def create_signed_url(storage_key: str, expires_in: int = 300) -> str:
     return result["signedURL"]
 
 
+def delete_file(storage_key: str) -> None:
+    """Remove a file from object storage (used when emptying trash)."""
+    _client().storage.from_(settings.supabase_storage_bucket).remove([storage_key])
+
+
 def download_file(storage_key: str) -> bytes:
     """Download a file's bytes (used by the worker to retrieve documents for parsing)."""
     return _client().storage.from_(settings.supabase_storage_bucket).download(storage_key)

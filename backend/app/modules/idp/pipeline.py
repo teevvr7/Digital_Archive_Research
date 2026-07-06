@@ -1,9 +1,16 @@
 """IDP text-extraction orchestrator.
 
-Implements the cost cascade:
+Implements the cost cascade for the universal ingestion baseline:
   1. PDF with text layer  → free PyMuPDF read (the ~85% case — no AI, no cost).
   2. PDF without text layer → rasterize each page → RapidOCR (CPU, no GPU).
   3. Image (JPEG/PNG/…) → RapidOCR directly, page_count = 1.
+  4. Office (docx/xlsx/pptx) → direct text extraction via python-docx/openpyxl/python-pptx.
+  5. Plain text (txt/csv/md) → decode directly.
+  6. Email (.eml) → stdlib ``email`` header + body extraction.
+
+None of tiers 4-6 involve OCR or AI — they're free, deterministic reads, same
+cost tier as tier 1. ``page_count`` is 1 for all of them (no native concept of
+pages).
 
 After text extraction, :func:`run_ai_extraction` sends page images to the configured
 VLM endpoint for structured field extraction (Milestone E). It returns ``None`` when
@@ -13,6 +20,8 @@ no endpoint is configured so the pipeline degrades gracefully.
 import logging
 import time
 from dataclasses import dataclass, field
+
+from app.modules.idp import mimetype
 
 logger = logging.getLogger(__name__)
 
@@ -216,9 +225,15 @@ def run_extraction(file_bytes: bytes, mime_type: str) -> ExtractionResult:
     Logs per-stage timing so the caller can evaluate OCR performance.
     Raises on unrecoverable parse errors (caller should mark document as failed).
     """
+    if mime_type == "application/pdf":
+        return _extract_pdf(file_bytes)
     if mime_type in _IMAGE_MIMES:
         return _extract_image(file_bytes)
-    return _extract_pdf(file_bytes)
+    if mime_type in mimetype.OFFICE_MIMES or mime_type in mimetype.TEXT_FAMILY_MIMES:
+        return _extract_office_or_text(file_bytes, mime_type)
+    if mime_type == mimetype.MIME_EML:
+        return _extract_email(file_bytes)
+    raise ValueError(f"Unsupported mime type: {mime_type}")
 
 
 def _extract_image(file_bytes: bytes) -> ExtractionResult:
@@ -235,6 +250,48 @@ def _extract_image(file_bytes: bytes) -> ExtractionResult:
         has_text_layer=False,
         ocr_used=True,
         ocr_confidence=confidence,
+    )
+
+
+def _extract_office_or_text(file_bytes: bytes, mime_type: str) -> ExtractionResult:
+    from app.modules.idp import office_parsing
+
+    t0 = time.perf_counter()
+    extractor = {
+        mimetype.MIME_DOCX: office_parsing.extract_docx_text,
+        mimetype.MIME_XLSX: office_parsing.extract_xlsx_text,
+        mimetype.MIME_PPTX: office_parsing.extract_pptx_text,
+        mimetype.MIME_TXT: office_parsing.extract_plain_text,
+        mimetype.MIME_CSV: office_parsing.extract_plain_text,
+        mimetype.MIME_MD: office_parsing.extract_plain_text,
+    }[mime_type]
+    text = extractor(file_bytes)
+    elapsed = time.perf_counter() - t0
+    logger.info("Office/text extract (%s): %.3fs, chars=%d", mime_type, elapsed, len(text))
+
+    return ExtractionResult(
+        text=text.strip(),
+        page_count=1,
+        has_text_layer=True,
+        ocr_used=False,
+        ocr_confidence=None,
+    )
+
+
+def _extract_email(file_bytes: bytes) -> ExtractionResult:
+    from app.modules.idp import office_parsing
+
+    t0 = time.perf_counter()
+    text = office_parsing.extract_email_text(file_bytes)
+    elapsed = time.perf_counter() - t0
+    logger.info("Email extract: %.3fs, chars=%d", elapsed, len(text))
+
+    return ExtractionResult(
+        text=text.strip(),
+        page_count=1,
+        has_text_layer=True,
+        ocr_used=False,
+        ocr_confidence=None,
     )
 
 

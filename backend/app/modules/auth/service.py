@@ -23,12 +23,28 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.security import TokenData
+from app.core.tenant_context import set_tenant
 from app.models.tenant import Tenant
 from app.models.user import User
 
 
 def _supabase_admin():
     return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
+def _admin_tenant_id(user_id: str) -> dict | None:
+    """Return ``{'tenant_id', 'role'}`` from Supabase app_metadata, or None if unset.
+
+    The source of truth for an already-bootstrapped user. Used to guard against a
+    stale token (issued in the first-login window, before app_metadata was set)
+    re-triggering tenant creation.
+    """
+    resp = _supabase_admin().auth.admin.get_user_by_id(user_id)
+    meta = getattr(resp.user, "app_metadata", None) or {}
+    tid = meta.get("tenant_id")
+    if tid:
+        return {"tenant_id": str(tid), "role": meta.get("role", "user")}
+    return None
 
 
 def _initials(name: str) -> str:
@@ -48,11 +64,28 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
     try:
         db.begin()
 
+        # A token minted in the first-login window carries no tenant_id yet. Before
+        # treating this as a brand-new user, consult Supabase so a stale/replayed
+        # token can never spawn a second tenant for an already-bootstrapped user.
+        if not token.tenant_id:
+            existing = _admin_tenant_id(token.user_id)
+            if existing:
+                token.tenant_id = existing["tenant_id"]
+                token.role = existing["role"]
+
         if not token.tenant_id:
             # ---- Brand-new user: create tenant + sync app_metadata ----
-            tenant = Tenant(name=_derive_tenant_name(token.email), plan="starter")
+            # Pre-generate the id and set the GUC BEFORE the INSERT so the tenants
+            # RLS WITH CHECK (id = app.current_tenant) passes on the insert itself.
+            # (uuid_pk uses a column default, so tenant.id is otherwise only
+            # populated at flush — too late for the WITH CHECK.)
+            new_tenant_id = uuid.uuid4()
+            set_tenant(db, str(new_tenant_id))
+            tenant = Tenant(
+                id=new_tenant_id, name=_derive_tenant_name(token.email), plan="starter"
+            )
             db.add(tenant)
-            db.flush()  # get tenant.id before inserting user
+            db.flush()
 
             # Update Supabase app_metadata so the JWT on next refresh has tenant_id + role.
             _supabase_admin().auth.admin.update_user_by_id(
@@ -63,6 +96,8 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             token.role = "admin"
         else:
             # Tenant already exists — fetch it (no RLS; direct by id).
+            # Set GUC first so SELECT + any INSERT both pass RLS.
+            set_tenant(db, token.tenant_id)
             tenant = db.get(Tenant, uuid.UUID(token.tenant_id))
             if tenant is None:
                 # Edge case: app_metadata set but tenant row missing (e.g. manual cleanup).
@@ -92,10 +127,14 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
             user.role = token.role  # keep in sync with app_metadata
 
+        # Capture the tenant id before commit — SQLAlchemy expires all attributes
+        # on commit, so accessing tenant.id after commit would re-query without
+        # the GUC and hit the RLS guard.
+        final_tenant_id = str(tenant.id)
         db.commit()
-        # Refresh both objects while session is still open so all column
-        # attributes are loaded into memory. They survive session.close()
-        # without triggering DetachedInstanceError in the router.
+        # Re-apply GUC: the transaction-local GUC reset at commit, so refresh
+        # SELECTs below need it set again to pass RLS.
+        set_tenant(db, final_tenant_id)
         db.refresh(user)
         db.refresh(tenant)
         return user, tenant

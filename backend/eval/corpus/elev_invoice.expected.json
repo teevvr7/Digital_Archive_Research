@@ -1,0 +1,7 @@
+{
+  "is_candidate": false,
+  "expected_gate_pass": null,
+  "document_type": null,
+  "fields": {},
+  "notes": "This is actually a QUOTE ('Quote number:', 'Quote total:'), not an invoice or receipt, despite the filename. Correctly excluded by the doc-type keyword gate -- structured extraction is type-conditional, so this document gets full text/thumbnail/metadata but is never attempted by either Tier 2 or the VLM. This is the intended behaviour for the 'never call the LLM on a document that doesn't need it' rule, not a failure."
+}

@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": false,
+  "document_type": "receipt",
+  "fields": {
+    "vendor": "ALPS MANAGEMENT SERVICES SDN BHD (586745-A)",
+    "invoiceNumber": null,
+    "invoiceDate": "2017-08-09",
+    "dueDate": null,
+    "totalAmount": null,
+    "currency": "MYR"
+  },
+  "notes": "This is actually a multi-transaction 'DEBTOR STATEMENT' (a running account-balance ledger across many invoices/payments), not a single invoice or receipt -- the keyword gate misclassifies it as 'receipt' purely because the boilerplate text contains 'PAYMENT RECEIVED.TQ'. This is a deliberate inclusion: it demonstrates the SECOND layer of defence working correctly -- even though the doc-type keyword gate has a false positive, the quality gate still correctly scores it low (no single invoice number or total to find in a running-balance table) and routes it to the VLM fallback rather than accepting a meaningless extraction. The 'invoiceDate' found is really the statement date (08/09/2017) -- a reasonable but not very meaningful match for this document type. Malaysian SDN BHD entity, currency correctly inferred as MYR. Scanned PDF, OCR path (RapidOCR)."
+}

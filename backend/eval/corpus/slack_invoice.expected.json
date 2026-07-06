@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "slack",
+    "invoiceNumber": "1223113",
+    "invoiceDate": "2023-12-01",
+    "dueDate": "2024-01-15",
+    "totalAmount": 1725.00,
+    "currency": "USD"
+  },
+  "notes": "Clean single-column SaaS billing invoice (Slack -> MineralTree), OCR'd from a PNG. Single line item ('Business+ Monthly User License' / 115 / $15.00 / $1,725.00) splits across lines in OCR output so it's not caught by the line-item regex, same limitation as 100-charles. Vendor comes back lowercase ('slack') because that's how OCR read the logo wordmark -- a cosmetic artifact, not a wrong entity."
+}

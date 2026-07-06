@@ -1,11 +1,57 @@
+export interface SavedView {
+  id: string;
+  name: string;
+  filterState: Record<string, unknown>;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface CustomField {
+  id: string;
+  name: string;
+  fieldType: string; // text | number | date | boolean | select
+  options: string[];
+  position: number;
+  createdAt: string;
+}
+
+export interface FieldValue {
+  fieldId: string;
+  fieldName: string;
+  fieldType: string;
+  value: unknown;
+}
+
+export interface Tag {
+  id: string;
+  tenantId: string;
+  name: string;
+  color: string;
+  match: string;
+  matchingAlgorithm: string;
+  isInsensitive: boolean;
+  isInboxTag: boolean;
+  createdAt: string;
+}
+
+export interface Correspondent {
+  id: string;
+  tenantId: string;
+  name: string;
+  match: string;
+  matchingAlgorithm: string;
+  isInsensitive: boolean;
+  createdAt: string;
+}
+
 export type ProcessingStatus =
   | "queued"
   | "extracting_text"
   | "ocr_processing"
   | "ai_extraction"
   | "completed"
-  | "failed"
   | "needs_review"
+  | "failed"
   | "success";
 
 export type DocumentType =
@@ -45,6 +91,7 @@ export interface Document {
   tenantId: string;
   filename: string;
   originalFilename: string;
+  title: string;
   documentType: DocumentType;
   mimeType: string;
   sizeBytes: number;
@@ -52,16 +99,21 @@ export interface Document {
   uploadedBy: string;
   uploadedAt: string;
   processedAt: string | null;
+  documentDate: string | null;
   pageCount: number | null;
   hasTextLayer: boolean;
   ocrConfidence: number | null;
   confidence: number | null;
   extractedData: Record<string, unknown> | null;
   extractedText: string | null;
-  tags: string[];
+  tags: { id: string; name: string; color: string }[];
+  correspondent: { id: string; name: string } | null;
+  customFieldValues: FieldValue[];
   storageKey: string;
   documentTypeId?: string | null;
   templateId?: string | null;
+  hasThumbnail: boolean;
+  deletedAt: string | null;
 }
 
 export interface ActivityEvent {
@@ -72,7 +124,10 @@ export interface ActivityEvent {
     | "processing_failed"
     | "search"
     | "download"
-    | "user_added";
+    | "user_added"
+    | "edit"
+    | "trash"
+    | "restore";
   documentId?: string;
   documentName?: string;
   userId: string;
