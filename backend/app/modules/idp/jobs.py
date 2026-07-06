@@ -103,8 +103,14 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             template = db.query(DocumentTemplate).filter(
                 DocumentTemplate.document_type_id == doc_type_id,
                 DocumentTemplate.tenant_id == doc.tenant_id,
-                DocumentTemplate.status == "promoted"
+                DocumentTemplate.is_default == True
             ).first()
+            if not template:
+                template = db.query(DocumentTemplate).filter(
+                    DocumentTemplate.document_type_id == doc_type_id,
+                    DocumentTemplate.tenant_id == doc.tenant_id,
+                    DocumentTemplate.status == "promoted"
+                ).first()
 
         # 3. Resolve strategy
         strategy = "paddle_qwen"

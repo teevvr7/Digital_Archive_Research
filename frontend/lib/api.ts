@@ -81,6 +81,26 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function put<T>(path: string, body?: unknown): Promise<T> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`PUT ${path} → ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
+async function del(path: string): Promise<void> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status} ${await res.text()}`);
+}
+
 async function postForm<T>(path: string, form: FormData): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -182,6 +202,7 @@ export interface IDPConfig {
   instruction: string;
   rules: string;
   isCustomized: boolean;
+  isSystem: boolean;
 }
 
 export interface IDPConfigUpdateRequest {
@@ -199,3 +220,71 @@ export const apiUpdateIDPConfig = (documentTypeId: string, body: IDPConfigUpdate
 
 export const apiListIDPConfigs = () =>
   get<{ configs: IDPConfig[] }>("/idp/config");
+
+export interface DocumentTypeCreateRequest {
+  name: string;
+  description?: string | null;
+  extractionMethod?: string;
+}
+
+export const apiCreateDocumentType = (body: DocumentTypeCreateRequest) =>
+  post<IDPConfig>("/idp/config/document-types", body);
+
+export const apiDeleteDocumentType = (id: string) =>
+  del(`/idp/config/document-types/${id}`);
+
+
+// ---- Templates ------------------------------------------------------------
+
+export interface Template {
+  id: string;
+  documentTypeId: string;
+  name: string;
+  isDefault: boolean;
+  useImage: boolean;
+  useOcr: boolean;
+  extractionMethod: string;
+  jsonSchema: Record<string, any> | null;
+  instruction: string;
+  rules: string;
+  status: string;
+}
+
+export interface TemplateCreateRequest {
+  documentTypeId: string;
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, any>;
+  instruction?: string | null;
+  rules?: string | null;
+  useImage: boolean;
+  useOcr: boolean;
+}
+
+export interface TemplateUpdateRequest {
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, any>;
+  instruction?: string | null;
+  rules?: string | null;
+  useImage: boolean;
+  useOcr: boolean;
+}
+
+export const apiListTemplates = () =>
+  get<Template[]>("/idp/config/templates");
+
+export const apiCreateTemplate = (body: TemplateCreateRequest) =>
+  post<Template>("/idp/config/templates", body);
+
+export const apiUpdateTemplate = (id: string, body: TemplateUpdateRequest) =>
+  put<Template>(`/idp/config/templates/${id}`, body);
+
+export const apiSetDefaultTemplate = (id: string) =>
+  post<Template>(`/idp/config/templates/${id}/set-default`);
+
+export const apiDeleteTemplate = (id: string) =>
+  del(`/idp/config/templates/${id}`);
+
+export const apiReprocessDocument = (id: string, templateId?: string | null) =>
+  post<Document>(`/documents/${id}/reprocess${templateId ? `?template_id=${templateId}` : ""}`);

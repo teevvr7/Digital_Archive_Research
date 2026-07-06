@@ -58,8 +58,14 @@ def run_ai_extraction(
         template = db.query(DocumentTemplate).filter(
             DocumentTemplate.document_type_id == doc_type_id,
             DocumentTemplate.tenant_id == doc.tenant_id,
-            DocumentTemplate.status == "promoted"
+            DocumentTemplate.is_default == True
         ).first()
+        if not template:
+            template = db.query(DocumentTemplate).filter(
+                DocumentTemplate.document_type_id == doc_type_id,
+                DocumentTemplate.tenant_id == doc.tenant_id,
+                DocumentTemplate.status == "promoted"
+            ).first()
 
     # 3. Resolve strategy
     strategy = "paddle_qwen"
@@ -126,12 +132,17 @@ def run_ai_extraction(
                 prompt_parts.append(rules.strip())
             custom_prompt = "\n\n".join(prompt_parts) if prompt_parts else None
 
+            use_image = getattr(template, "use_image", False) if template else False
+            use_ocr = getattr(template, "use_ocr", True) if template else True
+
             filename = doc.filename or "document"
             validated_json, raw_content, remote_ocr_text, page_count = run_remote_paddle_qwen_extraction(
                 file_bytes=file_bytes,
                 filename=filename,
                 json_schema=clean_schema,
-                custom_prompt=custom_prompt
+                custom_prompt=custom_prompt,
+                use_image=use_image,
+                use_ocr=use_ocr
             )
 
             # Assign remote outputs directly to document model properties

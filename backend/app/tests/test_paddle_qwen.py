@@ -234,7 +234,9 @@ def test_run_ai_extraction_dispatches_paddle_qwen():
             file_bytes=b"fake_bytes",
             filename="test_doc.png",
             json_schema={},
-            custom_prompt="Force math validation!\n\nNo negatives"
+            custom_prompt="Force math validation!\n\nNo negatives",
+            use_image=False,
+            use_ocr=True
         )
 
 

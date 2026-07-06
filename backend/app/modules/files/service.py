@@ -119,6 +119,8 @@ def _doc_to_out(doc: Document, uploader_name: str) -> DocumentOut:
         extracted_text=doc.extracted_text,
         tags=doc.tags or [],
         storage_key=doc.storage_key,
+        document_type_id=doc.document_type_id,
+        template_id=doc.template_id,
     )
 
 
@@ -145,6 +147,7 @@ def create_documents(
     user: TokenData,
     uploads: list[UploadFile],
     type_hints: list[str],
+    template_ids: list[uuid.UUID | None] | None = None,
 ) -> DocumentListOut:
     """Validate, store in object storage, and register uploaded files.
 
@@ -160,7 +163,11 @@ def create_documents(
     created: list[Document] = []
     total_size = 0
 
-    for upload, type_hint in zip(uploads, type_hints):
+    templates = template_ids or []
+    if len(templates) < len(uploads):
+        templates += [None] * (len(uploads) - len(templates))
+
+    for i, (upload, type_hint) in enumerate(zip(uploads, type_hints)):
         content_type = (upload.content_type or "").split(";")[0].strip()
         ext = ALLOWED_MIMES.get(content_type)
         if ext is None:
@@ -188,6 +195,36 @@ def create_documents(
         object_storage.upload_file(storage_key, data, content_type)
         total_size += len(data)
 
+        t_id = templates[i]
+        doc_type_id = None
+        resolved_type_name = type_hint or "other"
+
+        if t_id:
+            from app.models.document_template import DocumentTemplate
+            from app.models.document_type import DocumentType
+            template = db.get(DocumentTemplate, t_id)
+            if template:
+                doc_type_id = template.document_type_id
+                doc_type = db.get(DocumentType, doc_type_id)
+                if doc_type:
+                    resolved_type_name = doc_type.name
+        else:
+            from app.models.document_type import DocumentType
+            doc_type = db.query(DocumentType).filter(
+                DocumentType.name == resolved_type_name,
+                (DocumentType.tenant_id == tenant_id) | (DocumentType.tenant_id.is_(None))
+            ).first()
+            if doc_type:
+                doc_type_id = doc_type.id
+                from app.models.document_template import DocumentTemplate
+                default_tpl = db.query(DocumentTemplate).filter(
+                    DocumentTemplate.document_type_id == doc_type_id,
+                    DocumentTemplate.tenant_id == tenant_id,
+                    DocumentTemplate.is_default == True
+                ).first()
+                if default_tpl:
+                    t_id = default_tpl.id
+
         doc = Document(
             id=doc_id,
             tenant_id=tenant_id,
@@ -197,7 +234,9 @@ def create_documents(
             size_bytes=len(data),
             storage_key=storage_key,
             status=STATUS_QUEUED,
-            document_type=type_hint or "other",
+            document_type=resolved_type_name,
+            document_type_id=doc_type_id,
+            template_id=t_id,
             uploaded_by=uploader_id,
         )
         db.add(doc)
@@ -334,6 +373,46 @@ def retry_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
 
     enqueue_document(doc.id, doc.tenant_id)
 
+    return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
+
+
+def reprocess_document(db: Session, doc_id: uuid.UUID, template_id: uuid.UUID | None = None) -> DocumentOut:
+    """Reset a document's processing state and enqueues a fresh extraction task."""
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    # Reset processing job if exists
+    from app.models.processing_job import ProcessingJob
+    job = db.scalars(
+        select(ProcessingJob).where(ProcessingJob.document_id == doc_id)
+    ).first()
+    if job:
+        job.status = "queued"
+        job.attempts = 0
+        job.error_message = None
+        job.stage = "text_extraction"
+
+    doc.status = STATUS_QUEUED
+    doc.error_message = None
+    doc.extracted_data = None
+    doc.extracted_text = None
+    doc.page_count = None
+
+    if template_id:
+        doc.template_id = template_id
+        # Also sync document_type if template exists
+        from app.models.document_template import DocumentTemplate
+        template = db.get(DocumentTemplate, template_id)
+        if template:
+            from app.models.document_type import DocumentType
+            doc_type = db.get(DocumentType, template.document_type_id)
+            if doc_type:
+                doc.document_type_id = doc_type.id
+                doc.document_type = doc_type.name
+
+    db.flush()
+    enqueue_document(doc.id, doc.tenant_id)
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
 
 

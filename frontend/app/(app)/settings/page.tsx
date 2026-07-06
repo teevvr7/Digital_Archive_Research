@@ -18,7 +18,19 @@ import {
 } from "lucide-react";
 import { mockUsers, mockTenant, formatBytes, storagePercent } from "@/lib/mock-data";
 import type { User } from "@/types";
-import { apiListIDPConfigs, apiUpdateIDPConfig, type IDPConfig } from "@/lib/api";
+import {
+  apiListIDPConfigs,
+  apiUpdateIDPConfig,
+  apiListTemplates,
+  apiCreateTemplate,
+  apiUpdateTemplate,
+  apiSetDefaultTemplate,
+  apiDeleteTemplate,
+  apiCreateDocumentType,
+  apiDeleteDocumentType,
+  type IDPConfig,
+  type Template,
+} from "@/lib/api";
 
 type Tab = "organisation" | "users" | "api" | "security" | "notifications" | "idp";
 
@@ -392,35 +404,72 @@ export default function SettingsPage() {
 
 function IDPControlCenter() {
   const [configs, setConfigs] = useState<IDPConfig[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
-  
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
   // Form fields
+  const [templateName, setTemplateName] = useState("");
   const [method, setMethod] = useState("default");
+  const [useImage, setUseImage] = useState(false);
+  const [useOcr, setUseOcr] = useState(true);
   const [schemaStr, setSchemaStr] = useState("");
   const [instruction, setInstruction] = useState("");
   const [rules, setRules] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Custom document type modal fields
+  const [showNewTypeModal, setShowNewTypeModal] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeDesc, setNewTypeDesc] = useState("");
+
   useEffect(() => {
-    fetchConfigs();
+    fetchConfigsAndTemplates();
   }, []);
 
-  const fetchConfigs = async () => {
+  const fetchConfigsAndTemplates = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiListIDPConfigs();
-      setConfigs(res.configs);
-      if (res.configs.length > 0) {
-        const first = res.configs[0];
-        setSelectedConfigId(first.documentTypeId);
-        setMethod(first.extractionMethod);
-        setSchemaStr(first.jsonSchema ? JSON.stringify(first.jsonSchema, null, 2) : "{}");
-        setInstruction(first.instruction || "");
-        setRules(first.rules || "");
+      const [configRes, templateRes] = await Promise.all([
+        apiListIDPConfigs(),
+        apiListTemplates(),
+      ]);
+      setConfigs(configRes.configs);
+      setTemplates(templateRes);
+
+      if (configRes.configs.length > 0) {
+        const firstConfig = configRes.configs[0];
+        setSelectedConfigId(firstConfig.documentTypeId);
+
+        // Find default template or any template for this config
+        const configTemplates = templateRes.filter(
+          (t) => t.documentTypeId === firstConfig.documentTypeId
+        );
+        if (configTemplates.length > 0) {
+          const defaultTpl = configTemplates.find((t) => t.isDefault) || configTemplates[0];
+          setSelectedTemplateId(defaultTpl.id);
+          setTemplateName(defaultTpl.name);
+          setMethod(defaultTpl.extractionMethod);
+          setUseImage(defaultTpl.useImage);
+          setUseOcr(defaultTpl.useOcr);
+          setSchemaStr(defaultTpl.jsonSchema ? JSON.stringify(defaultTpl.jsonSchema, null, 2) : "{}");
+          setInstruction(defaultTpl.instruction || "");
+          setRules(defaultTpl.rules || "");
+        } else {
+          // If no templates exist yet, reset to default layout creation
+          setSelectedTemplateId("new");
+          setTemplateName(`Default ${firstConfig.name} Layout`);
+          setMethod(firstConfig.extractionMethod);
+          setUseImage(false);
+          setUseOcr(true);
+          setSchemaStr(firstConfig.jsonSchema ? JSON.stringify(firstConfig.jsonSchema, null, 2) : "{}");
+          setInstruction(firstConfig.instruction || "");
+          setRules(firstConfig.rules || "");
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -430,23 +479,51 @@ function IDPControlCenter() {
     }
   };
 
-  const handleSelect = (cfg: IDPConfig) => {
+  const handleSelectDocType = (cfg: IDPConfig) => {
     setSelectedConfigId(cfg.documentTypeId);
-    setMethod(cfg.extractionMethod);
-    setSchemaStr(cfg.jsonSchema ? JSON.stringify(cfg.jsonSchema, null, 2) : "{}");
-    setInstruction(cfg.instruction || "");
-    setRules(cfg.rules || "");
+    const configTemplates = templates.filter((t) => t.documentTypeId === cfg.documentTypeId);
+    if (configTemplates.length > 0) {
+      const defaultTpl = configTemplates.find((t) => t.isDefault) || configTemplates[0];
+      handleSelectTemplate(defaultTpl);
+    } else {
+      setSelectedTemplateId("new");
+      setTemplateName(`Default ${cfg.name} Layout`);
+      setMethod(cfg.extractionMethod);
+      setUseImage(false);
+      setUseOcr(true);
+      setSchemaStr(cfg.jsonSchema ? JSON.stringify(cfg.jsonSchema, null, 2) : "{}");
+      setInstruction(cfg.instruction || "");
+      setRules(cfg.rules || "");
+    }
+    setSaveSuccess(false);
+  };
+
+  const handleSelectTemplate = (tpl: Template) => {
+    setSelectedTemplateId(tpl.id);
+    setTemplateName(tpl.name);
+    setMethod(tpl.extractionMethod);
+    setUseImage(tpl.useImage);
+    setUseOcr(tpl.useOcr);
+    setSchemaStr(tpl.jsonSchema ? JSON.stringify(tpl.jsonSchema, null, 2) : "{}");
+    setInstruction(tpl.instruction || "");
+    setRules(tpl.rules || "");
     setSaveSuccess(false);
   };
 
   const handleSave = async () => {
     if (!selectedConfigId) return;
+
+    if (!useImage && !useOcr) {
+      setError("Please select at least one input modality (Image or OCR).");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSaveSuccess(false);
 
     try {
-      let parsedSchema = null;
+      let parsedSchema = {};
       if (schemaStr.trim()) {
         try {
           parsedSchema = JSON.parse(schemaStr);
@@ -455,17 +532,32 @@ function IDPControlCenter() {
         }
       }
 
-      const updated = await apiUpdateIDPConfig(selectedConfigId, {
-        extractionMethod: method,
-        jsonSchema: parsedSchema,
-        instruction: instruction.trim() || null,
-        rules: rules.trim() || null,
-      });
+      if (selectedTemplateId === "new") {
+        const created = await apiCreateTemplate({
+          documentTypeId: selectedConfigId,
+          name: templateName.trim() || "New Layout",
+          extractionMethod: method,
+          jsonSchema: parsedSchema,
+          instruction: instruction.trim() || null,
+          rules: rules.trim() || null,
+          useImage,
+          useOcr,
+        });
+        setTemplates((prev) => [...prev, created]);
+        setSelectedTemplateId(created.id);
+      } else if (selectedTemplateId) {
+        const updated = await apiUpdateTemplate(selectedTemplateId, {
+          name: templateName.trim() || "Layout Template",
+          extractionMethod: method,
+          jsonSchema: parsedSchema,
+          instruction: instruction.trim() || null,
+          rules: rules.trim() || null,
+          useImage,
+          useOcr,
+        });
+        setTemplates((prev) => prev.map((t) => (t.id === selectedTemplateId ? updated : t)));
+      }
 
-      // Update local state list
-      setConfigs((prev) =>
-        prev.map((c) => (c.documentTypeId === selectedConfigId ? updated : c))
-      );
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
@@ -476,7 +568,136 @@ function IDPControlCenter() {
     }
   };
 
+  const handleSetDefault = async () => {
+    if (!selectedTemplateId || selectedTemplateId === "new") return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiSetDefaultTemplate(selectedTemplateId);
+      setTemplates((prev) =>
+        prev.map((t) => {
+          if (t.documentTypeId === updated.documentTypeId) {
+            return { ...t, isDefault: t.id === updated.id };
+          }
+          return t;
+        })
+      );
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to set default template.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedTemplateId || selectedTemplateId === "new") return;
+    if (!confirm("Are you sure you want to delete this layout template?")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiDeleteTemplate(selectedTemplateId);
+      const remaining = templates.filter((t) => t.id !== selectedTemplateId);
+      setTemplates(remaining);
+
+      // Select another template for the active config if available
+      const configTemplates = remaining.filter((t) => t.documentTypeId === selectedConfigId);
+      if (configTemplates.length > 0) {
+        const defaultTpl = configTemplates.find((t) => t.isDefault) || configTemplates[0];
+        handleSelectTemplate(defaultTpl);
+      } else {
+        setSelectedTemplateId("new");
+        setTemplateName(`Default Layout`);
+        setUseImage(false);
+        setUseOcr(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to delete template.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateDocType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await apiCreateDocumentType({
+        name: newTypeName.trim(),
+        description: newTypeDesc.trim() || null,
+        extractionMethod: "paddle_qwen"
+      });
+      
+      setConfigs((prev) => [...prev, created]);
+      setSelectedConfigId(created.documentTypeId);
+      
+      // Select the newly created document type for default layout creation
+      setSelectedTemplateId("new");
+      setTemplateName(`Default Layout`);
+      setMethod("paddle_qwen");
+      setUseImage(false);
+      setUseOcr(true);
+      setSchemaStr(created.jsonSchema ? JSON.stringify(created.jsonSchema, null, 2) : "{}");
+      setInstruction(created.instruction || "");
+      setRules(created.rules || "");
+      
+      // Reset form & close modal
+      setNewTypeName("");
+      setNewTypeDesc("");
+      setShowNewTypeModal(false);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to create document type.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteDocType = async () => {
+    if (!selectedConfigId || !activeConfig) return;
+    if (activeConfig.isSystem) return;
+    
+    if (
+      !confirm(
+        `Are you sure you want to delete the document type "${activeConfig.name}"? This will permanently delete all associated templates and layouts.`
+      )
+    ) {
+      return;
+    }
+    
+    setSaving(true);
+    setError(null);
+    try {
+      await apiDeleteDocumentType(selectedConfigId);
+      
+      const remainingConfigs = configs.filter((c) => c.documentTypeId !== selectedConfigId);
+      setConfigs(remainingConfigs);
+      
+      // Clean up templates associated with it
+      const remainingTemplates = templates.filter((t) => t.documentTypeId !== selectedConfigId);
+      setTemplates(remainingTemplates);
+      
+      if (remainingConfigs.length > 0) {
+        const firstConfig = remainingConfigs[0];
+        handleSelectDocType(firstConfig);
+      } else {
+        setSelectedConfigId(null);
+        setSelectedTemplateId(null);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to delete document type.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const activeConfig = configs.find((c) => c.documentTypeId === selectedConfigId);
+  const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   if (loading) {
     return (
@@ -497,7 +718,7 @@ function IDPControlCenter() {
           <div>
             <h2 className="font-semibold text-slate-900 text-lg">IDP Core Routing & Models</h2>
             <p className="text-slate-500 text-sm mt-0.5">
-              Dynamically select parsing strategies, schema rules, and prompt instructions for document types. Customizations are isolated to your tenant.
+              Dynamically configure extraction templates, input modalities, layouts, and system instructions. Settings are isolated per tenant.
             </p>
           </div>
         </div>
@@ -511,34 +732,97 @@ function IDPControlCenter() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Document Type Selector */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 h-fit">
-          <h3 className="font-medium text-slate-800 text-sm px-2 mb-3">Document Types</h3>
-          <div className="space-y-1">
+        {/* Document Type & Layout Selector */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 h-fit">
+          <div className="flex items-center justify-between px-2">
+            <div>
+              <h3 className="font-semibold text-slate-800 text-sm">Document Types</h3>
+              <p className="text-slate-400 text-[11px] mt-0.5">Select category to configure</p>
+            </div>
+            <button
+              onClick={() => setShowNewTypeModal(true)}
+              className="p-1.5 border border-slate-200 hover:bg-slate-50 text-blue-600 rounded-lg cursor-pointer"
+              title="Add Custom Document Type"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-2">
             {configs.map((cfg) => {
               const isSelected = cfg.documentTypeId === selectedConfigId;
+              const configTemplates = templates.filter((t) => t.documentTypeId === cfg.documentTypeId);
+
               return (
-                <button
-                  key={cfg.documentTypeId}
-                  onClick={() => handleSelect(cfg)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-colors font-medium cursor-pointer ${
-                    isSelected
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="capitalize">{cfg.name}</span>
-                  <div className="flex items-center gap-1.5">
-                    {cfg.isCustomized && (
-                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] rounded">
-                        Custom
-                      </span>
-                    )}
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded">
-                      {cfg.extractionMethod === "paddle_qwen" ? "Qwen" : "VLM"}
+                <div key={cfg.documentTypeId} className="space-y-1">
+                  <button
+                    onClick={() => handleSelectDocType(cfg)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-colors font-semibold cursor-pointer ${
+                      isSelected
+                        ? "bg-slate-100 text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="capitalize">{cfg.name}</span>
+                      {cfg.isSystem ? (
+                        <span className="px-1 py-0.2 bg-slate-100 text-slate-400 text-[8px] rounded uppercase font-bold tracking-wider mt-0.5">
+                          System
+                        </span>
+                      ) : (
+                        <span className="px-1 py-0.2 bg-emerald-50 text-emerald-600 text-[8px] rounded uppercase font-bold tracking-wider mt-0.5">
+                          Custom
+                        </span>
+                      )}
+                    </div>
+                    <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[10px] rounded font-medium">
+                      {configTemplates.length}
                     </span>
-                  </div>
-                </button>
+                  </button>
+
+                  {isSelected && (
+                    <div className="pl-4 pr-1 py-1 space-y-1 border-l-2 border-slate-200 ml-3">
+                      {configTemplates.map((tpl) => {
+                        const isTplSelected = tpl.id === selectedTemplateId;
+                        return (
+                          <button
+                            key={tpl.id}
+                            onClick={() => handleSelectTemplate(tpl)}
+                            className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs text-left transition-colors cursor-pointer ${
+                              isTplSelected
+                                ? "bg-blue-50 text-blue-700 font-semibold"
+                                : "text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className="truncate max-w-[120px]">{tpl.name}</span>
+                            {tpl.isDefault && (
+                              <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[8px] rounded font-bold uppercase flex-shrink-0">
+                                Default
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => {
+                          setSelectedTemplateId("new");
+                          setTemplateName(`Custom ${cfg.name} Layout`);
+                          setMethod("paddle_qwen");
+                          setUseImage(false);
+                          setUseOcr(true);
+                          setSchemaStr(cfg.jsonSchema ? JSON.stringify(cfg.jsonSchema, null, 2) : "{}");
+                          setInstruction(cfg.instruction || "");
+                          setRules(cfg.rules || "");
+                          setSaveSuccess(false);
+                        }}
+                        className="w-full flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs text-blue-600 hover:bg-blue-50 text-left transition-colors font-medium cursor-pointer mt-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add layout template
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -547,18 +831,45 @@ function IDPControlCenter() {
         {/* Configuration Panel */}
         {activeConfig && (
           <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-6 space-y-6">
-            <div>
-              <h3 className="font-semibold text-slate-900 capitalize">
-                Configure {activeConfig.name} IDP Settings
-              </h3>
-              <p className="text-slate-400 text-xs mt-0.5">
-                Set model targets, spatial extractors, and target field schemas.
-              </p>
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <h3 className="font-semibold text-slate-900 font-sans">
+                  {selectedTemplateId === "new" ? "Create New Extraction Layout" : `Configure "${templateName}" Layout Settings`}
+                </h3>
+                <p className="text-slate-400 text-xs mt-0.5 font-sans">
+                  Set model targets, multimodal options, and layout key properties.
+                </p>
+              </div>
+              {!activeConfig.isSystem && (
+                <button
+                  onClick={handleDeleteDocType}
+                  disabled={saving}
+                  className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer border border-red-200 transition-colors flex items-center gap-1.5"
+                  title="Delete Custom Document Type Category"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Category
+                </button>
+              )}
+            </div>
+
+            {/* Layout Name Input */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Template Layout Name
+              </label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50 font-medium"
+                placeholder="e.g. Acme Corp Specific Layout"
+              />
             </div>
 
             {/* Model Toggle */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-semibold text-slate-700">
                 Extraction Pipeline Strategy
               </label>
               <div className="grid grid-cols-2 gap-4">
@@ -573,7 +884,7 @@ function IDPControlCenter() {
                   <p className={`text-sm font-semibold ${method === "default" ? "text-blue-700" : "text-slate-800"}`}>
                     Teammate VLM Cascade
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1 font-sans">
                     Uses default vLLM endpoint with multi-page token compression.
                   </p>
                 </button>
@@ -588,9 +899,64 @@ function IDPControlCenter() {
                   <p className={`text-sm font-semibold ${method === "paddle_qwen" ? "text-blue-700" : "text-slate-800"}`}>
                     PaddleOCR-VL + Qwen-VL
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1 font-sans">
                     First extracts via PaddleOCR (exact text & layouts), then reasons via Qwen-VL with math validation.
                   </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Input Modalities */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Input Modalities sent to GPU Server
+              </label>
+              <p className="text-slate-400 text-xs mt-0.5 font-sans">
+                Select which inputs are dispatched to the AI server. At least one must be checked.
+              </p>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setUseOcr((v) => !v)}
+                  className={`p-4 border rounded-xl text-left transition-all cursor-pointer flex justify-between items-center ${
+                    useOcr
+                      ? "border-blue-500 bg-blue-50/50 shadow-sm"
+                      : "border-slate-200 hover:border-slate-300 bg-white"
+                  }`}
+                >
+                  <div>
+                    <p className={`text-sm font-semibold ${useOcr ? "text-blue-700" : "text-slate-800"}`}>
+                      OCR Text Content
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5 font-sans">
+                      Sends precise character stream & structural layout bounding boxes.
+                    </p>
+                  </div>
+                  <div className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${useOcr ? "bg-blue-600" : "bg-slate-200"}`}>
+                    <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${useOcr ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUseImage((v) => !v)}
+                  className={`p-4 border rounded-xl text-left transition-all cursor-pointer flex justify-between items-center ${
+                    useImage
+                      ? "border-blue-500 bg-blue-50/50 shadow-sm"
+                      : "border-slate-200 hover:border-slate-300 bg-white"
+                  }`}
+                >
+                  <div>
+                    <p className={`text-sm font-semibold ${useImage ? "text-blue-700" : "text-slate-800"}`}>
+                      Raw Image Modality
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5 font-sans">
+                      Sends the document page image directly for visual layout parsing.
+                    </p>
+                  </div>
+                  <div className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${useImage ? "bg-blue-600" : "bg-slate-200"}`}>
+                    <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${useImage ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                  </div>
                 </button>
               </div>
             </div>
@@ -598,7 +964,7 @@ function IDPControlCenter() {
             {/* Instruction Editor */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-semibold text-slate-700">
                   System Instruction (Plain Text)
                 </label>
                 <span className="text-slate-400 text-[10px]">Main instruction guiding the model</span>
@@ -608,14 +974,14 @@ function IDPControlCenter() {
                 onChange={(e) => setInstruction(e.target.value)}
                 rows={4}
                 placeholder="You are a precise data extraction assistant..."
-                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
+                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50 font-mono"
               />
             </div>
 
             {/* Rules Editor */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-semibold text-slate-700">
                   System Rules & Extraction Constraints (Plain Text)
                 </label>
                 <span className="text-slate-400 text-[10px]">Rules for formatting, nesting, and values</span>
@@ -625,14 +991,14 @@ function IDPControlCenter() {
                 onChange={(e) => setRules(e.target.value)}
                 rows={6}
                 placeholder="RULES:&#10;1. DATES: All dates MUST be YYYY-MM-DD..."
-                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50"
+                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50/50 font-mono"
               />
             </div>
 
             {/* Target JSON Schema Editor */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-semibold text-slate-700">
                   Target JSON Schema (Structured JSON)
                 </label>
                 <span className="text-slate-400 text-[10px]">Must be valid JSON object</span>
@@ -646,31 +1012,104 @@ function IDPControlCenter() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              {saveSuccess && (
-                <span className="flex items-center gap-1 text-xs text-green-600 mr-2">
-                  <Check className="w-3.5 h-3.5" /> Strategy applied successfully
-                </span>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Save Configuration
-                  </>
+            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+              <div className="flex gap-2">
+                {selectedTemplateId !== "new" && activeTemplate && !activeTemplate.isDefault && (
+                  <button
+                    onClick={handleSetDefault}
+                    disabled={saving}
+                    className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer font-sans"
+                  >
+                    Set as Default
+                  </button>
                 )}
-              </button>
+                {selectedTemplateId !== "new" && (
+                  <button
+                    onClick={handleDelete}
+                    disabled={saving}
+                    className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 font-sans"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete Layout
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {saveSuccess && (
+                  <span className="flex items-center gap-1 text-xs text-green-600 font-semibold font-sans">
+                    <Check className="w-3.5 h-3.5" /> Layout saved successfully
+                  </span>
+                )}
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer font-sans"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      {selectedTemplateId === "new" ? "Create Layout" : "Save Configuration"}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Create Custom Document Type Modal */}
+      {showNewTypeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2 font-sans">Create Custom Document Type</h3>
+            <p className="text-slate-400 text-xs mb-5 font-sans">Add a new category of documents for classification and extraction routing.</p>
+            <form onSubmit={handleCreateDocType} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1 font-sans">Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Purchase Order, Contract"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-sans"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1 font-sans">Description (Optional)</label>
+                <textarea
+                  placeholder="Describe the document category purpose..."
+                  value={newTypeDesc}
+                  onChange={(e) => setNewTypeDesc(e.target.value)}
+                  rows={3}
+                  className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-sans"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowNewTypeModal(false)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold cursor-pointer font-sans"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-50 font-sans"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

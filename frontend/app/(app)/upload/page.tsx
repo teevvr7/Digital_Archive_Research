@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload,
@@ -13,13 +13,14 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
-import { apiUploadDocument } from "@/lib/api";
+import { apiUploadDocument, apiListTemplates, apiListIDPConfigs, type Template } from "@/lib/api";
 import type { DocumentType } from "@/types";
 
 interface PendingFile {
   id: string;
   file: File;
   docType: DocumentType;
+  templateId?: string;
   status: "pending" | "uploading" | "queued" | "error";
   error?: string;
 }
@@ -54,6 +55,24 @@ export default function UploadPage() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [defaultType, setDefaultType] = useState<DocumentType>("invoice");
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+
+  useEffect(() => {
+    const fetchConfigsAndTemplates = async () => {
+      try {
+        const [configRes, templateRes] = await Promise.all([
+          apiListIDPConfigs(),
+          apiListTemplates(),
+        ]);
+        setConfigs(configRes.configs);
+        setTemplates(templateRes);
+      } catch (e) {
+        console.error("Failed to load IDP configs/templates:", e);
+      }
+    };
+    fetchConfigsAndTemplates();
+  }, []);
 
   const addFiles = useCallback(
     (incoming: FileList | null) => {
@@ -62,16 +81,24 @@ export default function UploadPage() {
       for (const f of Array.from(incoming)) {
         if (!ACCEPTED.includes(f.type)) continue;
         if (f.size > MAX_SIZE_MB * 1_048_576) continue;
+
+        // Auto-assign default template if exists for the default document type
+        const docTypeConfig = configs.find((c) => c.name.toLowerCase() === defaultType.toLowerCase());
+        const defaultTpl = docTypeConfig
+          ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+          : undefined;
+
         newItems.push({
           id: `${Date.now()}-${Math.random()}`,
           file: f,
           docType: defaultType,
+          templateId: defaultTpl?.id,
           status: "pending",
         });
       }
       setFiles((prev) => [...prev, ...newItems]);
     },
-    [defaultType]
+    [defaultType, configs, templates]
   );
 
   const onDrop = (e: React.DragEvent) => {
@@ -84,7 +111,24 @@ export default function UploadPage() {
     setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const updateType = (id: string, docType: DocumentType) =>
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, docType } : f)));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id === id) {
+          // Sync and find default template for this newly selected document type
+          const docTypeConfig = configs.find((c) => c.name.toLowerCase() === docType.toLowerCase());
+          const defaultTpl = docTypeConfig
+            ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+            : undefined;
+          return { ...f, docType, templateId: defaultTpl?.id };
+        }
+        return f;
+      })
+    );
+
+  const updateTemplate = (id: string, templateId: string) =>
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, templateId: templateId || undefined } : f))
+    );
 
   const handleUpload = async () => {
     const pending = files.filter((f) => f.status === "pending");
@@ -100,6 +144,9 @@ export default function UploadPage() {
         const form = new FormData();
         form.append("files", pf.file);
         form.append("document_type", pf.docType);
+        if (pf.templateId) {
+          form.append("template_id", pf.templateId);
+        }
         await apiUploadDocument(form);
         setFiles((prev) =>
           prev.map((f) => (f.id === pf.id ? { ...f, status: "queued" } : f))
@@ -239,18 +286,47 @@ export default function UploadPage() {
                       {pf.error ?? "Upload failed"}
                     </div>
                   ) : (
-                    <div className="relative inline-block">
-                      <select
-                        value={pf.docType}
-                        onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
-                        className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        {DOC_TYPES.map(({ value, label }) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
+                    (() => {
+                      const docTypeConfig = configs.find((c) => c.name.toLowerCase() === pf.docType.toLowerCase());
+                      const matchingTemplates = docTypeConfig
+                        ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
+                        : [];
+
+                      return (
+                        <div className="flex gap-2 items-center">
+                          <div className="relative inline-block">
+                            <select
+                              value={pf.docType}
+                              onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
+                              className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                            >
+                              {DOC_TYPES.map(({ value, label }) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                          </div>
+
+                          {matchingTemplates.length > 0 && (
+                            <div className="relative inline-block">
+                              <select
+                                value={pf.templateId || ""}
+                                onChange={(e) => updateTemplate(pf.id, e.target.value)}
+                                className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-slate-50 text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                              >
+                                <option value="">Default Strategy</option>
+                                {matchingTemplates.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} {t.isDefault ? "(Default)" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
 

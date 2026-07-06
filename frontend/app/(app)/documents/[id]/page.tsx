@@ -18,7 +18,16 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiDocument, apiDownloadUrl, apiExtractDocument, apiRetryDocument } from "@/lib/api";
+import {
+  apiDocument,
+  apiDownloadUrl,
+  apiExtractDocument,
+  apiRetryDocument,
+  apiReprocessDocument,
+  apiListIDPConfigs,
+  apiListTemplates,
+  type Template,
+} from "@/lib/api";
 import type { Document } from "@/types";
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
@@ -96,6 +105,25 @@ export default function DocumentViewerPage({
     "extracted"
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [reprocessing, setReprocessing] = useState(false);
+
+  useEffect(() => {
+    Promise.all([apiListIDPConfigs(), apiListTemplates()])
+      .then(([configRes, templateRes]) => {
+        setConfigs(configRes.configs);
+        setTemplates(templateRes);
+      })
+      .catch((e) => console.error("Failed to load configs/templates:", e));
+  }, []);
+
+  useEffect(() => {
+    if (doc) {
+      setSelectedTemplateId(doc.templateId || "");
+    }
+  }, [doc]);
 
   useEffect(() => {
     apiDocument(id)
@@ -154,6 +182,20 @@ export default function DocumentViewerPage({
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Extraction request failed");
+    }
+  };
+
+  const handleReprocess = async () => {
+    if (!doc) return;
+    setActionError("");
+    setReprocessing(true);
+    try {
+      const updated = await apiReprocessDocument(doc.id, selectedTemplateId || null);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Reprocessing failed");
+    } finally {
+      setReprocessing(false);
     }
   };
 
@@ -307,6 +349,51 @@ export default function DocumentViewerPage({
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "extracted" && (
               <>
+                {/* Template override select & reprocess */}
+                {(() => {
+                  const docTypeConfig = configs.find((c) => c.name.toLowerCase() === doc.documentType.toLowerCase());
+                  const matchingTemplates = docTypeConfig
+                    ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
+                    : [];
+
+                  return (
+                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4 space-y-2">
+                      <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                        Extraction Template Layout
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <select
+                            value={selectedTemplateId || ""}
+                            onChange={(e) => setSelectedTemplateId(e.target.value)}
+                            className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                          >
+                            <option value="">Default Strategy</option>
+                            {matchingTemplates.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name} {t.isDefault ? "(Default)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        </div>
+                        <button
+                          onClick={handleReprocess}
+                          disabled={reprocessing}
+                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {reprocessing ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          Reprocess
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {doc.extractedData ? (
                   <div className="space-y-3">
                     {doc.confidence != null && (

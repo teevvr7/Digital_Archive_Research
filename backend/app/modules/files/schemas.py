@@ -38,6 +38,8 @@ class DocumentOut(CamelModel):
     extracted_text: str | None
     tags: list[str]
     storage_key: str
+    document_type_id: uuid.UUID | None = None
+    template_id: uuid.UUID | None = None
 
 
 class DocumentListOut(CamelModel):

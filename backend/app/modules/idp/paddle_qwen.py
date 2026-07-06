@@ -197,7 +197,9 @@ def run_remote_paddle_qwen_extraction(
     file_bytes: bytes,
     filename: str,
     json_schema: Dict[str, Any],
-    custom_prompt: str | None
+    custom_prompt: str | None,
+    use_image: bool = False,
+    use_ocr: bool = True
 ) -> Tuple[Dict[str, Any], str, str, int]:
     """Uploads the document file and custom settings to the remote unified Paddle-Qwen service on Lightning AI.
     
@@ -257,7 +259,9 @@ def run_remote_paddle_qwen_extraction(
         files = {"file": (filename, file_bytes, "application/octet-stream")}
         payload_data = {
             "json_schema": json.dumps(json_schema),
-            "custom_prompt": custom_prompt or ""
+            "custom_prompt": custom_prompt or "",
+            "use_image": str(use_image).lower(),
+            "use_ocr": str(use_ocr).lower()
         }
         
         # 120s timeout to allow remote cold-start VLM/LLM servers to response

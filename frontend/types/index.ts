@@ -60,6 +60,8 @@ export interface Document {
   extractedText: string | null;
   tags: string[];
   storageKey: string;
+  documentTypeId?: string | null;
+  templateId?: string | null;
 }
 
 export interface ActivityEvent {
