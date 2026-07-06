@@ -4,7 +4,13 @@
 
 ## 1. Project Overview
 
-A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Intelligent Document Processing (IDP)** module. Users upload documents (PDF, scanned PDF, images); the system stores them securely, extracts text and structured data, and makes everything fast and accurate to search and retrieve. **Primary goal:** a cost-efficient archive where the AI layer (~10–15% of logic) enriches a solid traditional-SaaS core (~85–90%). Deployed for Malaysia (PDPA-aware). **Cost-efficiency in storage and AI processing is the #1 priority in every decision.**
+A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Intelligent Document Processing (IDP)** module.
+
+**North star:** a **general-purpose archive for ALL kinds of files** — PDF, scanned PDF, images, AND office formats (DOCX/XLSX/PPTX/TXT/CSV/email). The system **ingests anything → processes it (text + thumbnail + metadata for every file) → organizes it neatly → lets users retrieve any file fast and accurately.** **Retrieval is the headline feature** — if a user can't find a file in seconds, nothing else matters.
+
+**Structured data extraction (invoices, receipts, …) is a cost-saving enhancement layered on top — NOT the point.** Invoices are simply the first document *type* to get deterministic structured extraction; every other file type still gets full ingestion, text, thumbnail, generic metadata, and search. A file is never blocked from being archived just because structured extraction doesn't apply to it.
+
+**Primary goal:** a cost-efficient archive where the AI layer (~10–15% of logic) enriches a solid traditional-SaaS core (~85–90%). Deployed for Malaysia (PDPA-aware). **Cost-efficiency in storage and AI processing is the #1 priority in every decision.** Target: production-grade, not MVP-grade.
 
 ## 2. Tech Stack & Architecture
 
@@ -21,16 +27,21 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 - S3-compatible **object storage** (Supabase Storage / Cloudflare R2), encrypted at rest
 - Files live in object storage **only**. The DB stores metadata + extracted JSON (`JSONB`). Never store file bytes in the DB.
 
-**Search** (no external search cluster)
-- `tsvector` full-text search over extracted text
-- `pg_trgm` for fuzzy filename matching
-- `JSONB` + GIN indexes for metadata filtering
+**Search & retrieval — the headline feature** (no external search cluster; target <2s)
+- `tsvector` full-text search over extracted text + filename (+ extracted field values)
+- `pg_trgm` for fuzzy/typo filename matching; prefix tsquery for partial words
+- `JSONB` + GIN indexes for long-tail metadata filtering
+- Structured filters on typed fields: tag, correspondent/sender, document type, **document_date range, amount range**, custom fields
+- **Saved views** (filter-rule sets + sort + display config) + facet counts, paperless-style
 
-**IDP pipeline (worker)**
-- Parsing: **PyMuPDF** — text-layer extraction (free, skips OCR when text layer exists — biggest cost saver) + page rasterization to PNG for OCR/VLM input. *(LiteParse dropped — Rust beta, unstable on Windows; replaced by RapidOCR for OCR fallback.)*
-- OCR fallback: **RapidOCR** (`rapidocr-onnxruntime`) — pip-only, CPU-only, Windows-friendly. Runs only when no usable text layer exists.
-- Structured extraction: **vLLM on Lightning AI Studio** (OpenAI-compatible endpoint, Qwen2.5-VL class), outputs **JSON directly**. Doc types are **dynamic** — stored as DB data, never hardcoded. Unknown/novel docs go to VLM; system learns templates and promotes to deterministic after N confirmations.
-- Self-learning loop: `document_types` + `document_templates` tables capture learned layouts. `extractions` table records every attempt — powers exception queue (low-confidence rows) and promote-after-N.
+**IDP pipeline (worker) — deterministic-first cost cascade.** Each tier runs only when the cheaper one fails the quality gate:
+- **Tier 0 — Parsing (free):** **PyMuPDF** text-layer extraction (skips OCR when a text layer exists — biggest cost saver) + page rasterization to PNG. A small **parser registry** routes by MIME (magic bytes, not extension): office → `python-docx`/`openpyxl`/`python-pptx`; text/csv/md → direct; email → headers+body. Multi-page → page-indexed block IR `{page, text, conf}`.
+- **Tier 1 — OCR (cheap, CPU):** OpenCV preprocess → **RapidOCR** (`rapidocr-onnxruntime`, pip-only, CPU-only, Windows-friendly) with per-word confidence. Runs only when no usable text layer exists.
+- **Tier 2 — Deterministic extraction (the core, CPU, ~$0):** `idp/extract.py` — keyword-gated templates (invoice2data engine, rules in `document_templates.field_mappings`) + `dateparser` + spaCy NER + regex/validators (amounts, invoice #, IBAN mod-97). `idp/gate.py` scores the candidate (completeness, format validity, OCR confidence, math-audit); **score ≥ 0.75 → `parsed_deterministic`**, else fall through.
+- **Tier 3 — Layout/table models (CPU, behind the gate, feature-flagged):** docling TableFormer / TATR / PP-Structure / LiLT for hard tables & KIE. **MIT/Apache weights only** (see §6 licensing rule).
+- **Tier 4 — VLM fallback (GPU/network, the exception handler, target 10–20% of docs):** **vLLM on Lightning AI Studio** (OpenAI-compatible, Qwen-VL class), outputs JSON. **The current VLM is a demo placeholder** — wired only as the gate-fail fallback seam; quality is enhanced later as separate work. Re-gate its output; still failing → `needs_review`.
+- Doc types are **dynamic** — stored as DB data, never hardcoded.
+- **Self-learning loop:** `document_types` + `document_templates` capture learned layouts; `extractions` records every attempt (`method` = deterministic|vlm|manual) — powers the exception queue (low-confidence/`needs_review`) and promote-after-N. Every correction becomes a new rule → shrinks future VLM share.
 
 **Frontend**
 - **Next.js / React** + TypeScript, **shadcn/ui** component kit. Keep UI minimal.
@@ -40,20 +51,23 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 **Key patterns**
 - Async-first: uploads return instantly; all heavy IDP work runs in the worker, never in request handlers.
 - Pooled multi-tenancy via RLS — `tenant_id` on every tenant-owned row, enforced at the DB.
-- IDP cost cascade (full version is post-MVP): triage → classify/fingerprint → cheap deterministic extract OR VLM-to-JSON for novel docs → confidence gate → store/index. The GPU runs only on novelty.
+- IDP cost cascade (now being built — see §2 IDP tiers): triage → parse → cheap deterministic extract → **quality gate (0.75)** → VLM only on gate-fail → store/index. The GPU runs only on the hard 10–20%.
 
-## 3. Core Features (MVP Must-Haves)
+## 3. Core Features
 
 - Authentication & login (basic admin/user roles)
-- Multi-tenancy via Postgres RLS (`tenant_id` everywhere, DB-enforced isolation)
-- File upload: PDF, scanned PDF, images
-- Secure object storage + metadata records
-- Async processing pipeline (queue + worker)
-- Text extraction: text-layer (PyMuPDF) + OCR fallback (PaddleOCR)
-- Structured extraction thin slice: VLM-to-JSON for **1–2 document types** against a fixed schema
-- Search & retrieval: fuzzy filename, full-text content, metadata filter
-- Document viewer + original download
-- Basic web UI (upload, list, search, view)
+- Multi-tenancy via Postgres RLS (`tenant_id` everywhere, **DB-enforced** isolation — non-bypassrls role)
+- File upload: **all file types** — PDF, scanned PDF, images, DOCX/XLSX/PPTX, TXT/CSV/MD, email
+- Secure object storage + metadata records + **sha256 dedup**
+- Async processing pipeline (queue + worker) with retry/backoff, never blocks on the VLM
+- Universal processing: text extraction (text-layer + OCR), **thumbnail**, generic metadata (dates/entities/title) for every file
+- Deterministic structured extraction behind a quality gate; VLM fallback only on gate-fail
+- Organization: **tags** (color/hierarchy/auto-match), **correspondents/senders**, **typed custom fields**, **trash/soft-delete**
+- Search & retrieval: fuzzy filename, full-text content, structured metadata filters, **saved views**, facet counts (<2s)
+- Metadata correction UI (edit extracted fields → feeds self-learning)
+- Bulk operations (multi-select tag / set type / delete / download)
+- Document viewer (multi-format) + original download
+- Web UI (upload, list with grid/table + thumbnails, search/filter, view, manage)
 
 ## 4. Roadmap & Current Phase
 
@@ -66,30 +80,32 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 | 4 | 8 | Hardening & security | All journeys pass; RLS isolation tests green; no critical bugs |
 | 5 | 9 | Pilot & launch | Pilot client live on real docs; KPIs instrumented |
 
-**➡️ CURRENT PHASE: Sprint 2/3 — Search + Structured IDP (Milestone D next).**
+**Milestones A–E ✅ complete** (auth, ingestion+RLS, IDP pipeline, search, VLM extraction). See git history + memory for details. The VLM stage shipped but is a **demo placeholder**.
+
+**➡️ CURRENT WORK: production-grade DMS upgrade** (plan: `~/.claude/plans/i-want-you-to-streamed-tiger.md`, paperless-ngx-inspired). Reference DMS at `../paperless`; extraction engines at `../invoice2data-master`, `../TemplatePro_2`, `../docling-main`.
+
+**New phase roadmap (executed step by step, one phase at a time):**
+| Phase | Theme |
+|---|---|
+| 0 | Production hardening foundations — **close the RLS bypassrls gap** (non-bypassrls DB role), Sentry, LLM budget gate + `ai_usage`, storage-quota check, pagination audit |
+| 1 | Universal ingestion & baseline processing — parser registry, all MIME types, text+thumbnail+generic metadata, sha256 dedup, `document_date`/`title` |
+| 2 | Deterministic extraction + quality gate + `eval/corpus` — VLM demoted to gate-fail fallback (target pass rate ≥80%, LLM share 10–20%) |
+| 3 | File management & viewer — soft-delete/trash, PATCH/DELETE, editable fields, multi-format viewer |
+| 4 | Organization — tags + correspondents (rule-match + ML classifier), auto-tag/auto-link |
+| 5 | Metadata — custom fields catalog + typed values (hybrid relational + JSONB) + correction UI |
+| 6 | Retrieval & UX — structured filters, saved views, grid/thumbnail list, bulk ops, inbox view |
 
 **Decisions locked:**
 - Infrastructure: Supabase (DB + Auth + Storage), Redis + RQ (queue), vLLM on Lightning AI Studio
 - Doc types: dynamic (DB data, not code); self-learning IDP pipeline
 - JWT: HS256 verified with project secret; ES256/RS256 JWKS-based verification also supported
-- OCR engine: **RapidOCR** (`rapidocr-onnxruntime`) — LiteParse dropped (Rust beta, unstable on Windows)
+- OCR engine: **RapidOCR** (`rapidocr-onnxruntime`); PyMuPDF for parsing (LiteParse dropped — Rust beta, unstable on Windows)
+- **Deterministic-first:** the VLM runs ONLY after `gate.py` fails (score < 0.75). Changing the 0.75 threshold needs human sign-off.
+- **SaaS-friendly model licensing:** any ML/layout/table/OCR model weights must be **MIT or Apache-2.0**. Banned: YOLOv10 (AGPL), LayoutLMv3/LayoutXLM (CC BY-NC, non-commercial). Approved substitutes: TATR, LiLT, PaddleOCR/PP-Structure, docling/TableFormer, Donut, img2table, RapidOCR/Tesseract. Surya = defer (restricted weights).
 
-**Milestone A ✅ complete:** Login → `/auth/bootstrap` → tenant + user rows created in DB → dashboard loads.
+**Now approved (previously out-of-scope — built in the phases above):** deterministic extraction path, ML auto-classification, type-promotion / template-field management UI, exception-review/correction UI, structured metadata filtering, bulk ops, trash.
 
-**Milestone B ✅ complete:** Upload → object storage → list → download; tenant RLS isolation proven by tests (9/9 green). Enqueue wired after-commit.
-
-**Milestone C ✅ complete (2026-06-10):** Async RQ worker (SimpleWorker on Windows / forking Worker on Linux); PyMuPDF text-layer extraction (free path) + RapidOCR fallback (OCR-only path); `search_tsv` populated after each extraction; full status lifecycle (`queued → extracting_text → [ocr_processing] → completed/failed`); live UI polling; real document viewer (`<img>`/`<iframe>` via signed URL). Tests: 13 passed, 9 skipped (DB isolation tests need `ALEMBIC_DATABASE_URL`).
-
-**Milestone D ✅ complete (2026-06-11):** `GET /api/search` — `websearch_to_tsquery` + prefix tsquery (`word:*`) for partial-word matching; `word_similarity(...) >= 0.2` case-insensitive for fuzzy filename; `ts_headline` with prefix tsquery for highlighted snippets; both `/search` page and `/documents` list upgraded. 7/7 tests green including tenant isolation. E2E verified: partial words, typo filenames, content snippets all confirmed.
-
-**Milestone E — next steps (VLM structured extraction):**
-1. Set up Lightning AI vLLM endpoint (Qwen2.5-VL) — needs API key + endpoint URL in `.env`
-2. `ai_extraction` pipeline stage after OCR: send page images to VLM, receive JSON
-3. Store result in `extracted_data JSONB` (already in schema), search via existing GIN index `ix_documents_extracted_gin`
-
-**Out of scope for MVP (do NOT build without explicit approval):** auto-classification, deterministic extraction path, type "promotion" UI, client template manager, cold-tiering, analytics, public API, microservices, Elasticsearch, multi-region, SSO/SAML, mobile app.
-
-**Phase 2 (post-MVP, data model already built for it):** real auto-classify + fingerprint, deterministic CPU extractor, promote-after-N, confidence-gate tuning, exception-review UI, pgvector semantic template matching.
+**Still out of scope (do NOT build without explicit approval):** cold-tiering, analytics dashboards, public API beyond API-key auth, microservices, Elasticsearch/external search cluster, multi-region, SSO/SAML, mobile app, cross-encoder reranking. (pgvector semantic search is a later, optional Tier-3 item.)
 
 ## 5. Project Structure
 
@@ -106,12 +122,18 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 │   │   ├── core/               # config, db session, security, TENANT/RLS context
 │   │   ├── modules/            # feature modules (clear boundaries, no internal cross-imports)
 │   │   │   ├── auth/           # routes, services, schemas
-│   │   │   ├── files/          # upload, storage adapter, metadata
-│   │   │   ├── search/         # FTS, trigram, metadata filters
-│   │   │   └── idp/            # pipeline orchestration, ocr/, extraction/, schemas
+│   │   │   ├── files/          # upload, storage adapter, metadata, dedup
+│   │   │   ├── search/         # FTS, trigram, structured + metadata filters, facets
+│   │   │   ├── tags/           # tag CRUD + assign (entity, not the old array col)
+│   │   │   ├── correspondents/ # sender/vendor entity CRUD + matching
+│   │   │   ├── metadata/       # custom-field catalog + typed values + correction
+│   │   │   ├── views/          # saved views (filter-rule sets)
+│   │   │   ├── bulk/           # bulk operations on documents
+│   │   │   └── idp/            # pipeline: parsing, ocr, extract, gate, classifier, extraction(VLM)
 │   │   ├── models/             # SQLAlchemy models (tenant_id on all tenant-owned tables)
 │   │   ├── migrations/         # Alembic
 │   │   └── tests/              # incl. tenant-isolation tests
+│   ├── eval/                   # eval/corpus + run.py (deterministic pass rate + LLM share)
 │   ├── pyproject.toml
 │   └── Dockerfile
 ├── frontend/
@@ -135,7 +157,9 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 **Architecture & cost discipline**
 - Respect module boundaries; communicate across modules through service layers, not internal imports.
 - Keep request handlers fast — push any OCR/extraction/long work to the worker. No blocking the API.
-- Honor the cost-first design: skip OCR when a text layer exists; only invoke the GPU/VLM on novel/low-confidence docs. Do not introduce heavy infrastructure (search clusters, extra services, new SaaS dependencies) without explicit approval.
+- Honor the cost-first design: skip OCR when a text layer exists; **the VLM runs ONLY after `gate.py` fails (score < 0.75)** — never call the VLM on the default path. Improve `extract.py` rules when pass rate is low; never lower the gate threshold to pass. Do not introduce heavy infrastructure (search clusters, extra services) without explicit approval.
+- **Retrieval-first & universal:** every file type must be archived, processed (text+thumbnail+metadata), and made searchable; never block ingestion because structured extraction doesn't apply. Search must stay <2s.
+- **SaaS-friendly model licensing (hard rule):** any model weights added must be **MIT or Apache-2.0**. Never add AGPL (e.g. YOLOv10) or non-commercial CC-BY-NC (e.g. LayoutLMv3) weights to the product. Use the approved substitutes (TATR, LiLT, PP-Structure, docling, Donut, img2table). New heavy/optional models go behind a feature flag, benchmarked on `eval/corpus` first.
 - Respect the MoSCoW scope. If a task drifts into Should/Could/Won't features, flag it before building.
 
 **Code quality**
@@ -145,8 +169,8 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 
 **Change safety**
 - **Do not delete or rewrite existing working functions without asking first.** Prefer additive, backward-compatible changes.
-- All schema changes go through Alembic migrations — never edit the DB or models ad hoc.
-- Add or update tests for new logic, especially tenant-isolation and pipeline tests.
+- All schema changes go through Alembic migrations — never edit the DB or models ad hoc. Every new tenant-owned table needs `tenant_id` + both RLS policy variants in the same migration.
+- Add or update tests for new logic, especially tenant-isolation and pipeline tests. Any change to `extract.py`/`gate.py`/parsers: run `eval/run.py` and report **deterministic pass rate** + **LLM share**; a change that improves one field but drops pass rate is a regression. New extraction rules need a fixture doc in `eval/corpus/`.
 - **Ask before:** adding a dependency, changing architecture, destructive operations, or touching auth/tenancy/RLS/storage code.
 
 **Working style**

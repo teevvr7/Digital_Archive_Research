@@ -10,6 +10,39 @@ import uuid
 from typing import Any
 
 from app.core.camel import CamelModel
+from app.modules.metadata.schemas import FieldValueOut  # noqa: F401 — re-exported for callers
+
+
+class TagOut(CamelModel):
+    """A tag as embedded in document responses (id + display fields only)."""
+
+    id: uuid.UUID
+    name: str
+    color: str
+
+
+class CorrespondentOut(CamelModel):
+    """A correspondent as embedded in document responses."""
+
+    id: uuid.UUID
+    name: str
+
+
+class DocumentPatchIn(CamelModel):
+    """Editable fields on a document.
+
+    All fields are optional — only those explicitly sent are updated.
+    Send ``null`` to clear an optional field (e.g. remove a document_date).
+
+    ``extracted_data_patch`` is a shallow-merge partial update for the
+    ``extracted_data`` JSONB column: only the listed keys are overwritten;
+    all other keys in the existing JSON are preserved.
+    """
+
+    title: str | None = None
+    document_type: str | None = None
+    document_date: datetime.date | None = None
+    extracted_data_patch: dict[str, Any] | None = None
 
 
 class DocumentOut(CamelModel):
@@ -23,6 +56,7 @@ class DocumentOut(CamelModel):
     tenant_id: uuid.UUID
     filename: str
     original_filename: str
+    title: str
     document_type: str
     mime_type: str
     size_bytes: int
@@ -30,14 +64,21 @@ class DocumentOut(CamelModel):
     uploaded_by: str
     uploaded_at: datetime.datetime
     processed_at: datetime.datetime | None
+    document_date: datetime.date | None
     page_count: int | None
     has_text_layer: bool
     ocr_confidence: float | None
     confidence: float | None
     extracted_data: dict[str, Any] | None
     extracted_text: str | None
-    tags: list[str]
+    tags: list[TagOut]
+    correspondent: CorrespondentOut | None
+    custom_field_values: list[FieldValueOut] = []
     storage_key: str
+    document_type_id: uuid.UUID | None = None
+    template_id: uuid.UUID | None = None
+    has_thumbnail: bool
+    deleted_at: datetime.datetime | None
 
 
 class DocumentListOut(CamelModel):
@@ -47,6 +88,9 @@ class DocumentListOut(CamelModel):
     total: int
     page: int
     page_size: int
+    # Filenames skipped because their content already exists for this tenant
+    # (sha256 dedup). Only ever non-empty on the upload response.
+    duplicates: list[str] = []
 
 
 class ActivityOut(CamelModel):
@@ -80,3 +124,23 @@ class DashboardOut(CamelModel):
     stats: DashboardStats
     recent_documents: list[DocumentOut]
     activity: list[ActivityOut]
+
+
+# ---------------------------------------------------------------------------
+# Bulk operation request bodies (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+class BulkTrashIn(CamelModel):
+    document_ids: list[uuid.UUID]
+
+
+class BulkTagIn(CamelModel):
+    document_ids: list[uuid.UUID]
+    tag_id: uuid.UUID
+    action: str  # "assign" | "remove"
+
+
+class BulkSetTypeIn(CamelModel):
+    document_ids: list[uuid.UUID]
+    document_type: str

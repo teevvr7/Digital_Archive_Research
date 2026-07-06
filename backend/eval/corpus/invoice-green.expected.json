@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "Craigs' Landscaping",
+    "invoiceNumber": "12345",
+    "invoiceDate": "2024-08-01",
+    "dueDate": "2024-08-31",
+    "totalAmount": 634.73,
+    "currency": "USD"
+  },
+  "notes": "Clean single-column invoice template (Craigs' Landscaping -> Smith Enterprises), OCR'd from a PNG. All header fields extract correctly. Total is post-discount-and-tax ($650 subtotal - $65 discount + $49.73 tax = $634.73) -- correctly picked up via the 'Total' label rather than 'Subtotal'."
+}

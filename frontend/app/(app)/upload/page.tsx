@@ -1,26 +1,32 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload,
   File,
   FileImage,
   FileText,
+  FileSpreadsheet,
+  Presentation,
+  Mail,
   X,
   CheckCircle2,
   AlertCircle,
+  CopyCheck,
   Loader2,
   ChevronDown,
 } from "lucide-react";
-import { apiUploadDocument } from "@/lib/api";
+import { apiUploadDocument, apiListTemplates, apiListIDPConfigs, type Template } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { DocumentType } from "@/types";
 
 interface PendingFile {
   id: string;
   file: File;
   docType: DocumentType;
-  status: "pending" | "uploading" | "queued" | "error";
+  templateId?: string;
+  status: "pending" | "uploading" | "queued" | "duplicate" | "error";
   error?: string;
 }
 
@@ -34,11 +40,43 @@ const DOC_TYPES: { value: DocumentType; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-const ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/webp", "image/tiff"];
+const ACCEPTED = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/tiff",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "message/rfc822",
+];
+// Browsers often report an empty/unreliable File.type for some of these
+// (markdown/eml especially) — fall back to extension for the client-side
+// picker filter. This is a UX nicety only; the real content check happens
+// server-side via magic-byte sniffing (idp/mimetype.py), never the extension.
+const ACCEPTED_EXTENSIONS = [
+  "pdf", "jpg", "jpeg", "png", "webp", "tif", "tiff",
+  "docx", "xlsx", "pptx", "txt", "csv", "md", "markdown", "eml",
+];
 const MAX_SIZE_MB = 50;
+
+function isAcceptedFile(f: globalThis.File): boolean {
+  if (ACCEPTED.includes(f.type)) return true;
+  const ext = f.name.split(".").pop()?.toLowerCase();
+  return !!ext && ACCEPTED_EXTENSIONS.includes(ext);
+}
 
 function FileIcon({ mime }: { mime: string }) {
   if (mime.startsWith("image/")) return <FileImage className="w-5 h-5 text-blue-500" />;
+  if (mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return <FileSpreadsheet className="w-5 h-5 text-green-600" />;
+  if (mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return <Presentation className="w-5 h-5 text-orange-500" />;
+  if (mime === "message/rfc822") return <Mail className="w-5 h-5 text-slate-500" />;
   return <FileText className="w-5 h-5 text-red-500" />;
 }
 
@@ -49,29 +87,56 @@ function formatSize(bytes: number) {
 
 export default function UploadPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [defaultType, setDefaultType] = useState<DocumentType>("invoice");
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+
+  useEffect(() => {
+    const fetchConfigsAndTemplates = async () => {
+      try {
+        const [configRes, templateRes] = await Promise.all([
+          apiListIDPConfigs(),
+          apiListTemplates(),
+        ]);
+        setConfigs(configRes.configs);
+        setTemplates(templateRes);
+      } catch (e) {
+        console.error("Failed to load IDP configs/templates:", e);
+      }
+    };
+    fetchConfigsAndTemplates();
+  }, []);
 
   const addFiles = useCallback(
     (incoming: FileList | null) => {
       if (!incoming) return;
       const newItems: PendingFile[] = [];
       for (const f of Array.from(incoming)) {
-        if (!ACCEPTED.includes(f.type)) continue;
+        if (!isAcceptedFile(f)) continue;
         if (f.size > MAX_SIZE_MB * 1_048_576) continue;
+
+        // Auto-assign default template if exists for the default document type
+        const docTypeConfig = configs.find((c) => c.name.toLowerCase() === defaultType.toLowerCase());
+        const defaultTpl = docTypeConfig
+          ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+          : undefined;
+
         newItems.push({
           id: `${Date.now()}-${Math.random()}`,
           file: f,
           docType: defaultType,
+          templateId: defaultTpl?.id,
           status: "pending",
         });
       }
       setFiles((prev) => [...prev, ...newItems]);
     },
-    [defaultType]
+    [defaultType, configs, templates]
   );
 
   const onDrop = (e: React.DragEvent) => {
@@ -84,13 +149,31 @@ export default function UploadPage() {
     setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const updateType = (id: string, docType: DocumentType) =>
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, docType } : f)));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id === id) {
+          // Sync and find default template for this newly selected document type
+          const docTypeConfig = configs.find((c) => c.name.toLowerCase() === docType.toLowerCase());
+          const defaultTpl = docTypeConfig
+            ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+            : undefined;
+          return { ...f, docType, templateId: defaultTpl?.id };
+        }
+        return f;
+      })
+    );
+
+  const updateTemplate = (id: string, templateId: string) =>
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, templateId: templateId || undefined } : f))
+    );
 
   const handleUpload = async () => {
     const pending = files.filter((f) => f.status === "pending");
     if (pending.length === 0) return;
     setUploading(true);
 
+    let anyStored = false;
     for (const pf of pending) {
       setFiles((prev) =>
         prev.map((f) => (f.id === pf.id ? { ...f, status: "uploading" } : f))
@@ -100,9 +183,16 @@ export default function UploadPage() {
         const form = new FormData();
         form.append("files", pf.file);
         form.append("document_type", pf.docType);
-        await apiUploadDocument(form);
+        if (pf.templateId) {
+          form.append("template_id", pf.templateId);
+        }
+        const result = await apiUploadDocument(form);
+        const isDuplicate = result.duplicates.length > 0;
+        if (!isDuplicate) anyStored = true;
         setFiles((prev) =>
-          prev.map((f) => (f.id === pf.id ? { ...f, status: "queued" } : f))
+          prev.map((f) =>
+            f.id === pf.id ? { ...f, status: isDuplicate ? "duplicate" : "queued" } : f
+          )
         );
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Upload failed";
@@ -113,17 +203,21 @@ export default function UploadPage() {
     }
 
     setUploading(false);
-
-    // Navigate to documents only if all succeeded
-    const updated = files.map((f) =>
-      pending.find((p) => p.id === f.id) ? { ...f, status: "queued" as const } : f
-    );
-    if (updated.every((f) => f.status === "queued")) {
-      setTimeout(() => router.push("/documents"), 800);
-    }
+    // A new file bumped tenant storage server-side — refresh so the sidebar
+    // storage meter reflects it (duplicates don't change usage).
+    if (anyStored) await refresh();
   };
 
-  const allDone = files.length > 0 && files.every((f) => f.status === "queued");
+  const isTerminal = (s: PendingFile["status"]) => s === "queued" || s === "duplicate";
+  const allDone = files.length > 0 && files.every((f) => isTerminal(f.status));
+
+  // Navigate to documents once every file has reached a terminal state.
+  useEffect(() => {
+    if (allDone) {
+      const timerId = setTimeout(() => router.push("/documents"), 800);
+      return () => clearTimeout(timerId);
+    }
+  }, [allDone, router]);
   const pendingCount = files.filter((f) => f.status === "pending").length;
 
   return (
@@ -131,7 +225,8 @@ export default function UploadPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-900">Upload Documents</h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          Supports PDF, scanned PDF, JPEG, PNG, TIFF — up to {MAX_SIZE_MB} MB each.
+          Supports PDF, scans, images, Word/Excel/PowerPoint, text/CSV/Markdown,
+          and email (.eml) — up to {MAX_SIZE_MB} MB each.
         </p>
       </div>
 
@@ -170,7 +265,7 @@ export default function UploadPage() {
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif,.docx,.xlsx,.pptx,.txt,.csv,.md,.eml"
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />
@@ -181,11 +276,13 @@ export default function UploadPage() {
           {dragging ? "Drop files here" : "Drag & drop files here"}
         </p>
         <p className="text-slate-400 text-sm mb-4">or click to browse</p>
-        <div className="flex items-center justify-center gap-3 text-xs text-slate-400">
+        <div className="flex items-center justify-center gap-3 text-xs text-slate-400 flex-wrap">
           <span className="flex items-center gap-1"><File className="w-3.5 h-3.5" /> PDF</span>
-          <span className="flex items-center gap-1"><FileImage className="w-3.5 h-3.5" /> JPEG</span>
-          <span className="flex items-center gap-1"><FileImage className="w-3.5 h-3.5" /> PNG</span>
-          <span className="flex items-center gap-1"><FileImage className="w-3.5 h-3.5" /> TIFF</span>
+          <span className="flex items-center gap-1"><FileImage className="w-3.5 h-3.5" /> Image</span>
+          <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Word/Text</span>
+          <span className="flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" /> Excel/CSV</span>
+          <span className="flex items-center gap-1"><Presentation className="w-3.5 h-3.5" /> PowerPoint</span>
+          <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Email</span>
         </div>
       </div>
 
@@ -233,24 +330,58 @@ export default function UploadPage() {
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Added to processing queue
                     </div>
+                  ) : pf.status === "duplicate" ? (
+                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                      <CopyCheck className="w-3.5 h-3.5" />
+                      Already archived — identical file skipped
+                    </div>
                   ) : pf.status === "error" ? (
                     <div className="flex items-center gap-1 text-xs text-red-500">
                       <AlertCircle className="w-3.5 h-3.5" />
                       {pf.error ?? "Upload failed"}
                     </div>
                   ) : (
-                    <div className="relative inline-block">
-                      <select
-                        value={pf.docType}
-                        onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
-                        className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        {DOC_TYPES.map(({ value, label }) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
+                    (() => {
+                      const docTypeConfig = configs.find((c) => c.name.toLowerCase() === pf.docType.toLowerCase());
+                      const matchingTemplates = docTypeConfig
+                        ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
+                        : [];
+
+                      return (
+                        <div className="flex gap-2 items-center">
+                          <div className="relative inline-block">
+                            <select
+                              value={pf.docType}
+                              onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
+                              className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                            >
+                              {DOC_TYPES.map(({ value, label }) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                          </div>
+
+                          {matchingTemplates.length > 0 && (
+                            <div className="relative inline-block">
+                              <select
+                                value={pf.templateId || ""}
+                                onChange={(e) => updateTemplate(pf.id, e.target.value)}
+                                className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-slate-50 text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                              >
+                                <option value="">Default Strategy</option>
+                                {matchingTemplates.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} {t.isDefault ? "(Default)" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
 
@@ -296,7 +427,7 @@ export default function UploadPage() {
             </>
           ) : allDone ? (
             <>
-              <CheckCircle2 className="w-4 h-4" /> All queued!
+              <CheckCircle2 className="w-4 h-4" /> Done!
             </>
           ) : (
             <>

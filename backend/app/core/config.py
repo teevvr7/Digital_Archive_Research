@@ -61,8 +61,14 @@ class Settings(BaseSettings):
     qwen_llm_model: str = "Qwen2.5-1.5B"
     allow_mock_fallback: bool = False
 
+    # ---- LLM budget gate ----
+    # Per-tenant monthly VLM token cap used when tenants.llm_monthly_token_cap is NULL.
+    # The docs_llm/docs_total ratio breaker from CLAUDE.md is deferred until Phase 2
+    # (deterministic extraction) exists — see project memory for the rationale.
+    llm_monthly_token_cap_default: int = 2_000_000
+
     # ---- App ----
-    cors_allow_origins: str = "http://localhost:3000"
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://[::1]:3000"
     sentry_dsn: str = ""
     env: str = "development"
 
