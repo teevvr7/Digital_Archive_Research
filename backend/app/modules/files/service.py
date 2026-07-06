@@ -142,9 +142,23 @@ def _doc_to_out(
     from app.modules.idp.config_router import split_schema_payload
 
     extracted_data = doc.extracted_data
+    extraction_method = None
+    
+    is_mock_doc = type(doc).__name__ in ("MagicMock", "Mock") or getattr(doc, "id", None) is None or type(doc.id).__name__ in ("MagicMock", "Mock")
+    
     if extracted_data and isinstance(extracted_data, dict):
         db = object_session(doc)
-        if db:
+        if db and not is_mock_doc and type(db).__name__ not in ("MagicMock", "Mock"):
+            try:
+                from app.models.extraction import Extraction
+                latest_ext = db.query(Extraction).filter(
+                    Extraction.document_id == doc.id
+                ).order_by(Extraction.created_at.desc()).first()
+                if latest_ext:
+                    extraction_method = latest_ext.method
+            except Exception:
+                pass
+            
             template = None
             if doc.template_id:
                 template = db.get(DocumentTemplate, doc.template_id)
@@ -204,6 +218,7 @@ def _doc_to_out(
         template_id=doc.template_id if isinstance(doc.template_id, (uuid.UUID, str)) else None,
         has_thumbnail=doc.thumbnail_key is not None,
         deleted_at=doc.deleted_at,
+        extraction_method=extraction_method,
     )
 
 

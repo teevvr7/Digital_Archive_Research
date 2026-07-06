@@ -79,6 +79,7 @@ class DocumentOut(CamelModel):
     template_id: uuid.UUID | None = None
     has_thumbnail: bool
     deleted_at: datetime.datetime | None
+    extraction_method: str | None = None
 
 
 class DocumentListOut(CamelModel):

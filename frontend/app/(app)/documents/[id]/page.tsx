@@ -463,6 +463,26 @@ export default function DocumentViewerPage({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={doc.status} />
+          {doc.extractionMethod === "deterministic" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Deterministic Match
+            </span>
+          )}
+          {doc.extractionMethod === "vlm" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+              VLM Extraction
+            </span>
+          )}
+          {doc.extractionMethod === "manual" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              Manually Verified
+            </span>
+          )}
+          {doc.status !== "failed" && doc.status !== "queued" && doc.status !== "extracting_text" && doc.status !== "ocr_processing" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {doc.hasTextLayer ? "Digital Read" : "Local OCR"}
+            </span>
+          )}
           {actionError && (
             <span className="text-xs text-red-500">{actionError}</span>
           )}

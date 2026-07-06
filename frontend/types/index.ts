@@ -114,6 +114,7 @@ export interface Document {
   templateId?: string | null;
   hasThumbnail: boolean;
   deletedAt: string | null;
+  extractionMethod?: string | null;
 }
 
 export interface ActivityEvent {

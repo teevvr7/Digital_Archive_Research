@@ -230,29 +230,6 @@ export default function UploadPage() {
         </p>
       </div>
 
-      {/* Default type selector */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 mb-5">
-        <p className="text-sm font-medium text-slate-700 mb-3">Default document type</p>
-        <div className="flex flex-wrap gap-2">
-          {DOC_TYPES.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setDefaultType(value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                defaultType === value
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-slate-400 mt-2">
-          Applied to newly added files. You can override per file below.
-        </p>
-      </div>
-
       {/* Drop zone */}
       <div
         className={`upload-zone rounded-xl p-10 text-center cursor-pointer mb-5 ${dragging ? "dragover" : ""}`}
