@@ -729,29 +729,40 @@ export default function DocumentViewerPage({
                       <>
                         {Object.entries(doc.extractedData).map(([key, value]) => {
                           if (Array.isArray(value)) {
+                            const isPrimitiveArray = value.length > 0 && typeof value[0] !== "object";
                             return (
                               <div key={key} className="bg-slate-50 rounded-lg p-3">
                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                                   {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
                                 </p>
                                 <div className="space-y-2">
-                                  {(value as Record<string, unknown>[]).map((item, i) => (
-                                    <div
-                                      key={i}
-                                      className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
-                                    >
-                                      {Object.entries(item).map(([k, v]) => (
-                                        <div key={k} className="flex items-center justify-between gap-2">
-                                          <span className="text-slate-400 capitalize">
-                                            {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                                          </span>
-                                          <span className="font-medium text-slate-700 text-right">
-                                            {String(v)}
-                                          </span>
+                                  {isPrimitiveArray ? (
+                                    <div className="space-y-1">
+                                      {(value as string[]).map((item, i) => (
+                                        <div key={i} className="text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded p-2">
+                                          {item}
                                         </div>
                                       ))}
                                     </div>
-                                  ))}
+                                  ) : (
+                                    (value as Record<string, unknown>[]).map((item, i) => (
+                                      <div
+                                        key={i}
+                                        className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
+                                      >
+                                        {Object.entries(item).map(([k, v]) => (
+                                          <div key={k} className="flex items-center justify-between gap-2">
+                                            <span className="text-slate-400 capitalize">
+                                              {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                            </span>
+                                            <span className="font-medium text-slate-700 text-right">
+                                              {String(v)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ))
+                                  )}
                                 </div>
                               </div>
                             );
