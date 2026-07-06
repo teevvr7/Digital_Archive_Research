@@ -708,7 +708,12 @@ def retry_document(db: Session, doc_id: uuid.UUID) -> DocumentOut:
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
 
 
-def reprocess_document(db: Session, doc_id: uuid.UUID, template_id: uuid.UUID | None = None) -> DocumentOut:
+def reprocess_document(
+    db: Session,
+    doc_id: uuid.UUID,
+    template_id: uuid.UUID | None = None,
+    document_type_id: uuid.UUID | None = None,
+) -> DocumentOut:
     """Reset a document's processing state and enqueues a fresh extraction task."""
     doc = db.get(Document, doc_id)
     if doc is None:
@@ -730,6 +735,13 @@ def reprocess_document(db: Session, doc_id: uuid.UUID, template_id: uuid.UUID | 
     doc.extracted_data = None
     doc.extracted_text = None
     doc.page_count = None
+
+    if document_type_id:
+        from app.models.document_type import DocumentType
+        doc_type = db.get(DocumentType, document_type_id)
+        if doc_type:
+            doc.document_type_id = document_type_id
+            doc.document_type = doc_type.name
 
     if template_id:
         doc.template_id = template_id

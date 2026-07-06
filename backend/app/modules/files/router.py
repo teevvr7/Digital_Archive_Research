@@ -173,10 +173,11 @@ def retry_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
 def reprocess_document(
     ctx: _DbCtx,
     doc_id: uuid.UUID,
-    template_id: uuid.UUID | None = Query(None)
+    template_id: uuid.UUID | None = Query(None),
+    document_type_id: uuid.UUID | None = Query(None)
 ) -> DocumentOut:
     db, _ = ctx
-    return service.reprocess_document(db, doc_id, template_id)
+    return service.reprocess_document(db, doc_id, template_id, document_type_id)
 
 
 @router.post(

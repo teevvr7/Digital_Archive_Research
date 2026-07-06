@@ -136,6 +136,7 @@ export default function DocumentViewerPage({
   const [configs, setConfigs] = useState<any[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [reprocessing, setReprocessing] = useState(false);
   const [textContent, setTextContent] = useState<string | null>(null);
 
@@ -176,6 +177,7 @@ export default function DocumentViewerPage({
   useEffect(() => {
     if (doc) {
       setSelectedTemplateId(doc.templateId || "");
+      setSelectedDocType(doc.documentType || "");
     }
   }, [doc]);
 
@@ -258,7 +260,9 @@ export default function DocumentViewerPage({
     setActionError("");
     setReprocessing(true);
     try {
-      const updated = await apiReprocessDocument(doc.id, selectedTemplateId || null);
+      const docTypeConfig = configs.find((c) => c.name.toLowerCase() === selectedDocType.toLowerCase());
+      const docTypeId = docTypeConfig?.documentTypeId || null;
+      const updated = await apiReprocessDocument(doc.id, selectedTemplateId || null, docTypeId);
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Reprocessing failed");
@@ -639,44 +643,75 @@ export default function DocumentViewerPage({
               <div className="space-y-4">
                 {/* Template override select & reprocess */}
                 {(() => {
-                  const docTypeConfig = configs.find((c) => c.name.toLowerCase() === doc.documentType.toLowerCase());
+                  const docTypeConfig = configs.find((c) => c.name.toLowerCase() === selectedDocType.toLowerCase());
                   const matchingTemplates = docTypeConfig
                     ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
                     : [];
 
                   return (
-                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4 space-y-2">
-                      <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                        Extraction Template Layout
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
+                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4 space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                          Document Type
+                        </label>
+                        <div className="relative">
                           <select
-                            value={selectedTemplateId || ""}
-                            onChange={(e) => setSelectedTemplateId(e.target.value)}
-                            className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                            value={selectedDocType}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+                              setSelectedDocType(newType);
+                              
+                              const newConfig = configs.find((c) => c.name.toLowerCase() === newType.toLowerCase());
+                              const defaultTpl = newConfig
+                                ? templates.find((t) => t.documentTypeId === newConfig.documentTypeId && t.isDefault)
+                                : undefined;
+                              setSelectedTemplateId(defaultTpl?.id || "");
+                            }}
+                            className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
                           >
-                            <option value="">Default Strategy</option>
-                            {matchingTemplates.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} {t.isDefault ? "(Default)" : ""}
+                            {configs.map((c) => (
+                              <option key={c.documentTypeId} value={c.name.toLowerCase()}>
+                                {c.name.charAt(0).toUpperCase() + c.name.slice(1)}
                               </option>
                             ))}
                           </select>
                           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                         </div>
-                        <button
-                          onClick={handleReprocess}
-                          disabled={reprocessing}
-                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                        >
-                          {reprocessing ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          )}
-                          Reprocess
-                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                          Extraction Template Layout
+                        </label>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <select
+                              value={selectedTemplateId || ""}
+                              onChange={(e) => setSelectedTemplateId(e.target.value)}
+                              className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                            >
+                              <option value="">Default Strategy</option>
+                              {matchingTemplates.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name} {t.isDefault ? "(Default)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          </div>
+                          <button
+                            onClick={handleReprocess}
+                            disabled={reprocessing}
+                            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {reprocessing ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            )}
+                            Reprocess
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

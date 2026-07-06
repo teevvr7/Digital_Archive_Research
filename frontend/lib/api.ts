@@ -351,8 +351,13 @@ export const apiSetDefaultTemplate = (id: string) =>
 export const apiDeleteTemplate = (id: string) =>
   delete_<void>(`/idp/config/templates/${id}`);
 
-export const apiReprocessDocument = (id: string, templateId?: string | null) =>
-  post<Document>(`/documents/${id}/reprocess${templateId ? `?template_id=${templateId}` : ""}`);
+export const apiReprocessDocument = (id: string, templateId?: string | null, documentTypeId?: string | null) => {
+  const params = new URLSearchParams();
+  if (templateId) params.append("template_id", templateId);
+  if (documentTypeId) params.append("document_type_id", documentTypeId);
+  const query = params.toString();
+  return post<Document>(`/documents/${id}/reprocess${query ? `?${query}` : ""}`);
+};
 
 // ---- Tags (Phase 4) -------------------------------------------------------
 
