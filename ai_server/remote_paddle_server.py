@@ -22,6 +22,15 @@ app = FastAPI(
     description="Unified API doing both OCR and LLM extraction on GPU"
 )
 
+@app.on_event("startup")
+def startup_event():
+    logger.info("Pre-loading PaddleOCRVL pipeline on server startup...")
+    try:
+        get_paddle_pipeline()
+        logger.info("PaddleOCRVL pipeline preloaded successfully on startup.")
+    except Exception as e:
+        logger.error("Failed to preload PaddleOCRVL pipeline on startup: %s", e)
+
 # --- Configuration & Debug Toggles (via Environment Variables) ---
 QWEN_LLM_URL = os.environ.get("QWEN_LLM_URL", "http://localhost:8001/v1")
 QWEN_LLM_MODEL = os.environ.get("QWEN_LLM_MODEL", "qwen3-vl-4b-instruct")
