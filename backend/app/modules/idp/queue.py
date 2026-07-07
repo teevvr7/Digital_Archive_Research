@@ -39,3 +39,16 @@ def enqueue_document(doc_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
         str(tenant_id),
         retry=Retry(max=3, interval=[10, 30, 60]),
     )
+
+
+def enqueue_storage_deletion(storage_keys: list[str]) -> None:
+    """Enqueue storage files deletion job."""
+    if not storage_keys:
+        return
+    conn = redis.from_url(settings.redis_url)
+    q = Queue(settings.idp_queue_name, connection=conn)
+    q.enqueue(
+        "app.modules.idp.jobs.delete_storage_files",
+        storage_keys,
+        retry=Retry(max=2, interval=[15, 60]),
+    )

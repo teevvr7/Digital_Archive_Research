@@ -591,3 +591,16 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
                 confidence=None,
                 status=EXTRACTION_LOW_CONFIDENCE,
             ))
+
+
+def delete_storage_files(storage_keys: list[str]) -> None:
+    """RQ task to delete file binaries from object storage asynchronously."""
+    logger.info("Asynchronous delete of storage files started: count=%d", len(storage_keys))
+    for key in storage_keys:
+        if not key:
+            continue
+        try:
+            object_storage.delete_file(key)
+            logger.info("Deleted storage file successfully: %s", key)
+        except Exception as exc:
+            logger.warning("Failed to delete storage file %s: %s", key, exc)

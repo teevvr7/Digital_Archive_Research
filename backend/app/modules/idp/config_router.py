@@ -11,19 +11,6 @@ from app.models.document_template import DocumentTemplate
 
 router = APIRouter(prefix="/idp/config", tags=["IDP Configuration"])
 
-from uuid import UUID
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.camel import CamelModel
-from sqlalchemy.orm import Session
-
-from app.core.deps import get_tenant_db
-from app.core.security import TokenData
-from app.models.document_type import DocumentType
-from app.models.document_template import DocumentTemplate
-
-router = APIRouter(prefix="/idp/config", tags=["IDP Configuration"])
-
 DEFAULT_INSTRUCTION = (
     "You are a precise data extraction assistant specialized in financial documents.\n"
     "Extract information from the provided text and return it strictly as a JSON object matching the target structure.\n"

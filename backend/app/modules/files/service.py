@@ -130,48 +130,114 @@ def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int)
         )
 
 
+def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, dict]]:
+    """Helper to batch-fetch extraction methods and template schemas to prevent N+1 queries."""
+    if not docs:
+        return {}, {}
+        
+    doc_ids = [doc.id for doc in docs]
+    
+    # 1. Batch load extraction methods
+    from app.models.extraction import Extraction
+    extractions = db.execute(
+        select(Extraction.document_id, Extraction.method)
+        .where(Extraction.document_id.in_(doc_ids))
+        .order_by(Extraction.created_at.desc())
+    ).all()
+    ext_methods_map = {}
+    for row in extractions:
+        if row.document_id not in ext_methods_map:
+            ext_methods_map[row.document_id] = row.method
+
+    # 2. Batch load template schemas
+    from app.models.document_template import DocumentTemplate
+    from app.modules.idp.config_router import split_schema_payload
+    
+    tpl_ids = {doc.template_id for doc in docs if doc.template_id}
+    doc_type_ids = {doc.document_type_id for doc in docs if doc.document_type_id and not doc.template_id}
+    
+    templates_by_id = {}
+    if tpl_ids:
+        tpls = db.scalars(
+            select(DocumentTemplate).where(DocumentTemplate.id.in_(tpl_ids))
+        ).all()
+        templates_by_id = {t.id: t for t in tpls}
+        
+    promoted_templates_by_type = {}
+    if doc_type_ids:
+        promoted_tpls = db.scalars(
+            select(DocumentTemplate).where(
+                DocumentTemplate.document_type_id.in_(doc_type_ids),
+                DocumentTemplate.status == "promoted"
+            )
+        ).all()
+        for t in promoted_tpls:
+            promoted_templates_by_type[t.document_type_id] = t
+            
+    # Compile template schemas map by doc.id
+    doc_schemas_map = {}
+    for doc in docs:
+        template = None
+        if doc.template_id:
+            template = templates_by_id.get(doc.template_id)
+        elif doc.document_type_id:
+            template = promoted_templates_by_type.get(doc.document_type_id)
+            
+        if template:
+            clean_schema, _, _ = split_schema_payload(template.field_mappings)
+            doc_schemas_map[doc.id] = clean_schema
+            
+    return ext_methods_map, doc_schemas_map
+
+
 def _doc_to_out(
     doc: Document,
     uploader_name: str,
     tags: list[TagOut] | None = None,
     correspondent: CorrespondentOut | None = None,
     custom_field_values: list[FieldValueOut] | None = None,
+    preloaded_extraction_method: str | None = None,
+    preloaded_template_schema: dict | None = None,
 ) -> DocumentOut:
     from sqlalchemy.orm import object_session
     from app.models.document_template import DocumentTemplate
     from app.modules.idp.config_router import split_schema_payload
 
     extracted_data = doc.extracted_data
-    extraction_method = None
+    extraction_method = preloaded_extraction_method
     
     is_mock_doc = type(doc).__name__ in ("MagicMock", "Mock") or getattr(doc, "id", None) is None or type(doc.id).__name__ in ("MagicMock", "Mock")
     
     if extracted_data and isinstance(extracted_data, dict):
         db = object_session(doc)
         if db and not is_mock_doc and type(db).__name__ not in ("MagicMock", "Mock"):
-            try:
-                from app.models.extraction import Extraction
-                latest_ext = db.query(Extraction).filter(
-                    Extraction.document_id == doc.id
-                ).order_by(Extraction.created_at.desc()).first()
-                if latest_ext:
-                    extraction_method = latest_ext.method
-            except Exception:
-                pass
+            if extraction_method is None:
+                try:
+                    from app.models.extraction import Extraction
+                    latest_ext = db.query(Extraction).filter(
+                        Extraction.document_id == doc.id
+                    ).order_by(Extraction.created_at.desc()).first()
+                    if latest_ext:
+                        extraction_method = latest_ext.method
+                except Exception:
+                    pass
             
-            template = None
-            if doc.template_id:
-                template = db.get(DocumentTemplate, doc.template_id)
-            elif doc.document_type_id:
-                template = db.query(DocumentTemplate).filter(
-                    DocumentTemplate.document_type_id == doc.document_type_id,
-                    DocumentTemplate.tenant_id == doc.tenant_id,
-                    DocumentTemplate.status == "promoted"
-                ).first()
+            clean_schema = preloaded_template_schema
+            if clean_schema is None:
+                template = None
+                if doc.template_id:
+                    template = db.get(DocumentTemplate, doc.template_id)
+                elif doc.document_type_id:
+                    template = db.query(DocumentTemplate).filter(
+                        DocumentTemplate.document_type_id == doc.document_type_id,
+                        DocumentTemplate.tenant_id == doc.tenant_id,
+                        DocumentTemplate.status == "promoted"
+                    ).first()
+                
+                if template:
+                    clean_schema, _, _ = split_schema_payload(template.field_mappings)
             
-            if template:
-                clean_schema, _, _ = split_schema_payload(template.field_mappings)
-                if clean_schema and isinstance(clean_schema, dict):
+            if clean_schema and isinstance(clean_schema, dict):
                     def sort_dict_by_schema(data, schema):
                         if not isinstance(data, dict) or not isinstance(schema, dict):
                             return data
@@ -497,6 +563,8 @@ def list_documents(
     corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
     field_values_by_doc = fetch_field_values_for_docs(db, doc_ids)
 
+    ext_methods_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, rows)
+
     items = [
         _doc_to_out(
             doc,
@@ -504,6 +572,8 @@ def list_documents(
             tags=tags_by_doc.get(doc.id, []),
             correspondent=corresp_by_id.get(doc.correspondent_id) if doc.correspondent_id else None,
             custom_field_values=field_values_by_doc.get(doc.id, []),
+            preloaded_extraction_method=ext_methods_map.get(doc.id),
+            preloaded_template_schema=doc_schemas_map.get(doc.id),
         )
         for doc in rows
     ]
@@ -669,23 +739,25 @@ def restore_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> Documen
 def empty_trash(db: Session, user: TokenData) -> int:
     """Hard-delete all trashed documents for the current tenant.
 
-    Storage objects are deleted first; any individual storage failure is
-    swallowed so a single orphaned object can't block the whole operation.
+    Storage objects are deleted asynchronously in the background via RQ.
     Returns the number of documents permanently deleted.
     """
     rows = db.scalars(
         select(Document).where(Document.deleted_at.is_not(None))
     ).all()
 
+    storage_keys = []
     for doc in rows:
         for key in filter(None, [doc.storage_key, doc.thumbnail_key]):
-            try:
-                object_storage.delete_file(key)
-            except Exception:
-                pass
+            storage_keys.append(key)
         db.delete(doc)
 
     db.flush()
+    
+    if storage_keys:
+        from app.modules.idp.queue import enqueue_storage_deletion
+        enqueue_storage_deletion(storage_keys)
+
     return len(rows)
 
 
@@ -915,8 +987,14 @@ def get_dashboard(db: Session) -> DashboardOut:
         select(Document).order_by(Document.uploaded_at.desc()).limit(5)
     ).all()
     names = _names_for_ids(db, {doc.uploaded_by for doc in recent_docs})
+    ext_methods_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, recent_docs)
     recent_out = [
-        _doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by)))
+        _doc_to_out(
+            doc,
+            names.get(doc.uploaded_by, str(doc.uploaded_by)),
+            preloaded_extraction_method=ext_methods_map.get(doc.id),
+            preloaded_template_schema=doc_schemas_map.get(doc.id),
+        )
         for doc in recent_docs
     ]
 
