@@ -57,7 +57,15 @@ _VLM_ELIGIBLE_MIMES = mimetype.VLM_ELIGIBLE_MIMES
 
 
 def _guess_document_date(text: str | None) -> datetime.date | None:
-    """Best-effort document date from content. Never raises, never blocks the doc."""
+    """Best-effort document date from content. Never raises, never blocks the doc.
+
+    ``dateparser.search.search_dates`` free-mines arbitrary text for anything
+    date-shaped and can misread an unrelated number (a version string, an ID,
+    a page reference) as a full date. Reject anything implausible — more than
+    a few days in the future, or more than 50 years old — rather than store
+    it: a missing ``document_date`` is safe, a wrong one silently corrupts
+    date-based search/filtering.
+    """
     if not text:
         return None
     try:
@@ -68,7 +76,11 @@ def _guess_document_date(text: str | None) -> datetime.date | None:
         )
         if not results:
             return None
-        return results[0][1].date()
+        guess = results[0][1].date()
+        today = datetime.date.today()
+        if guess > today + datetime.timedelta(days=3) or guess.year < today.year - 50:
+            return None
+        return guess
     except Exception:
         logger.debug("document_date heuristic failed", exc_info=True)
         return None

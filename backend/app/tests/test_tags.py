@@ -220,13 +220,12 @@ class TestAssignUnassignTag:
             assign_tag(db, user, uuid.uuid4(), uuid.uuid4())
         assert exc_info.value.status_code == 404
 
-    def test_unassign_404_if_not_assigned(self):
-        from fastapi import HTTPException
+    def test_unassign_is_idempotent_noop_if_not_assigned(self):
+        """Rapid double-click fires two DELETEs; the second must not 404."""
         db = MagicMock()
         db.scalars.return_value = MagicMock(first=MagicMock(return_value=None))
-        with pytest.raises(HTTPException) as exc_info:
-            unassign_tag(db, uuid.uuid4(), uuid.uuid4())
-        assert exc_info.value.status_code == 404
+        unassign_tag(db, uuid.uuid4(), uuid.uuid4())
+        db.delete.assert_not_called()
 
     def test_unassign_deletes_row(self):
         db = MagicMock()

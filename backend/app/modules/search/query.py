@@ -67,13 +67,13 @@ def filename_match(q: str):
     not affected by the session-level GUC default (0.6 is too strict for real typos).
     Lowercases both sides so "Quarterly" matches "quartrly".
     """
-    return func.word_similarity(q.lower(), func.lower(Document.original_filename)) >= 0.2
+    return func.extensions.word_similarity(q.lower(), func.lower(Document.original_filename)) >= 0.2
 
 
 def rank_expr(q: str, tsquery):
     """Combined relevance score: content rank + filename word-similarity (NULL-safe)."""
     return func.coalesce(func.ts_rank_cd(Document.search_tsv, tsquery), 0.0) + func.coalesce(
-        func.word_similarity(q.lower(), func.lower(Document.original_filename)), 0.0
+        func.extensions.word_similarity(q.lower(), func.lower(Document.original_filename)), 0.0
     )
 
 

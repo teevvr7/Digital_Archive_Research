@@ -142,9 +142,9 @@ function DocCard({
         <Link
           href={`/documents/${doc.id}`}
           className="block text-sm font-medium text-slate-800 hover:text-blue-700 truncate"
-          title={doc.originalFilename}
+          title={doc.title || doc.originalFilename}
         >
-          {doc.originalFilename}
+          {doc.title || doc.originalFilename}
         </Link>
         <p className="text-xs text-slate-400 mt-0.5">{formatRelativeTime(doc.uploadedAt)}</p>
         {doc.tags.length > 0 && (
@@ -245,13 +245,17 @@ export default function DocumentsPage() {
     trashed: trashed || undefined,
   });
 
-  useEffect(() => {
+  const refreshDocuments = () => {
     setLoading(true);
     setError("");
     apiDocuments(buildQuery())
       .then((d) => { setData(d); setSelectedIds(new Set()); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    refreshDocuments();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, inbox, sortBy, page, query, trashed]);
 
@@ -358,7 +362,7 @@ export default function DocumentsPage() {
     try {
       await apiBulkTrash([...selectedIds]);
       setSelectedIds(new Set());
-      setPage((p) => p); // trigger re-fetch via dep change
+      refreshDocuments();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Bulk trash failed");
     } finally {
@@ -371,7 +375,7 @@ export default function DocumentsPage() {
     setShowBulkTagMenu(false);
     try {
       await apiBulkTag([...selectedIds], tagId, action);
-      setPage((p) => p);
+      refreshDocuments();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Bulk tag failed");
     } finally {
@@ -384,7 +388,7 @@ export default function DocumentsPage() {
     setShowBulkTypeMenu(false);
     try {
       await apiBulkSetType([...selectedIds], docType);
-      setPage((p) => p);
+      refreshDocuments();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Bulk set type failed");
     } finally {
@@ -894,8 +898,9 @@ export default function DocumentsPage() {
                           <Link
                             href={`/documents/${doc.id}`}
                             className="font-medium text-slate-800 group-hover:text-blue-700 truncate block max-w-xs"
+                            title={doc.title || doc.originalFilename}
                           >
-                            {doc.originalFilename}
+                            {doc.title || doc.originalFilename}
                           </Link>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {doc.correspondent && (
@@ -925,9 +930,7 @@ export default function DocumentsPage() {
                     <td className="px-4 py-3.5 text-slate-500 text-xs">
                       <div>{doc.uploadedBy}</div>
                       <div className="text-slate-400">{formatRelativeTime(doc.uploadedAt)}</div>
-                      {doc.documentDate && (
-                        <div className="text-slate-400">{doc.documentDate}</div>
-                      )}
+                      <div className="text-slate-400">{doc.documentDate || doc.uploadedAt.split("T")[0]}</div>
                     </td>
                     <td className="px-4 py-3.5 text-slate-500 text-xs">
                       {formatBytes(doc.sizeBytes)}

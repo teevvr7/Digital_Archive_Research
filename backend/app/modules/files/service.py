@@ -5,7 +5,7 @@ import hashlib
 import uuid
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Date, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -359,10 +359,17 @@ def list_documents(
         )
     if correspondent_id is not None:
         stmt = stmt.where(Document.correspondent_id == correspondent_id)
-    if date_from is not None:
-        stmt = stmt.where(Document.document_date >= date_from)
-    if date_to is not None:
-        stmt = stmt.where(Document.document_date <= date_to)
+    if date_from is not None or date_to is not None:
+        # Most documents never get a detected document_date (non-invoice
+        # types, or the heuristic simply found nothing) — falling back to
+        # uploaded_at keeps the filter usable instead of silently excluding
+        # every undated document, and matches the same fallback shown in the
+        # frontend list's date column.
+        effective_date = func.coalesce(Document.document_date, func.cast(Document.uploaded_at, Date))
+        if date_from is not None:
+            stmt = stmt.where(effective_date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(effective_date <= date_to)
     if inbox:
         # Subquery avoids join conflict with tag_id filter
         inbox_subq = select(DocumentTag.document_id).join(
@@ -488,6 +495,12 @@ def patch_document(
         doc.document_type = patch.document_type
     if "document_date" in updated_fields:
         doc.document_date = patch.document_date  # may be None to clear
+    if "correspondent_id" in updated_fields:
+        if patch.correspondent_id is not None:
+            correspondent = db.get(Correspondent, patch.correspondent_id)
+            if correspondent is None:
+                raise HTTPException(status_code=404, detail="Correspondent not found.")
+        doc.correspondent_id = patch.correspondent_id  # may be None to clear
     if "extracted_data_patch" in updated_fields and patch.extracted_data_patch is not None:
         # Shallow-merge: only the supplied keys are overwritten; all other
         # keys in the existing JSONB are preserved.

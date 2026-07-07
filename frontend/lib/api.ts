@@ -80,7 +80,10 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`POST ${path} → ${res.status} ${await res.text()}`);
-  return res.json() as Promise<T>;
+  // 204 No Content — return undefined (typed as T via void callers, e.g. tag assign)
+  if (res.status === 204) return undefined as unknown as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 async function patch_<T>(path: string, body?: unknown): Promise<T> {
@@ -203,6 +206,7 @@ export type DocumentPatch = {
   title?: string;
   documentType?: string;
   documentDate?: string | null;
+  correspondentId?: string | null;
   /** Shallow merge into extracted_data — only listed keys are overwritten. */
   extractedDataPatch?: Record<string, unknown>;
 };
