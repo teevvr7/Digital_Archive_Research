@@ -758,20 +758,25 @@ export default function DocumentViewerPage({
                     {extractionEditing ? (
                       /* ---- Correction form ---- */
                       <div className="space-y-2">
-                        {Object.entries(extractionDraft).map(([key]) => (
-                          <div key={key}>
-                            <label className="text-xs text-slate-500 capitalize block mb-0.5">
-                              {key.replace(/_/g, " ")}
-                            </label>
-                            <input
-                              value={extractionDraft[key]}
-                              onChange={(e) =>
-                                setExtractionDraft((d) => ({ ...d, [key]: e.target.value }))
-                              }
-                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        ))}
+                        {Object.entries(extractionDraft).map(([key, val]) => {
+                          if (typeof val === "object" && val !== null) {
+                            return null;
+                          }
+                          return (
+                            <div key={key}>
+                              <label className="text-xs text-slate-500 capitalize block mb-0.5">
+                                {key.replace(/_/g, " ")}
+                              </label>
+                              <input
+                                value={String(val ?? "")}
+                                onChange={(e) =>
+                                  setExtractionDraft((d) => ({ ...d, [key]: e.target.value }))
+                                }
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                          );
+                        })}
                         <div className="flex gap-2 pt-1">
                           <button
                             onClick={handleSaveExtraction}
@@ -820,16 +825,71 @@ export default function DocumentViewerPage({
                                         key={i}
                                         className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
                                       >
-                                        {Object.entries(item).map(([k, v]) => (
-                                          <div key={k} className="flex items-center justify-between gap-2">
-                                            <span className="text-slate-400 capitalize">
-                                              {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                                            </span>
-                                            <span className="font-medium text-slate-700 text-right">
-                                              {String(v)}
-                                            </span>
-                                          </div>
-                                        ))}
+                                        {Object.entries(item).map(([k, v]) => {
+                                          if (Array.isArray(v)) {
+                                            const isSubPrimitive = v.length > 0 && typeof v[0] !== "object";
+                                            return (
+                                              <div key={k} className="mt-2 pl-3 border-l-2 border-slate-100 space-y-1.5 w-full">
+                                                <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider block">
+                                                  {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:
+                                                </span>
+                                                {isSubPrimitive ? (
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {v.map((subVal, subIdx) => (
+                                                      <span key={subIdx} className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                                        {String(subVal)}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  (v as Record<string, unknown>[]).map((subItem, subIdx) => (
+                                                    <div key={subIdx} className="bg-slate-50 border border-slate-150 rounded p-1.5 space-y-1 w-full">
+                                                      {Object.entries(subItem).map(([subK, subV]) => (
+                                                        <div key={subK} className="flex items-center justify-between gap-2 text-[11px]">
+                                                          <span className="text-slate-400 capitalize">
+                                                            {subK.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                                          </span>
+                                                          <span className="font-medium text-slate-600 text-right">
+                                                            {String(subV)}
+                                                          </span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ))
+                                                )}
+                                              </div>
+                                            );
+                                          }
+                                          if (typeof v === "object" && v !== null) {
+                                            return (
+                                              <div key={k} className="mt-1 pl-3 border-l-2 border-slate-100 space-y-1 w-full">
+                                                <span className="text-[11px] text-slate-500 font-semibold block">
+                                                  {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:
+                                                </span>
+                                                {Object.entries(v).map(([objK, objV]) => (
+                                                  <div key={objK} className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400 capitalize">
+                                                      {objK.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                                    </span>
+                                                    <span className="font-medium text-slate-600 text-right">
+                                                      {String(objV)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <div key={k} className="flex items-center justify-between gap-2">
+                                              <span className="text-slate-400 capitalize">
+                                                {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                              </span>
+                                              <span className="font-medium text-slate-700 text-right">
+                                                {String(v)}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     ))
                                   )}
