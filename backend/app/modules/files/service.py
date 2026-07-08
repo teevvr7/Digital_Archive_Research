@@ -130,10 +130,10 @@ def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int)
         )
 
 
-def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, str], dict[uuid.UUID, dict]]:
-    """Helper to batch-fetch extraction methods, model names, and template schemas to prevent N+1 queries."""
+def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, str], dict[uuid.UUID, dict], dict[uuid.UUID, str]]:
+    """Helper to batch-fetch extraction methods, model names, template schemas, and extraction strategies to prevent N+1 queries."""
     if not docs:
-        return {}, {}, {}
+        return {}, {}, {}, {}
         
     doc_ids = [doc.id for doc in docs]
     
@@ -152,12 +152,12 @@ def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) 
         if row.document_id not in ext_models_map:
             ext_models_map[row.document_id] = row.model_name
 
-    # 2. Batch load template schemas
+    # 2. Batch load template schemas and strategies
     from app.models.document_template import DocumentTemplate
     from app.modules.idp.config_router import split_schema_payload
     
     tpl_ids = {doc.template_id for doc in docs if doc.template_id}
-    doc_type_ids = {doc.document_type_id for doc in docs if doc.document_type_id and not doc.template_id}
+    doc_type_ids = {doc.document_type_id for doc in docs if doc.document_type_id}
     
     templates_by_id = {}
     if tpl_ids:
@@ -176,21 +176,38 @@ def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) 
         ).all()
         for t in promoted_tpls:
             promoted_templates_by_type[t.document_type_id] = t
+
+    from app.models.document_type import DocumentType
+    doc_types = db.scalars(
+        select(DocumentType).where(DocumentType.tenant_id == docs[0].tenant_id)
+    ).all()
+    doc_types_map = {t.id: t.extraction_method for t in doc_types}
             
-    # Compile template schemas map by doc.id
+    # Compile template schemas and strategies map by doc.id
     doc_schemas_map = {}
+    doc_strategies_map = {}
     for doc in docs:
         template = None
+        strategy = None
+        
         if doc.template_id:
             template = templates_by_id.get(doc.template_id)
+            if template:
+                strategy = template.extraction_method
         elif doc.document_type_id:
             template = promoted_templates_by_type.get(doc.document_type_id)
-            
+            if template:
+                strategy = template.extraction_method
+            else:
+                strategy = doc_types_map.get(doc.document_type_id)
+                
         if template:
             clean_schema, _, _ = split_schema_payload(template.field_mappings)
             doc_schemas_map[doc.id] = clean_schema
             
-    return ext_methods_map, ext_models_map, doc_schemas_map
+        doc_strategies_map[doc.id] = strategy or "cascade"
+            
+    return ext_methods_map, ext_models_map, doc_schemas_map, doc_strategies_map
 
 
 def _doc_to_out(
@@ -202,6 +219,7 @@ def _doc_to_out(
     preloaded_extraction_method: str | None = None,
     preloaded_template_schema: dict | None = None,
     preloaded_vlm_model: str | None = None,
+    preloaded_strategy: str | None = None,
 ) -> DocumentOut:
     from sqlalchemy.orm import object_session
     from app.models.document_template import DocumentTemplate
@@ -210,6 +228,7 @@ def _doc_to_out(
     extracted_data = doc.extracted_data
     extraction_method = preloaded_extraction_method
     vlm_model = preloaded_vlm_model
+    configured_strategy = preloaded_strategy
     
     is_mock_doc = type(doc).__name__ in ("MagicMock", "Mock") or getattr(doc, "id", None) is None or type(doc.id).__name__ in ("MagicMock", "Mock")
     
@@ -233,10 +252,24 @@ def _doc_to_out(
             except Exception:
                 pass
 
+        if configured_strategy is None:
+            try:
+                if doc.template_id:
+                    template = db.get(DocumentTemplate, doc.template_id)
+                    if template:
+                        configured_strategy = template.extraction_method
+                if not configured_strategy and doc.document_type_id:
+                    from app.models.document_type import DocumentType
+                    doc_type = db.get(DocumentType, doc.document_type_id)
+                    if doc_type:
+                        configured_strategy = doc_type.extraction_method
+            except Exception:
+                pass
+
     # Resolve OCR engine name dynamically
     ocr_engine = None
     if doc.ocr_used:
-        if extraction_method == "paddle_qwen":
+        if configured_strategy == "paddle_qwen":
             ocr_engine = "paddleocr"
         else:
             ocr_engine = "rapidocr"
@@ -587,7 +620,7 @@ def list_documents(
     corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
     field_values_by_doc = fetch_field_values_for_docs(db, doc_ids)
 
-    ext_methods_map, ext_models_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, rows)
+    ext_methods_map, ext_models_map, doc_schemas_map, doc_strategies_map = _batch_preload_extractions_and_templates(db, rows)
 
     items = [
         _doc_to_out(
@@ -599,6 +632,7 @@ def list_documents(
             preloaded_extraction_method=ext_methods_map.get(doc.id),
             preloaded_template_schema=doc_schemas_map.get(doc.id),
             preloaded_vlm_model=ext_models_map.get(doc.id),
+            preloaded_strategy=doc_strategies_map.get(doc.id),
         )
         for doc in rows
     ]
@@ -1012,7 +1046,7 @@ def get_dashboard(db: Session) -> DashboardOut:
         select(Document).order_by(Document.uploaded_at.desc()).limit(5)
     ).all()
     names = _names_for_ids(db, {doc.uploaded_by for doc in recent_docs})
-    ext_methods_map, ext_models_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, recent_docs)
+    ext_methods_map, ext_models_map, doc_schemas_map, doc_strategies_map = _batch_preload_extractions_and_templates(db, recent_docs)
     recent_out = [
         _doc_to_out(
             doc,
@@ -1020,6 +1054,7 @@ def get_dashboard(db: Session) -> DashboardOut:
             preloaded_extraction_method=ext_methods_map.get(doc.id),
             preloaded_template_schema=doc_schemas_map.get(doc.id),
             preloaded_vlm_model=ext_models_map.get(doc.id),
+            preloaded_strategy=doc_strategies_map.get(doc.id),
         )
         for doc in recent_docs
     ]
