@@ -16,7 +16,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
@@ -70,8 +70,6 @@ class Document(Base):
     )
     # Denormalised type name for the UI dropdown enum (invoice|receipt|...). "other" by default.
     document_type: Mapped[str] = mapped_column(String, nullable=False, default="other")
-    layout_fingerprint: Mapped[str | None] = mapped_column(String, nullable=True)
-
     # Parsing results
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     has_text_layer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -83,8 +81,6 @@ class Document(Base):
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[float | None] = mapped_column(REAL, nullable=True)
 
-    # Organisation
-    tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     search_tsv: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
 
     # Universal ingestion baseline (Phase 1) — every file gets these regardless of type.
