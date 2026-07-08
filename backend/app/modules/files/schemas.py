@@ -42,6 +42,7 @@ class DocumentPatchIn(CamelModel):
     title: str | None = None
     document_type: str | None = None
     document_date: datetime.date | None = None
+    correspondent_id: uuid.UUID | None = None
     extracted_data_patch: dict[str, Any] | None = None
 
 

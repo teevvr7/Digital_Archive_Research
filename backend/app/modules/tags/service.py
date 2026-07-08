@@ -108,7 +108,11 @@ def assign_tag(db: Session, user: TokenData, doc_id: uuid.UUID, tag_id: uuid.UUI
 
 
 def unassign_tag(db: Session, doc_id: uuid.UUID, tag_id: uuid.UUID) -> None:
-    """Remove a tag assignment. 404 if the assignment does not exist."""
+    """Remove a tag assignment (idempotent — a no-op if already unassigned).
+
+    Mirrors ``assign_tag``'s idempotency so a rapid double-click (two DELETE
+    requests in flight) never surfaces a 404 to the user.
+    """
     dt = db.scalars(
         select(DocumentTag).where(
             DocumentTag.document_id == doc_id,
@@ -116,6 +120,6 @@ def unassign_tag(db: Session, doc_id: uuid.UUID, tag_id: uuid.UUID) -> None:
         )
     ).first()
     if dt is None:
-        raise HTTPException(status_code=404, detail="Tag is not assigned to this document.")
+        return
     db.delete(dt)
     db.flush()

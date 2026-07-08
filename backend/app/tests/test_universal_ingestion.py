@@ -333,6 +333,40 @@ def test_guess_document_date_never_raises_on_garbage():
     assert _guess_document_date("@@@ ### $$$ %%%") is None or True
 
 
+def test_guess_document_date_rejects_implausible_far_future_year():
+    """Regression, calibrated against a real live upload: ``big-invoice.pdf``'s
+    address line ("...TRARALGON, 3844, AUSTRALIA...") contains an Australian
+    postcode that ``dateparser`` misread as a year, producing
+    document_date=3844-07-03 (confirmed live via direct DB query against the
+    real ``extracted_text``).
+
+    Mocks ``dateparser``'s return directly rather than trying to reproduce its
+    exact fuzzy free-text match, which is dateparser-version-dependent and not
+    what this guard tests — the guard is the plausibility bound in
+    ``_guess_document_date``, not dateparser's internal matching behavior.
+    """
+    from unittest.mock import patch
+    import datetime as _dt
+    from app.modules.idp.jobs import _guess_document_date
+
+    with patch("dateparser.search.search_dates") as mock_search:
+        mock_search.return_value = [("3844", _dt.datetime(3844, 7, 3))]
+        assert _guess_document_date("...TRARALGON, 3844, AUSTRALIA...") is None
+
+
+def test_guess_document_date_rejects_implausible_far_past_year():
+    """Regression, calibrated against a real live upload: a marketing PDF with
+    no genuine document date produced document_date=1949-07-06 (confirmed
+    live via direct DB query against the real ``extracted_text``)."""
+    from unittest.mock import patch
+    import datetime as _dt
+    from app.modules.idp.jobs import _guess_document_date
+
+    with patch("dateparser.search.search_dates") as mock_search:
+        mock_search.return_value = [("1949", _dt.datetime(1949, 7, 6))]
+        assert _guess_document_date("marketing copy with no real date") is None
+
+
 # ---------------------------------------------------------------------------
 # VLM eligibility gating — structured extraction stays type-conditional
 # ---------------------------------------------------------------------------

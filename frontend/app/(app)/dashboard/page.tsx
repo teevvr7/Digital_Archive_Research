@@ -208,7 +208,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate group-hover:text-blue-700">
-                      {doc.originalFilename}
+                      {doc.title || doc.originalFilename}
                     </p>
                     <p className="text-xs text-slate-400">
                       {doc.uploadedBy} · {formatRelativeTime(doc.uploadedAt)}

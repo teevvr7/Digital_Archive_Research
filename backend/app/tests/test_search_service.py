@@ -29,6 +29,11 @@ _A_TEXT = "Total electricity consumption rose; final schedule attached."
 # (denser than doc A) so it outranks doc A on a "schedule" query.
 _B_FILENAME = "Vendor Contract Agreement.pdf"
 _B_TEXT = "The maintenance schedule and the cleaning schedule are reviewed weekly."
+# Doc C — renamed via the correction UI: original_filename is stale, title is
+# what search_tsv/filename_match must actually key off of. Picked to have zero
+# pg_trgm word_similarity overlap with any other query term in this file.
+_C_ORIGINAL_FILENAME = "Bluefox Import 2024.pdf"
+_C_TITLE = "Renamed Budget Report.pdf"
 
 
 @pytest.fixture(scope="module")
@@ -40,16 +45,19 @@ def direct_engine():
 
 @pytest.fixture(scope="module")
 def seeds(direct_engine):
-    """Seed one tenant + user + two completed docs with populated search_tsv."""
+    """Seed one tenant + user + three completed docs with populated search_tsv."""
+    from app.modules.search.query import build_search_text
+
     t_id = uuid.uuid4()
     u_id = uuid.uuid4()
-    a_id, b_id = uuid.uuid4(), uuid.uuid4()
+    a_id, b_id, c_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
     insert_doc = text(
         "INSERT INTO documents (id, tenant_id, uploaded_by, filename, original_filename,"
-        " mime_type, size_bytes, storage_key, document_type, status, extracted_text, search_tsv)"
-        " VALUES (:id, :tid, :uid, :fn, :ofn, 'application/pdf', 1000, :sk, :dtype, 'completed',"
-        " :etext, to_tsvector('english', :tsv)) ON CONFLICT DO NOTHING"
+        " title, mime_type, size_bytes, storage_key, document_type, status, extracted_text,"
+        " search_tsv)"
+        " VALUES (:id, :tid, :uid, :fn, :ofn, :title, 'application/pdf', 1000, :sk, :dtype,"
+        " 'completed', :etext, to_tsvector('english', :tsv)) ON CONFLICT DO NOTHING"
     )
 
     with direct_engine.connect() as conn:
@@ -65,9 +73,10 @@ def seeds(direct_engine):
             ),
             {"id": str(u_id), "tid": str(t_id), "email": "s@t.com", "name": "Search User"},
         )
-        for did, ofn, dtype, etext in [
-            (a_id, _A_FILENAME, "report", _A_TEXT),
-            (b_id, _B_FILENAME, "contract", _B_TEXT),
+        for did, ofn, title, dtype, etext in [
+            (a_id, _A_FILENAME, _A_FILENAME, "report", _A_TEXT),
+            (b_id, _B_FILENAME, _B_FILENAME, "contract", _B_TEXT),
+            (c_id, _C_ORIGINAL_FILENAME, _C_TITLE, "report", None),
         ]:
             conn.execute(
                 insert_doc,
@@ -77,20 +86,21 @@ def seeds(direct_engine):
                     "uid": str(u_id),
                     "fn": ofn,
                     "ofn": ofn,
+                    "title": title,
                     "sk": f"{t_id}/docs/{did}.pdf",
                     "dtype": dtype,
                     "etext": etext,
-                    "tsv": f"{ofn} {etext}",
+                    "tsv": build_search_text(title, ofn, etext),
                 },
             )
         conn.execute(text("SET session_replication_role = 'origin'"))
         conn.commit()
 
-    yield {"t": t_id, "u": u_id, "a": a_id, "b": b_id}
+    yield {"t": t_id, "u": u_id, "a": a_id, "b": b_id, "c": c_id}
 
     with direct_engine.connect() as conn:
         conn.execute(text("SET session_replication_role = 'replica'"))
-        for did in (a_id, b_id):
+        for did in (a_id, b_id, c_id):
             conn.execute(text("DELETE FROM documents WHERE id = :id"), {"id": str(did)})
         conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": str(u_id)})
         conn.execute(text("DELETE FROM tenants WHERE id = :id"), {"id": str(t_id)})
@@ -147,6 +157,35 @@ def test_fuzzy_filename_typo_matches(direct_engine, seeds):
     assert str(seeds["a"]) in ids
     hit = next(i for i in out.items if str(i.document.id) == str(seeds["a"]))
     assert "filename" in hit.matched_fields
+    db.rollback()
+    db.close()
+
+
+def test_renamed_title_is_findable_by_its_new_name(direct_engine, seeds):
+    """Doc C's title ("Renamed Budget Report.pdf") differs from its stale
+    original_filename ("Old Scan 001.pdf"). Regression: search_tsv/filename_match
+    used to key off original_filename only, so a renamed document was
+    permanently unsearchable by its new name."""
+    from app.modules.search import service
+
+    db = _search_session(direct_engine, seeds["t"])
+    out = service.search_documents(db, q="Renamed Budget")
+    ids = _ids(out)
+    assert str(seeds["c"]) in ids
+    db.rollback()
+    db.close()
+
+
+def test_renamed_doc_still_findable_by_its_old_filename(direct_engine, seeds):
+    """The pre-rename original_filename must stay searchable too — a user who
+    remembers the old name shouldn't lose the document."""
+    from app.modules.search import service
+
+    db = _search_session(direct_engine, seeds["t"])
+    db.execute(text("SET LOCAL pg_trgm.word_similarity_threshold = 0.2"))
+    out = service.search_documents(db, q="Bluefox Import")
+    ids = _ids(out)
+    assert str(seeds["c"]) in ids
     db.rollback()
     db.close()
 
