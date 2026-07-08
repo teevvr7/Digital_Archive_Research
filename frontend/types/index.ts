@@ -124,7 +124,8 @@ export interface ActivityEvent {
     | "user_added"
     | "edit"
     | "trash"
-    | "restore";
+    | "restore"
+    | "permanent_delete";
   documentId?: string;
   documentName?: string;
   userId: string;

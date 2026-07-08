@@ -223,6 +223,9 @@ export const apiRestoreDocument = (id: string) =>
 export const apiEmptyTrash = () =>
   post<{ deleted: number }>("/documents/empty-trash");
 
+export const apiPermanentDelete = (id: string) =>
+  delete_<void>(`/documents/${id}/permanent`);
+
 // ---- Search (Milestone D) ------------------------------------------------
 
 export type SearchQuery = {

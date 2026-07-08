@@ -15,6 +15,7 @@ from app.core.security import TokenData
 from app.models.activity_event import (
     ACT_DOWNLOAD,
     ACT_EDIT,
+    ACT_PERMANENT_DELETE,
     ACT_RESTORE,
     ACT_TRASH,
     ACT_UPLOAD,
@@ -46,7 +47,7 @@ from app.modules.files.schemas import (
 from app.modules.metadata.service import fetch_field_values_for_docs
 from app.modules.idp import mimetype
 from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
-from app.modules.search.query import apply_text_search
+from app.modules.search.query import apply_text_search, build_search_text
 
 # Sniffed-mime -> storage extension. Source of truth lives in idp/mimetype.py
 # so the worker's parser registry and the upload allow-list never drift apart.
@@ -360,12 +361,12 @@ def list_documents(
     if correspondent_id is not None:
         stmt = stmt.where(Document.correspondent_id == correspondent_id)
     if date_from is not None or date_to is not None:
-        # Most documents never get a detected document_date (non-invoice
-        # types, or the heuristic simply found nothing) — falling back to
-        # uploaded_at keeps the filter usable instead of silently excluding
-        # every undated document, and matches the same fallback shown in the
-        # frontend list's date column.
-        effective_date = func.coalesce(Document.document_date, func.cast(Document.uploaded_at, Date))
+        # Filters on uploaded_at, not document_date: most documents never get
+        # a detected document_date (non-invoice types, or the heuristic simply
+        # found nothing), and uploaded_at is never null — a simpler, always-
+        # reliable filter than trying to fall back between the two. Matches
+        # the frontend list's date column, which shows uploaded_at only.
+        effective_date = func.cast(Document.uploaded_at, Date)
         if date_from is not None:
             stmt = stmt.where(effective_date >= date_from)
         if date_to is not None:
@@ -491,6 +492,12 @@ def patch_document(
     updated_fields = patch.model_fields_set
     if "title" in updated_fields and patch.title is not None:
         doc.title = patch.title
+        # Rebuild the search index so the new title is findable and the doc
+        # doesn't stay permanently indexed under its stale pre-rename title.
+        doc.search_tsv = func.to_tsvector(
+            "english",
+            build_search_text(doc.title, doc.original_filename, doc.extracted_text),
+        )
     if "document_type" in updated_fields and patch.document_type is not None:
         doc.document_type = patch.document_type
     if "document_date" in updated_fields:
@@ -585,6 +592,47 @@ def restore_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> Documen
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
 
 
+def permanent_delete_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> None:
+    """Hard-delete a single trashed document and its storage objects.
+
+    404 if not found, 409 if it isn't already in the trash — permanent delete
+    is only reachable from the trash view, never directly from the active list,
+    mirroring the paperless-style soft-delete-first safety net.
+    """
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.deleted_at is None:
+        raise HTTPException(status_code=409, detail="Document must be trashed before it can be permanently deleted.")
+
+    for key in filter(None, [doc.storage_key, doc.thumbnail_key]):
+        try:
+            object_storage.delete_file(key)
+        except Exception:
+            pass
+
+    tenant_id = doc.tenant_id
+    size_bytes = doc.size_bytes
+    actor_id = uuid.UUID(user.user_id)
+    db.add(ActivityEvent(
+        tenant_id=tenant_id,
+        type=ACT_PERMANENT_DELETE,
+        document_id=doc.id,
+        document_name=doc.original_filename,
+        user_id=actor_id,
+        user_name=_user_name(db, actor_id),
+    ))
+    db.delete(doc)
+
+    if size_bytes > 0:
+        db.execute(
+            update(Tenant)
+            .where(Tenant.id == tenant_id)
+            .values(storage_used_bytes=func.greatest(Tenant.storage_used_bytes - size_bytes, 0))
+        )
+    db.flush()
+
+
 def empty_trash(db: Session, user: TokenData) -> int:
     """Hard-delete all trashed documents for the current tenant.
 
@@ -596,13 +644,24 @@ def empty_trash(db: Session, user: TokenData) -> int:
         select(Document).where(Document.deleted_at.is_not(None))
     ).all()
 
+    tenant_id = None
+    freed_bytes = 0
     for doc in rows:
+        tenant_id = doc.tenant_id
+        freed_bytes += doc.size_bytes
         for key in filter(None, [doc.storage_key, doc.thumbnail_key]):
             try:
                 object_storage.delete_file(key)
             except Exception:
                 pass
         db.delete(doc)
+
+    if freed_bytes > 0 and tenant_id is not None:
+        db.execute(
+            update(Tenant)
+            .where(Tenant.id == tenant_id)
+            .values(storage_used_bytes=func.greatest(Tenant.storage_used_bytes - freed_bytes, 0))
+        )
 
     db.flush()
     return len(rows)

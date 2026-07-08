@@ -18,6 +18,7 @@ ACT_USER_ADDED = "user_added"
 ACT_EDIT = "edit"
 ACT_TRASH = "trash"
 ACT_RESTORE = "restore"
+ACT_PERMANENT_DELETE = "permanent_delete"
 
 
 class ActivityEvent(Base):

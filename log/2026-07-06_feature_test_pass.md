@@ -258,3 +258,83 @@ User's direction: show `uploaded_at` as a fallback wherever `document_date` is m
 - Verified: full `pytest` suite 214/214, `tsc --noEmit` clean (same 2 pre-existing errors only).
 
 **All 6 queued items closed.** Backend restarted cleanly after each change (force-kill + fresh process, not relying on `--reload`, per the lesson learned earlier this session). Pending final live-browser confirmation from user on items 1, 3, 5, 6 (items 2 and 4 are pure repo/cosmetic, no behavior to re-verify).
+
+---
+
+## 2026-07-08 — Live verification round: found + fixed one more real bug (title search gap)
+
+Verifying item 1 (title display), user confirmed the Documents list and Search page both correctly show `title` now — **but** searching for a word that's only in the new title ("test"/"testing", part of `100-charles-testing.pdf`) found nothing.
+
+Root-caused with two direct code checks, not guessed:
+- `search_tsv` (the full-text index) is built **exactly once**, at initial pipeline processing (`idp/jobs.py`), from `original_filename + extracted_text` — **never `title`**, and **`patch_document` never rebuilds it** when the title changes via the correction UI.
+- `filename_match` (the fuzzy/typo tier, `search/query.py`) only ever compared against `Document.original_filename`, never `title`.
+
+Net effect: renaming a document (the entire point of the correction UI) makes the new name permanently unsearchable on both search tiers, while the stale original filename remains searchable forever. Given the product's own stated north star is "retrieval is the headline feature," this was worth fixing immediately rather than queuing — user agreed.
+
+**Fix (touches 3 files):**
+- New shared helper `build_search_text(title, original_filename, extracted_text)` in `search/query.py`, used by both the pipeline and the patch endpoint so they can never drift out of sync again.
+- `idp/jobs.py::process_document` now builds `search_tsv` via `build_search_text(doc.title, ...)` instead of skipping title.
+- `files/service.py::patch_document` now rebuilds `search_tsv` whenever `title` changes (previously never touched it at all).
+- `search/query.py::filename_match`/`rank_expr` now take `func.greatest()` of word_similarity against **both** `coalesce(title, original_filename)` and `original_filename` directly — so a renamed doc is findable by *either* its new title *or* its old filename, not one at the expense of the other.
+
+**Test-writing note worth remembering:** the first fixture pick for a new regression test (`test_search_service.py`, a doc renamed from `"Old Scan 001.pdf"` to `"Renamed Budget Report.pdf"`) accidentally broke two unrelated pre-existing tests — turned out `word_similarity('schedule', 'old scan 001.pdf') = 0.222`, just over the 0.2 fuzzy-match threshold, a pure trigram coincidence unrelated to the fix itself. Diagnosed by directly querying `word_similarity` for candidate strings against every existing query term in the file before picking a collision-free one (`"Bluefox Import 2024.pdf"`). Lesson: when adding a new seeded doc to a shared search-test fixture, check it doesn't accidentally fuzzy-match the other tests' query terms — pg_trgm collisions are non-obvious and won't be caught by eyeballing the strings.
+
+**Existing data backfill:** per user's choice, ran a one-time backfill re-deriving `search_tsv` for all 17 live documents via the same `build_search_text` logic (code fix alone only applies to new uploads/renames going forward, not already-processed documents) — confirmed 17 rows updated.
+
+Verified: full `pytest` suite 216/216 (214 + 2 new regression tests: renamed-title findable by new name, and still findable by old filename). Backend **and** worker both restarted fresh (this fix touches `idp/jobs.py`, which the worker imports, unlike prior fixes this session that only needed the API restarted). **Re-verified live by user — title search confirmed working, both new and old names.**
+
+**Verification round continued:** `document_date` fix confirmed (Datawiz AI Marketing.pdf / big-invoice.pdf show sensible dates now) and date-range filter confirmed (previously-undated docs now show up). User's follow-up feedback: the fallback logic (show `document_date` when present, else `uploaded_at`) was more complexity than needed — simpler and more predictable to just always show/filter by `uploaded_at` in the Documents list, dropping `document_date` from the list column and the date-range filter entirely (uploaded_at is never null, so no fallback logic needed at all).
+
+**Simplification applied:**
+- `documents/page.tsx` date column: now unconditionally `doc.uploadedAt.split("T")[0]`, no more `documentDate ||` fallback.
+- `files/service.py::list_documents`: `date_from`/`date_to` now filter on `cast(Document.uploaded_at, Date)` directly, dropped the `coalesce(document_date, uploaded_at)` — since `uploaded_at` is never null, this is strictly simpler and always reliable, no NULL-exclusion edge case possible.
+- `document_date` (the extracted content date, when detected) is untouched everywhere else — still shown in the document detail page's Metadata tab, still stored, still what `_guess_document_date`'s plausibility guard protects; it's just no longer used for the list column or the date-range filter.
+- Verified: `pytest` 216/216, `tsc --noEmit` clean (same 2 pre-existing errors only). Backend restarted fresh (API-only change, worker left running untouched this time).
+
+---
+
+## Trash page: 2 more real bugs found + fixed
+
+While verifying, user noticed the Trash view was missing a per-file delete, and the storage meter never reacted to deletions. Both root-caused in code, not guessed:
+
+**Bug 1 — no per-file permanent delete.** `backend/app/modules/files/router.py` only ever exposed `POST /documents/empty-trash` (bulk, deletes *everything*). No endpoint existed to permanently delete one selected trashed document, and the frontend's trash-row actions only ever rendered a "Restore" button — no delete control at all.
+
+**Bug 2 — storage meter never updates.** `files/service.py::empty_trash` deleted the storage objects and DB rows but **never decremented `Tenant.storage_used_bytes`** — compare the upload path, which explicitly increments it. A real accounting leak: the meter only ever grew, even after permanently deleting everything, which would eventually cause false "storage full" upload rejections.
+
+**Fix (both, same session):**
+- New `ACT_PERMANENT_DELETE` activity type (backend `models/activity_event.py` + frontend `types/index.ts`, kept in sync per the existing "must match frontend exactly" convention).
+- New `permanent_delete_document(db, user, doc_id)` service function (`files/service.py`) — 404 if not found, 409 if not already trashed (permanent delete only reachable from the trash view, mirrors the soft-delete-first safety net), deletes storage objects, hard-deletes the row, decrements `storage_used_bytes` by the doc's `size_bytes` (floored at 0 via `func.greatest(...)` as a defensive guard).
+- `empty_trash` fixed the same way — now sums freed bytes across all deleted docs and decrements once.
+- New `DELETE /documents/{id}/permanent` endpoint (`router.py`), `apiPermanentDelete` client function (`lib/api.ts`).
+- Frontend: trash-view row actions now show **both** Restore and a "Delete permanently" button (previously Restore only), with a confirm dialog.
+- **Also fixed while touching this code:** `handleEmptyTrash` had the *exact same* stale-list bug already fixed once this session for bulk ops — it called `setData(null); setPage(1)`, a no-op when already on page 1 (React skips re-running the fetch effect when a setter receives an unchanged value). Switched to the existing `refreshDocuments()` helper instead.
+
+Added 8 new tests (`test_file_management.py`): 404/409/storage-delete/db-delete/activity-event/storage-decrement coverage for the new function, plus storage-decrement regression tests for `empty_trash`. Verified: full `pytest` suite 224/224, `tsc --noEmit` clean (same 2 pre-existing errors only). Backend restarted fresh. **Re-verified live by user — trash-page permanent delete confirmed working.**
+
+## Infra note: uvicorn `--reload` served genuinely stale code, then port 8000 got stuck on an unkillable phantom process
+
+While verifying the permanent-delete fix, the user hit `DELETE /documents/{id}/permanent → 404 {"detail":"Not Found"}` — FastAPI's generic "no route matched" body, not the custom 404 raised by the handler. Root-caused conclusively (not guessed): the route was 100% present and correctly registered in the source (verified by directly importing `app.modules.files.router` in a fresh one-off script and listing its routes) — but the *running* uvicorn process didn't have it. `--reload`/WatchFiles had silently kept serving an old app instance despite logging "Reloading..." and "Application startup complete" with no visible errors, for at least the second time this session. The prior verification method (checking `/api/docs` returns 200) was insufficient — that only proves *an* app booted, not that *this specific* route loaded; the real test is comparing a known-good route's auth-rejection status (401) against the new route's status through an unauthenticated request.
+
+Attempting a clean restart then hit a second, unrelated problem: port 8000 became occupied by a process (`PID 32640`) that `netstat` reported as `LISTENING` but neither PowerShell's `Stop-Process` nor `taskkill` could find in the process table at all — consistent with a WSL2/Docker Desktop network-namespace artifact (the frontend log had shown a `172.17.0.1` Docker bridge address earlier in the session). This was outside what's fixable from the sandboxed shell; user resolved it on their end (likely a machine restart — post-fix, the frontend's network address changed from the Docker bridge IP to a real LAN IP, and all prior orphaned processes were gone).
+
+**Decision: dropped `--reload` entirely for the rest of the session**, running backend as a single stable process (`uvicorn app.main:app --host 0.0.0.0 --port 8000`, no `--reload`) to eliminate this whole class of silent-stale-code bug. Trade-off: every future backend code change now needs an explicit manual restart (already the established practice this session anyway, given `--reload`'s unreliability), but no more silent staleness.
+
+**New verification standard going forward:** after any backend restart, don't just check `/api/docs` responds — hit the *specific* new/changed route unauthenticated and confirm it returns 401 (route matched, auth rejected) rather than 404 (route missing). This is now the reliable way to confirm a route actually loaded.
+
+---
+
+## 2 more real bugs found + fixed: storage meter desync + Dashboard title display
+
+**Bug 3 — sidebar storage meter desyncs from the Dashboard's storage widget.** Root-caused: **two independent data sources** for the same `tenants.storage_used_bytes` value. The sidebar reads `useAuth().tenant.storageUsedBytes` (populated via `apiMe()`, only refreshed when `useAuth().refresh()` is explicitly called — `upload/page.tsx` already does this after a byte-storing upload, per the 2026-07-03 fix). The Dashboard fetches its own fresh copy via `apiDashboard()` on mount, completely independent of the sidebar's cached value. The new trash-page mutations (`handlePermanentDelete`, `handleEmptyTrash`) — the two that actually free real storage — never called `refresh()`, so the sidebar kept showing a stale number while the Dashboard (fetching fresh on each visit) showed the correct one, appearing "not synced."
+
+**Fix:** `documents/page.tsx` now calls `useAuth().refresh()` after both `handlePermanentDelete` and `handleEmptyTrash` (not after trash/restore, which don't change storage — soft-delete doesn't free bytes). Same established pattern as the upload-page fix, just never extended to the trash page when it was built.
+
+**Bug 4 — Dashboard's Recent Documents widget showed `originalFilename` instead of `title`.** Same bug class already fixed twice this session (Documents list, Search results) — this third occurrence on the Dashboard page was simply missed earlier. Fixed the same way: `doc.title || doc.originalFilename`.
+
+Both frontend-only changes. Verified: `tsc --noEmit` clean (same 2 pre-existing errors only). No backend restart needed; frontend hot-reloads. **Re-verified live by user — storage meter now stays in sync, Dashboard shows renamed titles.**
+
+---
+
+## Session status: all reported issues resolved
+
+Every bug found during this feature-test pass and its follow-up verification rounds is now fixed and confirmed live: the original 5 (tag-assign 204, correspondent-assign built, search regression, bulk-ops stale list, trash-search leak), the 6 queued items (title display, tag idempotency, tag sizing, log folder, document_date heuristic, date filter), the title-search gap (search_tsv/filename_match never included title), and the trash-page pair (missing per-file delete + storage-meter desync, plus the Dashboard title-display miss caught in the same pass). 224/224 backend tests passing throughout, `tsc --noEmit` clean. Backend now runs without `--reload` for reliability (see the infra note above) — remember to manually restart it after any future backend change in this project.

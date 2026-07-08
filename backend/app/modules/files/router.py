@@ -231,6 +231,16 @@ def restore_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
     return service.restore_document(db, user, doc_id)
 
 
+@router.delete(
+    "/documents/{doc_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Permanently delete a single trashed document and its storage objects",
+)
+def permanent_delete_document(ctx: _DbCtx, doc_id: uuid.UUID) -> None:
+    db, user = ctx
+    service.permanent_delete_document(db, user, doc_id)
+
+
 # ---- Dashboard (separate prefix registered in main.py) ----
 
 

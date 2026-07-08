@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.tenant_context import tenant_session
 from app.modules.idp import extract, gate, mimetype
 from app.modules.idp.thumbnails import generate_thumbnail
+from app.modules.search.query import build_search_text
 from app.models.activity_event import (
     ACT_PROCESSING_COMPLETE,
     ACT_PROCESSING_FAILED,
@@ -298,8 +299,8 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             doc.document_date = _guess_document_date(result.text)
             _attach_thumbnail(db, doc, file_bytes)
 
-            # Populate full-text search index: filename + extracted text.
-            combined = " ".join(filter(None, [doc.original_filename, result.text]))
+            # Populate full-text search index: title + filename + extracted text.
+            combined = build_search_text(doc.title, doc.original_filename, result.text)
             db.execute(
                 update(Document)
                 .where(Document.id == doc_uuid)

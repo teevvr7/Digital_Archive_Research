@@ -268,6 +268,79 @@ class TestRestoreDocument:
 
 
 # ---------------------------------------------------------------------------
+# permanent_delete_document
+# ---------------------------------------------------------------------------
+
+class TestPermanentDeleteDocument:
+    def test_404_when_doc_not_found(self, mock_db: MagicMock) -> None:
+        mock_db._doc_to_return = None
+        user = _make_token()
+        with pytest.raises(HTTPException) as exc_info:
+            files_service.permanent_delete_document(mock_db, user, uuid.uuid4())
+        assert exc_info.value.status_code == 404
+
+    def test_409_if_not_trashed(self, mock_db: MagicMock) -> None:
+        doc = _make_doc()  # deleted_at is None
+        mock_db._doc_to_return = doc
+        user = _make_token()
+        with pytest.raises(HTTPException) as exc_info:
+            files_service.permanent_delete_document(mock_db, user, doc.id)
+        assert exc_info.value.status_code == 409
+
+    def test_calls_delete_file_for_storage_and_thumbnail(self, mock_db: MagicMock) -> None:
+        doc = _make_doc(
+            deleted_at=datetime.datetime.now(datetime.timezone.utc),
+            thumbnail_key="tenant/thumbnails/thumb.webp",
+        )
+        mock_db._doc_to_return = doc
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE) as mock_delete:
+            files_service.permanent_delete_document(mock_db, user, doc.id)
+
+        called_keys = {c.args[0] for c in mock_delete.call_args_list}
+        assert called_keys == {doc.storage_key, doc.thumbnail_key}
+
+    def test_hard_deletes_db_row(self, mock_db: MagicMock) -> None:
+        doc = _make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc))
+        mock_db._doc_to_return = doc
+        deleted_objects: list[object] = []
+        mock_db.delete.side_effect = deleted_objects.append
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE):
+            files_service.permanent_delete_document(mock_db, user, doc.id)
+
+        assert deleted_objects == [doc]
+
+    def test_emits_permanent_delete_activity_event(self, mock_db: MagicMock) -> None:
+        doc = _make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc))
+        mock_db._doc_to_return = doc
+        added: list[object] = []
+        mock_db.add.side_effect = added.append
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE):
+            files_service.permanent_delete_document(mock_db, user, doc.id)
+
+        from app.models.activity_event import ActivityEvent, ACT_PERMANENT_DELETE
+        events = [o for o in added if isinstance(o, ActivityEvent)]
+        assert any(e.type == ACT_PERMANENT_DELETE for e in events)
+
+    def test_decrements_tenant_storage_used_bytes(self, mock_db: MagicMock) -> None:
+        """Regression: storage_used_bytes was never decremented on delete,
+        so the storage meter never reflected freed space."""
+        doc = _make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc))
+        mock_db._doc_to_return = doc
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE):
+            files_service.permanent_delete_document(mock_db, user, doc.id)
+
+        assert mock_db.execute.called
+
+
+# ---------------------------------------------------------------------------
 # empty_trash
 # ---------------------------------------------------------------------------
 
@@ -341,3 +414,24 @@ class TestEmptyTrash:
             count = files_service.empty_trash(mock_db, user)
 
         assert count == 0
+
+    def test_decrements_tenant_storage_used_bytes(self, mock_db: MagicMock) -> None:
+        """Regression: storage_used_bytes was never decremented, so the
+        storage meter only ever grew even after emptying the trash."""
+        trashed = [_make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc)) for _ in range(2)]
+        mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=trashed))
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE):
+            files_service.empty_trash(mock_db, user)
+
+        assert mock_db.execute.called
+
+    def test_no_storage_update_when_nothing_trashed(self, mock_db: MagicMock) -> None:
+        mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+        user = _make_token()
+
+        with patch(_STORAGE_DELETE):
+            files_service.empty_trash(mock_db, user)
+
+        mock_db.execute.assert_not_called()

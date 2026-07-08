@@ -27,6 +27,7 @@ import {
   X,
   CheckSquare,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import {
@@ -37,6 +38,7 @@ import {
   apiTrashDocument,
   apiRestoreDocument,
   apiEmptyTrash,
+  apiPermanentDelete,
   apiTags,
   apiCorrespondents,
   apiThumbnailUrl,
@@ -170,6 +172,8 @@ function DocCard({
 // ---------------------------------------------------------------------------
 
 export default function DocumentsPage() {
+  const { refresh: refreshAuth } = useAuth();
+
   // ---- Filters ----
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProcessingStatus | "all">("all");
@@ -439,12 +443,25 @@ export default function DocumentsPage() {
     try {
       const { deleted } = await apiEmptyTrash();
       alert(`Permanently deleted ${deleted} document${deleted !== 1 ? "s" : ""}.`);
-      setData(null);
-      setPage(1);
+      refreshDocuments();
+      // Freed real storage — the sidebar's tenant snapshot won't know unless told.
+      refreshAuth();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Failed to empty trash");
     } finally {
       setEmptyingTrash(false);
+    }
+  };
+
+  const handlePermanentDelete = async (doc: Document) => {
+    if (!confirm(`Permanently delete "${doc.title || doc.originalFilename}"? This cannot be undone.`)) return;
+    try {
+      await apiPermanentDelete(doc.id);
+      setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+      // Freed real storage — the sidebar's tenant snapshot won't know unless told.
+      refreshAuth();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Permanent delete failed");
     }
   };
 
@@ -930,7 +947,7 @@ export default function DocumentsPage() {
                     <td className="px-4 py-3.5 text-slate-500 text-xs">
                       <div>{doc.uploadedBy}</div>
                       <div className="text-slate-400">{formatRelativeTime(doc.uploadedAt)}</div>
-                      <div className="text-slate-400">{doc.documentDate || doc.uploadedAt.split("T")[0]}</div>
+                      <div className="text-slate-400">{doc.uploadedAt.split("T")[0]}</div>
                     </td>
                     <td className="px-4 py-3.5 text-slate-500 text-xs">
                       {formatBytes(doc.sizeBytes)}
@@ -945,13 +962,22 @@ export default function DocumentsPage() {
                           <Eye className="w-3.5 h-3.5" />
                         </Link>
                         {trashed ? (
-                          <button
-                            onClick={() => handleRestore(doc)}
-                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
-                            title="Restore"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleRestore(doc)}
+                              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
+                              title="Restore"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handlePermanentDelete(doc)}
+                              className="p-1.5 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                              title="Delete permanently"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
                         ) : (
                           <>
                             <button
