@@ -80,6 +80,9 @@ class DocumentOut(CamelModel):
     has_thumbnail: bool
     deleted_at: datetime.datetime | None
     extraction_method: str | None = None
+    ocr_used: bool = False
+    ocr_engine: str | None = None
+    vlm_model: str | None = None
 
 
 class DocumentListOut(CamelModel):

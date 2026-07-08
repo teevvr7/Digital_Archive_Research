@@ -115,6 +115,9 @@ export interface Document {
   hasThumbnail: boolean;
   deletedAt: string | null;
   extractionMethod?: string | null;
+  ocrUsed?: boolean;
+  ocrEngine?: string | null;
+  vlmModel?: string | null;
 }
 
 export interface ActivityEvent {

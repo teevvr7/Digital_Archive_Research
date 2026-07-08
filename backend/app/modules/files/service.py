@@ -130,24 +130,27 @@ def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int)
         )
 
 
-def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, dict]]:
-    """Helper to batch-fetch extraction methods and template schemas to prevent N+1 queries."""
+def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, str], dict[uuid.UUID, dict]]:
+    """Helper to batch-fetch extraction methods, model names, and template schemas to prevent N+1 queries."""
     if not docs:
-        return {}, {}
+        return {}, {}, {}
         
     doc_ids = [doc.id for doc in docs]
     
-    # 1. Batch load extraction methods
+    # 1. Batch load extraction methods and model names
     from app.models.extraction import Extraction
     extractions = db.execute(
-        select(Extraction.document_id, Extraction.method)
+        select(Extraction.document_id, Extraction.method, Extraction.model_name)
         .where(Extraction.document_id.in_(doc_ids))
         .order_by(Extraction.created_at.desc())
     ).all()
     ext_methods_map = {}
+    ext_models_map = {}
     for row in extractions:
         if row.document_id not in ext_methods_map:
             ext_methods_map[row.document_id] = row.method
+        if row.document_id not in ext_models_map:
+            ext_models_map[row.document_id] = row.model_name
 
     # 2. Batch load template schemas
     from app.models.document_template import DocumentTemplate
@@ -187,7 +190,7 @@ def _batch_preload_extractions_and_templates(db: Session, docs: list[Document]) 
             clean_schema, _, _ = split_schema_payload(template.field_mappings)
             doc_schemas_map[doc.id] = clean_schema
             
-    return ext_methods_map, doc_schemas_map
+    return ext_methods_map, ext_models_map, doc_schemas_map
 
 
 def _doc_to_out(
@@ -198,6 +201,7 @@ def _doc_to_out(
     custom_field_values: list[FieldValueOut] | None = None,
     preloaded_extraction_method: str | None = None,
     preloaded_template_schema: dict | None = None,
+    preloaded_vlm_model: str | None = None,
 ) -> DocumentOut:
     from sqlalchemy.orm import object_session
     from app.models.document_template import DocumentTemplate
@@ -205,23 +209,40 @@ def _doc_to_out(
 
     extracted_data = doc.extracted_data
     extraction_method = preloaded_extraction_method
+    vlm_model = preloaded_vlm_model
     
     is_mock_doc = type(doc).__name__ in ("MagicMock", "Mock") or getattr(doc, "id", None) is None or type(doc.id).__name__ in ("MagicMock", "Mock")
     
+    db = None
+    if not is_mock_doc:
+        try:
+            db = object_session(doc)
+        except Exception:
+            pass
+
+    if db and type(db).__name__ not in ("MagicMock", "Mock"):
+        if extraction_method is None:
+            try:
+                from app.models.extraction import Extraction
+                latest_ext = db.query(Extraction).filter(
+                    Extraction.document_id == doc.id
+                ).order_by(Extraction.created_at.desc()).first()
+                if latest_ext:
+                    extraction_method = latest_ext.method
+                    vlm_model = latest_ext.model_name
+            except Exception:
+                pass
+
+    # Resolve OCR engine name dynamically
+    ocr_engine = None
+    if doc.ocr_used:
+        if extraction_method == "paddle_qwen":
+            ocr_engine = "paddleocr"
+        else:
+            ocr_engine = "rapidocr"
+
     if extracted_data and isinstance(extracted_data, dict):
-        db = object_session(doc)
-        if db and not is_mock_doc and type(db).__name__ not in ("MagicMock", "Mock"):
-            if extraction_method is None:
-                try:
-                    from app.models.extraction import Extraction
-                    latest_ext = db.query(Extraction).filter(
-                        Extraction.document_id == doc.id
-                    ).order_by(Extraction.created_at.desc()).first()
-                    if latest_ext:
-                        extraction_method = latest_ext.method
-                except Exception:
-                    pass
-            
+        if db and type(db).__name__ not in ("MagicMock", "Mock"):
             clean_schema = preloaded_template_schema
             if clean_schema is None:
                 template = None
@@ -238,23 +259,23 @@ def _doc_to_out(
                     clean_schema, _, _ = split_schema_payload(template.field_mappings)
             
             if clean_schema and isinstance(clean_schema, dict):
-                    def sort_dict_by_schema(data, schema):
-                        if not isinstance(data, dict) or not isinstance(schema, dict):
-                            return data
-                        
-                        sorted_data = {}
-                        for key in schema.keys():
-                            if key in data:
-                                sorted_data[key] = sort_dict_by_schema(data[key], schema[key])
-                        for key in data.keys():
-                            if key not in sorted_data:
-                                if isinstance(data[key], dict):
-                                    sorted_data[key] = sort_dict_by_schema(data[key], {})
-                                else:
-                                    sorted_data[key] = data[key]
-                        return sorted_data
+                def sort_dict_by_schema(data, schema):
+                    if not isinstance(data, dict) or not isinstance(schema, dict):
+                        return data
                     
-                    extracted_data = sort_dict_by_schema(extracted_data, clean_schema)
+                    sorted_data = {}
+                    for key in schema.keys():
+                        if key in data:
+                            sorted_data[key] = sort_dict_by_schema(data[key], schema[key])
+                    for key in data.keys():
+                        if key not in sorted_data:
+                            if isinstance(data[key], dict):
+                                sorted_data[key] = sort_dict_by_schema(data[key], {})
+                            else:
+                                sorted_data[key] = data[key]
+                    return sorted_data
+                
+                extracted_data = sort_dict_by_schema(extracted_data, clean_schema)
 
     return DocumentOut(
         id=doc.id,
@@ -285,6 +306,9 @@ def _doc_to_out(
         has_thumbnail=doc.thumbnail_key is not None,
         deleted_at=doc.deleted_at,
         extraction_method=extraction_method,
+        ocr_used=doc.ocr_used,
+        ocr_engine=ocr_engine,
+        vlm_model=vlm_model,
     )
 
 
@@ -563,7 +587,7 @@ def list_documents(
     corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
     field_values_by_doc = fetch_field_values_for_docs(db, doc_ids)
 
-    ext_methods_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, rows)
+    ext_methods_map, ext_models_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, rows)
 
     items = [
         _doc_to_out(
@@ -574,6 +598,7 @@ def list_documents(
             custom_field_values=field_values_by_doc.get(doc.id, []),
             preloaded_extraction_method=ext_methods_map.get(doc.id),
             preloaded_template_schema=doc_schemas_map.get(doc.id),
+            preloaded_vlm_model=ext_models_map.get(doc.id),
         )
         for doc in rows
     ]
@@ -987,13 +1012,14 @@ def get_dashboard(db: Session) -> DashboardOut:
         select(Document).order_by(Document.uploaded_at.desc()).limit(5)
     ).all()
     names = _names_for_ids(db, {doc.uploaded_by for doc in recent_docs})
-    ext_methods_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, recent_docs)
+    ext_methods_map, ext_models_map, doc_schemas_map = _batch_preload_extractions_and_templates(db, recent_docs)
     recent_out = [
         _doc_to_out(
             doc,
             names.get(doc.uploaded_by, str(doc.uploaded_by)),
             preloaded_extraction_method=ext_methods_map.get(doc.id),
             preloaded_template_schema=doc_schemas_map.get(doc.id),
+            preloaded_vlm_model=ext_models_map.get(doc.id),
         )
         for doc in recent_docs
     ]

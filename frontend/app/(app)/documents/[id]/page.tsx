@@ -474,7 +474,9 @@ export default function DocumentViewerPage({
           )}
           {doc.extractionMethod === "vlm" && (
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-              VLM Extraction
+              {doc.vlmModel
+                ? `VLM (${doc.vlmModel.toLowerCase().includes("qwen") ? "Qwen-VL" : doc.vlmModel.split("/").pop()})`
+                : "VLM Extraction"}
             </span>
           )}
           {doc.extractionMethod === "manual" && (
@@ -483,9 +485,22 @@ export default function DocumentViewerPage({
             </span>
           )}
           {doc.status !== "failed" && doc.status !== "queued" && doc.status !== "extracting_text" && doc.status !== "ocr_processing" && (
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-              {doc.hasTextLayer ? "Digital Read" : "Local OCR"}
-            </span>
+            <>
+              {doc.hasTextLayer && (
+                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  Digital Read
+                </span>
+              )}
+              {doc.ocrUsed && (
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${
+                  doc.ocrEngine === "paddleocr"
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    : "bg-cyan-50 text-cyan-700 border-cyan-200"
+                }`}>
+                  {doc.ocrEngine === "paddleocr" ? "GPU OCR (Paddle)" : "Local OCR (Rapid)"}
+                </span>
+              )}
+            </>
           )}
           {actionError && (
             <span className="text-xs text-red-500">{actionError}</span>
