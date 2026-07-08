@@ -265,7 +265,7 @@ def run_remote_paddle_qwen_extraction(
         }
         
         # 240s timeout to allow remote cold-start VLM/LLM servers to respond and process multi-page PDFs
-        response = httpx.post(url, files=files, data=payload_data, timeout=240.0)
+        response = httpx.post(url, files=files, data=payload_data, timeout=600.0)
         response.raise_for_status()
         res_json = response.json()
         
