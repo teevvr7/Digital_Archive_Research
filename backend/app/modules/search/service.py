@@ -47,7 +47,7 @@ def search_documents(
         snippet.label("snippet"),
         content.label("content_match"),
         fname.label("filename_match"),
-    ).where(or_(content, fname))
+    ).where(Document.deleted_at.is_(None), or_(content, fname))
 
     if type_filter:
         stmt = stmt.where(Document.document_type == type_filter)

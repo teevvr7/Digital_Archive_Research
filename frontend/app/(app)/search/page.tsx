@@ -310,7 +310,7 @@ export default function SearchPage() {
                           href={`/documents/${doc.id}`}
                           className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors truncate"
                         >
-                          {highlight(doc.originalFilename, submitted)}
+                          {highlight(doc.title || doc.originalFilename, submitted)}
                         </Link>
                         <StatusBadge status={doc.status} />
                       </div>

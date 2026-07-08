@@ -29,6 +29,18 @@ def _prefix_tsquery_str(q: str) -> str | None:
 _HEADLINE_OPTS = "StartSel=<mark>,StopSel=</mark>,MaxFragments=2,MinWords=5,MaxWords=24,ShortWord=2"
 
 
+def build_search_text(title: str, original_filename: str, extracted_text: str | None) -> str:
+    """Combine title + original filename + extracted text for the ``search_tsv`` index.
+
+    Title is included (not just ``original_filename``) so a document renamed via
+    the correction UI stays findable by its new name; the original filename stays
+    in the mix too so the pre-rename name remains searchable. Called both at
+    initial pipeline processing and whenever ``patch_document`` changes the title,
+    so the two never drift out of sync.
+    """
+    return " ".join(filter(None, [title, original_filename, extracted_text]))
+
+
 def build_tsquery(q: str):
     """``websearch_to_tsquery``: handles quoted "phrases", OR, -exclude; never errors."""
     return func.websearch_to_tsquery("english", q)
@@ -60,20 +72,31 @@ def content_match(q: str, tsquery):
     return or_(base, Document.search_tsv.op("@@")(func.to_tsquery("english", prefix_str)))
 
 
-def filename_match(q: str):
-    """Typo-tolerant filename match via pg_trgm word_similarity (case-insensitive, threshold 0.3).
+def _name_similarity(q: str):
+    """Best pg_trgm word_similarity against either the (possibly renamed) title
+    or the original filename, so a document stays findable by both its current
+    and its original name after a correction-UI rename."""
+    effective_title = func.coalesce(Document.title, Document.original_filename)
+    return func.greatest(
+        func.word_similarity(q.lower(), func.lower(effective_title)),
+        func.word_similarity(q.lower(), func.lower(Document.original_filename)),
+    )
 
-    Uses ``word_similarity(q, filename)`` directly so the threshold is explicit and
+
+def filename_match(q: str):
+    """Typo-tolerant title/filename match via pg_trgm word_similarity (case-insensitive, threshold 0.3).
+
+    Uses ``word_similarity(q, name)`` directly so the threshold is explicit and
     not affected by the session-level GUC default (0.6 is too strict for real typos).
     Lowercases both sides so "Quarterly" matches "quartrly".
     """
-    return func.word_similarity(q.lower(), func.lower(Document.original_filename)) >= 0.2
+    return _name_similarity(q) >= 0.2
 
 
 def rank_expr(q: str, tsquery):
-    """Combined relevance score: content rank + filename word-similarity (NULL-safe)."""
+    """Combined relevance score: content rank + title/filename word-similarity (NULL-safe)."""
     return func.coalesce(func.ts_rank_cd(Document.search_tsv, tsquery), 0.0) + func.coalesce(
-        func.word_similarity(q.lower(), func.lower(Document.original_filename)), 0.0
+        _name_similarity(q), 0.0
     )
 
 

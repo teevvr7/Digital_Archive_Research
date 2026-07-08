@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.tenant_context import tenant_session
 from app.modules.idp import extract, gate, mimetype
 from app.modules.idp.thumbnails import generate_thumbnail
+from app.modules.search.query import build_search_text
 from app.models.activity_event import (
     ACT_PROCESSING_COMPLETE,
     ACT_PROCESSING_FAILED,
@@ -57,7 +58,15 @@ _VLM_ELIGIBLE_MIMES = mimetype.VLM_ELIGIBLE_MIMES
 
 
 def _guess_document_date(text: str | None) -> datetime.date | None:
-    """Best-effort document date from content. Never raises, never blocks the doc."""
+    """Best-effort document date from content. Never raises, never blocks the doc.
+
+    ``dateparser.search.search_dates`` free-mines arbitrary text for anything
+    date-shaped and can misread an unrelated number (a version string, an ID,
+    a page reference) as a full date. Reject anything implausible — more than
+    a few days in the future, or more than 50 years old — rather than store
+    it: a missing ``document_date`` is safe, a wrong one silently corrupts
+    date-based search/filtering.
+    """
     if not text:
         return None
     try:
@@ -68,7 +77,11 @@ def _guess_document_date(text: str | None) -> datetime.date | None:
         )
         if not results:
             return None
-        return results[0][1].date()
+        guess = results[0][1].date()
+        today = datetime.date.today()
+        if guess > today + datetime.timedelta(days=3) or guess.year < today.year - 50:
+            return None
+        return guess
     except Exception:
         logger.debug("document_date heuristic failed", exc_info=True)
         return None
@@ -404,10 +417,8 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             doc.document_date = _guess_document_date(doc.extracted_text if isinstance(doc.extracted_text, str) else None)
             _attach_thumbnail(db, doc, file_bytes)
 
-            # Populate full-text search index: filename + extracted text.
-            original_filename = doc.original_filename if isinstance(doc.original_filename, str) else ""
-            extracted_text = doc.extracted_text if isinstance(doc.extracted_text, str) else ""
-            combined = " ".join(filter(None, [original_filename, extracted_text]))
+            # Populate full-text search index: title + filename + extracted text.
+            combined = build_search_text(doc.title, doc.original_filename, doc.extracted_text)
             db.execute(
                 update(Document)
                 .where(Document.id == doc_uuid)

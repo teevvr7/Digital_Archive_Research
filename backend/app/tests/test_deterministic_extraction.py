@@ -226,6 +226,7 @@ def test_process_document_skips_vlm_when_deterministic_gate_passes():
     doc.tenant_id = "00000000-0000-0000-0000-000000000002"
     doc.status = "queued"
     doc.original_filename = "test.pdf"
+    doc.title = "test.pdf"
     doc.extracted_data = None
 
     mock_db = MagicMock()
@@ -266,6 +267,7 @@ def test_process_document_skips_both_tiers_for_non_candidate_content():
     doc.tenant_id = "00000000-0000-0000-0000-000000000004"
     doc.status = "queued"
     doc.original_filename = "test.pdf"
+    doc.title = "test.pdf"
     doc.extracted_data = None
 
     mock_db = MagicMock()
@@ -306,6 +308,7 @@ def test_process_document_marks_needs_review_when_both_tiers_fail():
     doc.tenant_id = "00000000-0000-0000-0000-000000000006"
     doc.status = "queued"
     doc.original_filename = "test.pdf"
+    doc.title = "test.pdf"
     doc.extracted_data = None
 
     mock_db = MagicMock()
