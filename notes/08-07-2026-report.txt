@@ -1,0 +1,77 @@
+1. Daily Summary of Activities
+- Completed schema cleanups by dropping deprecated layout_fingerprint and tags columns.
+- Implemented split badging indicator systems showing separate OCR Source Modality and parsing Extraction Strategy badges.
+- Fixed OCR engine resolution mapping inside backend files service to return paddleocr for remote pipeline executions.
+- Redesigned the frontend structured card details layout to render nested lists (like sub_items) in indented hierarchical sub-cards.
+- Hardened the correction form input loops to skip non-scalar values and prevent data corruption.
+- Researched Paperless-ngx and Docling performance metrics, parsing bottlenecks, and potential SMB system integrations.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Schema Cleanups & Column Drops
+Description of Work Done: Generated and applied migrations to drop deprecated columns layout_fingerprint and tags from the database schema, keeping key trigram/FTS indexes unaffected.
+Status: Completed
+Remarks: 100% test coverage passing.
+
+Task Number: 2
+Task / Project Name: Modality Badging Upgrades
+Description of Work Done: Exposed dynamic ocrUsed, ocrEngine, and vlmModel schema fields. Redesigned frontend details header badges to split OCR retrieval and parsing indicators.
+Status: Completed
+Remarks: Corrected remote Paddle-Qwen badging alignment.
+
+Task Number: 3
+Task / Project Name: Sub-items & Hierarchy Card Rendering
+Description of Work Done: Developed indented nested sub-card rendering for line items lists containing arrays of sub-items. Hided complex objects from flat input edit fields.
+Status: Completed
+Remarks: Fixed the raw "[object Object]" rendering bug.
+
+Task Number: 4
+Task / Project Name: Competitor & Integration Research (Outside IDE)
+Description of Work Done: Examined Paperless-ngx and Docling ingestion layers. Explored workflows for small businesses to feed extracted structured invoice JSON straight into ERP systems.
+Status: Completed
+Remarks: Documented findings in progress note.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Sub-items in invoices displaying as raw "[object Object]" inside line items cards.
+Root Cause: Frontend card iteration utilized flat String(v) interpolation, which stringifies complex arrays of objects.
+Resolution Provided: Created recursive renderer checks to format nested arrays and objects into custom indented views.
+
+Issue Number: 2
+Issue Description: VLM document details view displaying conflicting "Local OCR (Rapid)" badge instead of GPU-based Paddle OCR.
+Root Cause: Backend resolver defaulted to rapidocr since the extracted method type is saved generically as "vlm" in database tables.
+Resolution Provided: Refactored the mapper helper to read the configured extraction strategy from templates or doc_types.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, FastAPI, Next.js, React, Alembic, PostgreSQL, TailwindCSS.
+Infrastructure: Supabase (DB/Storage), Lightning AI (Remote GPU Space).
+IDE / Tools: Git, VS Code, PowerShell.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Controlled component edit loops attempting to map nested lines array structures as flat text inputs.
+Solution: Filtered out non-scalar fields from the auto-generation mapping loop in edit mode, keeping arrays safely untouched in state.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Handling recursive React rendering components for deep JSON payloads.
+- Schema migration constraints and index maintenance on Postgres/Supabase tables.
+- Performance profiling of Document AI competitor tools (Docling, Paperless-ngx).
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Continue refining template layouts and workflows.
+- Enhance batch uploading drag-and-drop validation warnings.
