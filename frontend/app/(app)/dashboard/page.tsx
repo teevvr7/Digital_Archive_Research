@@ -14,60 +14,10 @@ import {
   FileScan,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
+import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { apiDashboard, type DashboardResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { ActivityEvent } from "@/types";
-
-function ActivityIcon({ type }: { type: ActivityEvent["type"] }) {
-  switch (type) {
-    case "upload":
-      return <Upload className="w-3.5 h-3.5 text-blue-600" />;
-    case "processing_complete":
-      return <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />;
-    case "processing_failed":
-      return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
-    case "download":
-      return <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />;
-    default:
-      return <FileText className="w-3.5 h-3.5 text-slate-400" />;
-  }
-}
-
-function ActivityLabel({ event }: { event: ActivityEvent }) {
-  switch (event.type) {
-    case "upload":
-      return (
-        <>
-          uploaded{" "}
-          <span className="font-medium text-slate-800">{event.documentName}</span>
-        </>
-      );
-    case "processing_complete":
-      return (
-        <>
-          <span className="font-medium text-slate-800">{event.documentName}</span>{" "}
-          processed
-        </>
-      );
-    case "processing_failed":
-      return (
-        <>
-          <span className="font-medium text-slate-800">{event.documentName}</span>{" "}
-          failed — {event.meta}
-        </>
-      );
-    case "download":
-      return (
-        <>
-          downloaded{" "}
-          <span className="font-medium text-slate-800">{event.documentName}</span>
-        </>
-      );
-    default:
-      return <>{event.type}</>;
-  }
-}
 
 export default function DashboardPage() {
   const { tenant } = useAuth();

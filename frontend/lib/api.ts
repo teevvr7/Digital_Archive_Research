@@ -40,6 +40,8 @@ export interface DashboardStats {
   storageUsedBytes: number;
   storageLimitBytes: number;
   documentsCount: number;
+  /** Non-trashed document counts by family: pdf/image/office/text/email/other. */
+  documentsByFamily: Record<string, number>;
 }
 
 export interface DashboardResponse {
@@ -247,11 +249,33 @@ export const apiSearch = (query: SearchQuery) => {
   return get<SearchListResponse>(`/search?${params}`);
 };
 
-// ---- Settings (Milestone E) ----------------------------------------------
+// ---- Settings --------------------------------------------------------------
 
-export const apiOrganisation = () => get<unknown>("/settings/organisation");
-export const apiUsers = () => get<unknown>("/settings/users");
-export const apiApiKeys = () => get<unknown>("/settings/api-keys");
+/** Rename the organisation. Admin-only (backend enforces via require_admin). */
+export const apiUpdateTenant = (name: string) =>
+  patch_<AuthTenant>("/auth/tenant", { name });
+
+// ---- Activity / audit trail -------------------------------------------------
+
+export interface ActivityListResponse {
+  items: ActivityEvent[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Paginated audit-trail feed. Pass `documentId` for a single document's
+ * History tab, or omit it for the org-wide feed (Settings > Activity). */
+export const apiActivity = (opts: { documentId?: string; page?: number } = {}) => {
+  const params = new URLSearchParams(
+    Object.fromEntries(
+      Object.entries(opts)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k === "documentId" ? "document_id" : k, String(v)])
+    )
+  ).toString();
+  return get<ActivityListResponse>(`/activity${params ? `?${params}` : ""}`);
+};
 
 // ---- Tags (Phase 4) -------------------------------------------------------
 

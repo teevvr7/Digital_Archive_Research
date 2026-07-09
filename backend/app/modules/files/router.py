@@ -4,13 +4,15 @@ import datetime
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_tenant_db
+from app.core.rate_limit import limiter
 from app.core.security import TokenData
 from app.modules.files import service
 from app.modules.files.schemas import (
+    ActivityListOut,
     BulkSetTypeIn,
     BulkTagIn,
     BulkTrashIn,
@@ -33,7 +35,13 @@ _DbCtx = Annotated[tuple[Session, TokenData], Depends(get_tenant_db)]
     status_code=status.HTTP_201_CREATED,
     summary="Upload one or more documents",
 )
+# The frontend sends one file per request (a loop, not one multipart batch), so
+# a legitimate drag-and-drop of a few hundred files means a few hundred requests
+# in quick succession from the same user — the limit has to be calibrated against
+# that request-per-file pattern, not against "one logical upload action".
+@limiter.limit("300/minute")
 async def upload_documents(
+    request: Request,
     ctx: _DbCtx,
     files: Annotated[list[UploadFile], File(description="Files to upload")],
     document_type: Annotated[list[str] | None, Form()] = None,
@@ -239,6 +247,21 @@ def restore_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
 def permanent_delete_document(ctx: _DbCtx, doc_id: uuid.UUID) -> None:
     db, user = ctx
     service.permanent_delete_document(db, user, doc_id)
+
+
+@router.get(
+    "/activity",
+    response_model=ActivityListOut,
+    response_model_by_alias=True,
+    summary="Paginated audit-trail feed (org-wide, or scoped to one document)",
+)
+def list_activity(
+    ctx: _DbCtx,
+    document_id: uuid.UUID | None = None,
+    page: int = 1,
+) -> ActivityListOut:
+    db, _ = ctx
+    return service.list_activity(db, document_id=document_id, page=max(1, page))
 
 
 # ---- Dashboard (separate prefix registered in main.py) ----

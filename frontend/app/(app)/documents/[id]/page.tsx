@@ -24,6 +24,7 @@ import {
   Plus,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
+import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import {
   apiDocument,
@@ -40,7 +41,9 @@ import {
   apiSetFieldValue,
   apiDeleteFieldValue,
   apiCorrespondents,
+  apiActivity,
   type DocumentPatch,
+  type ActivityListResponse,
 } from "@/lib/api";
 import type { CustomField, Correspondent, Document, DocumentType, FieldValue, Tag } from "@/types";
 
@@ -128,7 +131,9 @@ export default function DocumentViewerPage({
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw">("extracted");
+  const [activeTab, setActiveTab] = useState<"extracted" | "metadata" | "raw" | "history">("extracted");
+  const [history, setHistory] = useState<ActivityListResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
 
@@ -202,6 +207,16 @@ export default function DocumentViewerPage({
       .then(setTextContent)
       .catch(() => {});
   }, [doc?.mimeType, previewUrl]);
+
+  // Lazy-load this document's audit trail only when the History tab is opened.
+  useEffect(() => {
+    if (activeTab !== "history") return;
+    setHistoryLoading(true);
+    apiActivity({ documentId: id })
+      .then(setHistory)
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  }, [activeTab, id]);
 
   const handleDownload = async () => {
     if (!doc) return;
@@ -566,7 +581,7 @@ export default function DocumentViewerPage({
         <div className="w-96 flex flex-col bg-white flex-shrink-0 overflow-hidden">
           {/* Tabs */}
           <div className="border-b border-slate-200 flex flex-shrink-0">
-            {(["extracted", "metadata", "raw"] as const).map((tab) => (
+            {(["extracted", "metadata", "raw", "history"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -580,7 +595,9 @@ export default function DocumentViewerPage({
                   ? "Extracted Data"
                   : tab === "metadata"
                   ? "Metadata"
-                  : "Raw JSON"}
+                  : tab === "raw"
+                  ? "Raw JSON"
+                  : "History"}
               </button>
             ))}
           </div>
@@ -1007,6 +1024,35 @@ export default function DocumentViewerPage({
                   <div className="bg-slate-50 rounded-lg p-4 text-center">
                     <p className="text-slate-400 text-xs">No extracted data yet.</p>
                   </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <div className="space-y-3">
+                {!history || history.items.length === 0 ? (
+                  <div className="bg-slate-50 rounded-lg p-4 text-center">
+                    <p className="text-slate-400 text-xs">
+                      {historyLoading ? "Loading…" : "No activity recorded for this document."}
+                    </p>
+                  </div>
+                ) : (
+                  history.items.map((event) => (
+                    <div key={event.id} className="flex items-start gap-2.5">
+                      <div className="mt-0.5">
+                        <ActivityIcon type={event.type} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-700">
+                          <span className="font-medium text-slate-800">{event.userName}</span>{" "}
+                          <ActivityLabel event={event} />
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {formatRelativeTime(event.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             )}

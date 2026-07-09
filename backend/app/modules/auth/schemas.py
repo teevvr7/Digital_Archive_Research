@@ -29,3 +29,11 @@ class TenantOut(CamelModel):
 class MeOut(CamelModel):
     user: UserOut
     tenant: TenantOut
+
+
+class TenantPatchIn(CamelModel):
+    """Editable organisation profile fields. Only ``name`` is real today —
+    no timezone/locale columns exist yet, so we don't fake fields that don't
+    persist anywhere."""
+
+    name: str

@@ -16,6 +16,7 @@ import {
   CopyCheck,
   Loader2,
   ChevronDown,
+  CheckSquare,
 } from "lucide-react";
 import { apiUploadDocument } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -92,6 +93,8 @@ export default function UploadPage() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [defaultType, setDefaultType] = useState<DocumentType>("invoice");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkType, setBulkType] = useState<DocumentType>("invoice");
 
   const addFiles = useCallback(
     (incoming: FileList | null) => {
@@ -118,16 +121,49 @@ export default function UploadPage() {
     addFiles(e.dataTransfer.files);
   };
 
-  const removeFile = (id: string) =>
+  const removeFile = (id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
 
   const updateType = (id: string, docType: DocumentType) =>
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, docType } : f)));
+
+  // Only pending files have an editable type — once uploading/queued/etc.,
+  // the type was already submitted with the request.
+  const pendingFiles = files.filter((f) => f.status === "pending");
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === pendingFiles.length ? new Set() : new Set(pendingFiles.map((f) => f.id))
+    );
+  };
+
+  const applyBulkType = () => {
+    setFiles((prev) =>
+      prev.map((f) => (selectedIds.has(f.id) ? { ...f, docType: bulkType } : f))
+    );
+    setSelectedIds(new Set());
+  };
 
   const handleUpload = async () => {
     const pending = files.filter((f) => f.status === "pending");
     if (pending.length === 0) return;
     setUploading(true);
+    setSelectedIds(new Set());
 
     let anyStored = false;
     for (const pf of pending) {
@@ -242,13 +278,27 @@ export default function UploadPage() {
       {/* File list */}
       {files.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-5">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-700">
-              {files.length} file{files.length > 1 ? "s" : ""} selected
-            </p>
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              {pendingFiles.length > 0 && !uploading && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size > 0 && selectedIds.size === pendingFiles.length}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-slate-300 cursor-pointer flex-shrink-0"
+                  title="Select all"
+                />
+              )}
+              <p className="text-sm font-semibold text-slate-700">
+                {files.length} file{files.length > 1 ? "s" : ""} added
+              </p>
+            </div>
             {!uploading && (
               <button
-                onClick={() => setFiles([])}
+                onClick={() => {
+                  setFiles([]);
+                  setSelectedIds(new Set());
+                }}
                 className="text-xs text-slate-400 hover:text-red-500 transition-colors"
               >
                 Clear all
@@ -256,9 +306,48 @@ export default function UploadPage() {
             )}
           </div>
 
+          {/* Bulk type-change toolbar — only meaningful for still-pending files */}
+          {selectedIds.size > 0 && (
+            <div className="px-5 py-2.5 border-b border-blue-100 bg-blue-50 flex items-center gap-2 flex-wrap">
+              <CheckSquare className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-800">
+                {selectedIds.size} selected
+              </span>
+              <div className="relative inline-block ml-2">
+                <select
+                  value={bulkType}
+                  onChange={(e) => setBulkType(e.target.value as DocumentType)}
+                  className="appearance-none text-xs pl-2.5 pr-6 py-1.5 rounded-lg border border-blue-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {DOC_TYPES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+              </div>
+              <button
+                onClick={applyBulkType}
+                className="text-xs font-medium px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Apply to {selectedIds.size}
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-[420px] overflow-y-auto">
           <div className="divide-y divide-slate-50">
             {files.map((pf) => (
               <div key={pf.id} className="px-5 py-3.5 flex items-center gap-4">
+                {pf.status === "pending" ? (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(pf.id)}
+                    onChange={() => toggleSelect(pf.id)}
+                    className="w-4 h-4 rounded border-slate-300 cursor-pointer flex-shrink-0"
+                  />
+                ) : (
+                  <span className="w-4 flex-shrink-0" />
+                )}
                 <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
                   <FileIcon mime={pf.file.type} />
                 </div>
@@ -322,6 +411,7 @@ export default function UploadPage() {
                 )}
               </div>
             ))}
+          </div>
           </div>
         </div>
       )}

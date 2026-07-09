@@ -135,6 +135,50 @@ def test_enqueue_not_called_when_no_files(mock_db):
     mock_enqueue.assert_not_called()
 
 
+def test_batch_over_limit_rejected_with_413(mock_db):
+    """The per-request file-count cap (Level 1 hardening) rejects an oversized
+    batch before reading any file bytes — no I/O, no enqueue, no partial writes."""
+    from fastapi import HTTPException
+
+    tenant_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    token = _make_token(tenant_id, user_id)
+
+    too_many = [_make_upload(f"file{i}.pdf") for i in range(files_service._MAX_FILES_PER_UPLOAD + 1)]
+
+    with patch(_ENQUEUE_TARGET) as mock_enqueue:
+        with pytest.raises(HTTPException) as exc_info:
+            files_service.create_documents(mock_db, token, too_many, ["other"] * len(too_many))
+
+    assert exc_info.value.status_code == 413
+    mock_enqueue.assert_not_called()
+    # Rejected before pass 1 even starts reading — no file's .read() was touched.
+    for upload in too_many:
+        upload.file.read.assert_not_called()
+
+
+def test_batch_at_exact_limit_is_allowed(mock_db):
+    """Exactly the cap (not cap+1) must still succeed — an off-by-one guard."""
+    tenant_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    token = _make_token(tenant_id, user_id)
+
+    exactly_max = [
+        _make_upload(f"file{i}.pdf", content=f"%PDF-1.4 {i}".encode())
+        for i in range(files_service._MAX_FILES_PER_UPLOAD)
+    ]
+    dummy = _dummy_doc_out()
+
+    with patch(_ENQUEUE_TARGET) as mock_enqueue, \
+         patch("app.core.storage.upload_file"), \
+         patch.object(files_service, "_doc_to_out", return_value=dummy):
+        files_service.create_documents(
+            mock_db, token, exactly_max, ["other"] * len(exactly_max)
+        )
+
+    assert mock_enqueue.call_count == files_service._MAX_FILES_PER_UPLOAD
+
+
 def test_retry_calls_enqueue_once(mock_db):
     """retry_document must call enqueue_document exactly once."""
     from app.models.document import STATUS_FAILED, Document

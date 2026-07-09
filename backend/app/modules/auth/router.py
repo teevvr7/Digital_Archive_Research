@@ -5,12 +5,16 @@
 ``/auth/me``        — current user + tenant (requires a valid tenant context).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 import httpx
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_admin
+from app.core.rate_limit import limiter
 from app.core.security import TokenData
 from app.modules.auth import schemas, service
 
@@ -23,11 +27,13 @@ class SignupRequest(BaseModel):
 
 
 @router.post("/signup")
-async def signup(req: SignupRequest):
+@limiter.limit("10/hour")
+async def signup(request: Request, req: SignupRequest):
     """Create a pre-confirmed account via the Supabase admin API (local testing).
 
     Uses the service-role key with ``email_confirm=True`` so the user can sign in
-    immediately without the email-verification round-trip.
+    immediately without the email-verification round-trip. Rate-limited (10/hour
+    per IP) — this is an unauthenticated endpoint, the obvious abuse target.
     """
     if not settings.supabase_service_role_key:
         raise HTTPException(status_code=500, detail="SUPABASE_SERVICE_ROLE_KEY not configured")
@@ -81,3 +87,14 @@ def me(user: TokenData = Depends(get_current_user)):
         user=schemas.UserOut.model_validate(db_user),
         tenant=schemas.TenantOut.model_validate(db_tenant),
     )
+
+
+@router.patch("/tenant", response_model=schemas.TenantOut, response_model_by_alias=True)
+def update_tenant(
+    patch: schemas.TenantPatchIn,
+    ctx: tuple[Session, TokenData] = Depends(require_admin),
+):
+    """Rename the organisation. Admin-only (Settings > Organisation)."""
+    db, user = ctx
+    tenant = service.update_tenant_name(db, uuid.UUID(user.tenant_id), patch.name)
+    return schemas.TenantOut.model_validate(tenant)

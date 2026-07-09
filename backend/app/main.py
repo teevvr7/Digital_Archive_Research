@@ -2,8 +2,13 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
+from app.core.monitoring import init_sentry
+from app.core.rate_limit import limiter
 from app.modules.auth.router import router as auth_router
 from app.modules.correspondents.router import router as correspondents_router
 from app.modules.files.router import dashboard_router
@@ -13,6 +18,9 @@ from app.modules.search.router import router as search_router
 from app.modules.tags.router import router as tags_router
 from app.modules.views.router import router as views_router
 
+# Must run before the app is constructed so startup errors are also captured.
+init_sentry("api")
+
 app = FastAPI(
     title="DataWiz Digital Archive API",
     version="0.1.0",
@@ -20,6 +28,11 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
+
+# ---- Rate limiting (targeted — see core/rate_limit.py) ----
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ---- CORS ----
 app.add_middleware(

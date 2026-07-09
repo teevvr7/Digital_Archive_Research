@@ -16,6 +16,7 @@ we're INSERTing the very rows that RLS would otherwise gate).
 import datetime
 import uuid
 
+from fastapi import HTTPException
 from supabase import create_client
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -143,6 +144,21 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
         raise
     finally:
         db.close()
+
+
+def update_tenant_name(db: Session, tenant_id: uuid.UUID, name: str) -> Tenant:
+    """Rename the current tenant. Runs under the normal RLS-scoped session
+    (unlike ``bootstrap``, the tenant row is guaranteed to already exist)."""
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Organisation name cannot be empty.")
+    tenant = db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found.")
+    tenant.name = name
+    db.flush()
+    db.refresh(tenant)
+    return tenant
 
 
 def _derive_tenant_name(email: str) -> str:

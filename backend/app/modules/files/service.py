@@ -34,6 +34,7 @@ from app.models.user import User
 from app.models.correspondent import Correspondent
 from app.models.tag import DocumentTag, Tag
 from app.modules.files.schemas import (
+    ActivityListOut,
     ActivityOut,
     CorrespondentOut,
     DashboardOut,
@@ -55,6 +56,11 @@ ALLOWED_MIMES: dict[str, str] = mimetype.ALLOWED_MIMES
 
 _PAGE_SIZE = 20
 _EXTRACT_MISSING_BATCH_LIMIT = 100
+# Per-request file-count cap (Level 1 production hardening). Generous enough
+# for a real batch upload (e.g. a folder of a month's invoices) while bounding
+# the cost of one request — per-file size + total storage quota are checked
+# separately and don't protect against "many small files" flooding.
+_MAX_FILES_PER_UPLOAD = 50
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +205,15 @@ def create_documents(
     Jobs are enqueued on the IDP queue after the DB transaction commits, so
     the worker never races an uncommitted row.
     """
+    if len(uploads) > _MAX_FILES_PER_UPLOAD:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"Too many files in one request ({len(uploads)}). "
+                f"Upload at most {_MAX_FILES_PER_UPLOAD} at a time."
+            ),
+        )
+
     max_bytes = settings.max_upload_mb * 1024 * 1024
     tenant_id = uuid.UUID(user.tenant_id)  # type: ignore[arg-type]
     uploader_id = uuid.UUID(user.user_id)
@@ -817,6 +832,49 @@ def bulk_set_type(
     return result.rowcount
 
 
+def list_activity(
+    db: Session,
+    document_id: uuid.UUID | None = None,
+    page: int = 1,
+) -> ActivityListOut:
+    """Paginated audit-trail feed. Scoped to one document (History tab) when
+    ``document_id`` is given, otherwise the org-wide feed (Settings)."""
+    stmt = select(ActivityEvent)
+    if document_id is not None:
+        stmt = stmt.where(ActivityEvent.document_id == document_id)
+
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    offset = (page - 1) * _PAGE_SIZE
+    rows = db.scalars(
+        stmt.order_by(ActivityEvent.timestamp.desc()).offset(offset).limit(_PAGE_SIZE)
+    ).all()
+
+    return ActivityListOut(
+        items=[_evt_to_out(e) for e in rows],
+        total=total,
+        page=page,
+        page_size=_PAGE_SIZE,
+    )
+
+
+def _mime_family(mime_type: str) -> str:
+    """Bucket a sniffed mime type into a display family for the storage-breakdown
+    widget. Mirrors the same families the upload flow already recognises
+    (idp/mimetype.py) so this never drifts from what the parser registry knows."""
+    if mime_type == mimetype.MIME_PDF:
+        return "pdf"
+    if mime_type in mimetype.IMAGE_MIMES:
+        return "image"
+    if mime_type in mimetype.OFFICE_MIMES:
+        return "office"
+    if mime_type in mimetype.TEXT_FAMILY_MIMES:
+        return "text"
+    if mime_type == mimetype.MIME_EML:
+        return "email"
+    return "other"
+
+
 def get_dashboard(db: Session) -> DashboardOut:
     """Aggregate dashboard data: counts, storage, recent docs, and activity feed."""
     # Status breakdown (RLS-scoped)
@@ -828,6 +886,17 @@ def get_dashboard(db: Session) -> DashboardOut:
     processed = by_status.get(STATUS_COMPLETED, 0)
     failed = by_status.get(STATUS_FAILED, 0)
     in_pipeline = total - processed - failed
+
+    # Mime-family breakdown for the Settings storage widget (only non-trashed docs).
+    mime_rows = db.execute(
+        select(Document.mime_type, func.count(Document.id))
+        .where(Document.deleted_at.is_(None))
+        .group_by(Document.mime_type)
+    ).all()
+    by_family: dict[str, int] = {}
+    for mime_type, count in mime_rows:
+        family = _mime_family(mime_type)
+        by_family[family] = by_family.get(family, 0) + count
 
     # Tenant storage — RLS returns only the current tenant's row
     tenant_row = db.execute(
@@ -860,6 +929,7 @@ def get_dashboard(db: Session) -> DashboardOut:
             storage_used_bytes=storage_used,
             storage_limit_bytes=storage_limit,
             documents_count=total,
+            documents_by_family=by_family,
         ),
         recent_documents=recent_out,
         activity=[_evt_to_out(e) for e in events],

@@ -115,6 +115,9 @@ class DashboardStats(CamelModel):
     storage_used_bytes: int
     storage_limit_bytes: int
     documents_count: int
+    # Family counts for the Settings storage-breakdown widget: pdf/image/office/
+    # text/email/other. Real data — replaces the previous hardcoded numbers.
+    documents_by_family: dict[str, int] = {}
 
 
 class DashboardOut(CamelModel):
@@ -123,6 +126,15 @@ class DashboardOut(CamelModel):
     stats: DashboardStats
     recent_documents: list[DocumentOut]
     activity: list[ActivityOut]
+
+
+class ActivityListOut(CamelModel):
+    """Paginated activity feed — org-wide (Settings) or scoped to one document (History tab)."""
+
+    items: list[ActivityOut]
+    total: int
+    page: int
+    page_size: int
 
 
 # ---------------------------------------------------------------------------
