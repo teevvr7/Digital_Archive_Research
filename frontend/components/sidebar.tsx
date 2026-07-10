@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Bookmark,
   Inbox,
+  Table,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/documents?inbox=true", label: "Inbox", icon: Inbox },
   { href: "/upload", label: "Upload", icon: Upload },
+  { href: "/spreadsheet", label: "Spreadsheet", icon: Table },
   { href: "/search", label: "Search", icon: Search },
 ];
 

@@ -459,3 +459,95 @@ export const apiBulkTag = (
 
 export const apiBulkSetType = (documentIds: string[], documentType: string) =>
   post<{ updated: number }>("/documents/bulk-set-type", { documentIds, documentType });
+
+// ---------------------------------------------------------------------------
+// Spreadsheet Center — Export API
+// ---------------------------------------------------------------------------
+
+export interface ExportDocumentType {
+  name: string;
+  count: number;
+}
+
+export interface ExportTemplate {
+  id: string;
+  name: string;
+  documentType: string;
+}
+
+export interface ExportMeta {
+  documentTypes: ExportDocumentType[];
+  templates: ExportTemplate[];
+}
+
+export interface ExportFilters {
+  documentType?: string;
+  templateId?: string;
+  status?: string;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
+}
+
+export interface SpreadsheetPreviewResponse {
+  rows: Record<string, unknown>[];
+  total: number;
+}
+
+/** Fetch doc types and templates for the Spreadsheet Center filter dropdowns. */
+export async function fetchExportMeta(): Promise<ExportMeta> {
+  return get<ExportMeta>("/export/meta");
+}
+
+/** Fetch available canonical column names for the current filter selection. */
+export async function fetchExportFields(filters: ExportFilters): Promise<string[]> {
+  return post<string[]>("/export/fields", filters);
+}
+
+/** Fetch a preview of the spreadsheet rows (JSON, max reasonable limit). */
+export async function fetchExportPreview(
+  filters: ExportFilters,
+  columns: string[],
+  mode: "summary" | "expanded"
+): Promise<SpreadsheetPreviewResponse> {
+  return post<SpreadsheetPreviewResponse>("/export/spreadsheet?format=preview", {
+    ...filters,
+    columns,
+    mode,
+  });
+}
+
+/** Trigger a CSV download via the browser. */
+export async function downloadExportCsv(
+  filters: ExportFilters,
+  columns: string[],
+  mode: "summary" | "expanded"
+): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Not authenticated");
+
+  const res = await fetch(`${BASE}/export/spreadsheet?format=csv`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...filters, columns, mode }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Export failed: ${res.status} ${text}`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
