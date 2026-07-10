@@ -19,6 +19,7 @@ import {
   XCircle,
   Search,
   UserPlus,
+  Copy,
 } from "lucide-react";
 import type { ActivityEvent } from "@/types";
 
@@ -44,6 +45,8 @@ export function ActivityIcon({ type }: { type: ActivityEvent["type"] }) {
       return <Search className="w-3.5 h-3.5 text-slate-500" />;
     case "user_added":
       return <UserPlus className="w-3.5 h-3.5 text-blue-600" />;
+    case "duplicate_detected":
+      return <Copy className="w-3.5 h-3.5 text-amber-600" />;
     default:
       return <FileText className="w-3.5 h-3.5 text-slate-400" />;
   }
@@ -72,6 +75,8 @@ export function ActivityLabel({ event }: { event: ActivityEvent }) {
       return <>searched{event.meta ? ` — "${event.meta}"` : ""}</>;
     case "user_added":
       return <>added a new user{event.meta ? ` — ${event.meta}` : ""}</>;
+    case "duplicate_detected":
+      return <>flagged {doc} as a possible duplicate{event.meta ? ` — ${event.meta}` : ""}</>;
     default:
       return <>{event.type}</>;
   }

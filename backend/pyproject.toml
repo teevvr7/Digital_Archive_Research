@@ -30,6 +30,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "sentry-sdk[fastapi]>=2.0",     # error monitoring (api + worker) — no-op until SENTRY_DSN is set
     "slowapi>=0.1.9",               # rate limiting (Redis-backed, reuses the existing queue's Redis)
+    "openpyxl>=3.1",                # XLSX export from the API process (pure-Python, no native deps)
 ]
 
 [project.optional-dependencies]

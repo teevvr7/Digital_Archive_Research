@@ -7,6 +7,7 @@ from app.models.base import Base
 from app.models.correspondent import Correspondent
 from app.models.custom_field import CustomField, DocumentFieldValue
 from app.models.document import Document
+from app.models.document_share import DocumentShare
 from app.models.document_template import DocumentTemplate
 from app.models.document_type import DocumentType
 from app.models.extraction import Extraction
@@ -34,4 +35,5 @@ __all__ = [
     "CustomField",
     "DocumentFieldValue",
     "SavedView",
+    "DocumentShare",
 ]

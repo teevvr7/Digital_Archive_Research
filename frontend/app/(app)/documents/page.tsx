@@ -47,6 +47,8 @@ import {
   apiBulkTrash,
   apiBulkTag,
   apiBulkSetType,
+  apiExportDocuments,
+  apiBulkDownload,
   type DocumentListResponse,
 } from "@/lib/api";
 import type { Correspondent, Document, DocumentType, ProcessingStatus, SavedView, Tag } from "@/types";
@@ -182,6 +184,9 @@ export default function DocumentsPage() {
   const [correspondentFilter, setCorrespondentFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [amountMin, setAmountMin] = useState<string>("");
+  const [amountMax, setAmountMax] = useState<string>("");
+  const [vendorFilter, setVendorFilter] = useState<string>("");
   const [inbox, setInbox] = useState(false);
   const [sortBy, setSortBy] = useState("date_desc");
   const [page, setPage] = useState(1);
@@ -212,9 +217,12 @@ export default function DocumentsPage() {
   // ---- Misc ----
   const [emptyingTrash, setEmptyingTrash] = useState(false);
   const [extractingMissing, setExtractingMissing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const bulkTagRef = useRef<HTMLDivElement>(null);
   const bulkTypeRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Load static lists once
   useEffect(() => {
@@ -230,6 +238,8 @@ export default function DocumentsPage() {
         setShowBulkTagMenu(false);
       if (bulkTypeRef.current && !bulkTypeRef.current.contains(e.target as Node))
         setShowBulkTypeMenu(false);
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node))
+        setShowExportMenu(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -242,6 +252,9 @@ export default function DocumentsPage() {
     correspondent_id: correspondentFilter !== "all" ? correspondentFilter : undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
+    amount_min: amountMin ? Number(amountMin) : undefined,
+    amount_max: amountMax ? Number(amountMax) : undefined,
+    vendor: vendorFilter || undefined,
     inbox: inbox || undefined,
     q: query || undefined,
     sort: sortBy,
@@ -261,7 +274,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     refreshDocuments();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, inbox, sortBy, page, query, trashed]);
+  }, [statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, amountMin, amountMax, vendorFilter, inbox, sortBy, page, query, trashed]);
 
   // Silent poll while any doc is still processing
   useEffect(() => {
@@ -272,7 +285,7 @@ export default function DocumentsPage() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, inbox, sortBy, page, query, trashed]);
+  }, [data, statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, amountMin, amountMax, vendorFilter, inbox, sortBy, page, query, trashed]);
 
   const docs = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -288,6 +301,9 @@ export default function DocumentsPage() {
     setCorrespondentFilter("all");
     setDateFrom("");
     setDateTo("");
+    setAmountMin("");
+    setAmountMax("");
+    setVendorFilter("");
     setInbox(false);
     setSortBy("date_desc");
     setPage(1);
@@ -295,7 +311,8 @@ export default function DocumentsPage() {
 
   const hasActiveFilters =
     query || statusFilter !== "all" || typeFilter !== "all" || tagFilter !== "all" ||
-    correspondentFilter !== "all" || dateFrom || dateTo || inbox;
+    correspondentFilter !== "all" || dateFrom || dateTo || amountMin || amountMax ||
+    vendorFilter || inbox;
 
   // ---- Apply saved view ----
   const applyView = (view: SavedView) => {
@@ -307,6 +324,9 @@ export default function DocumentsPage() {
     setCorrespondentFilter((s.correspondent_id as string) || "all");
     setDateFrom((s.date_from as string) || "");
     setDateTo((s.date_to as string) || "");
+    setAmountMin(s.amount_min !== undefined ? String(s.amount_min) : "");
+    setAmountMax(s.amount_max !== undefined ? String(s.amount_max) : "");
+    setVendorFilter((s.vendor as string) || "");
     setInbox(Boolean(s.inbox));
     setSortBy((s.sort as string) || "date_desc");
     setPage(1);
@@ -320,6 +340,9 @@ export default function DocumentsPage() {
     ...(correspondentFilter !== "all" && { correspondent_id: correspondentFilter }),
     ...(dateFrom && { date_from: dateFrom }),
     ...(dateTo && { date_to: dateTo }),
+    ...(amountMin && { amount_min: Number(amountMin) }),
+    ...(amountMax && { amount_max: Number(amountMax) }),
+    ...(vendorFilter && { vendor: vendorFilter }),
     ...(inbox && { inbox: true }),
     ...(sortBy !== "date_desc" && { sort: sortBy }),
   });
@@ -371,6 +394,33 @@ export default function DocumentsPage() {
       alert(e instanceof Error ? e.message : "Bulk trash failed");
     } finally {
       setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    setBulkLoading(true);
+    try {
+      await apiBulkDownload([...selectedIds]);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Bulk download failed");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setExporting(true);
+    try {
+      const { truncated } = await apiExportDocuments(buildQuery(), format);
+      if (truncated) {
+        alert(
+          `Export capped at the first 5,000 matching documents — narrow your filters to get everything.`
+        );
+      }
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -629,6 +679,16 @@ export default function DocumentsPage() {
               )}
             </div>
 
+            <button
+              onClick={handleBulkDownload}
+              disabled={bulkLoading || selectedIds.size > 100}
+              title={selectedIds.size > 100 ? "Download at most 100 files at a time" : "Download originals as a zip"}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg disabled:opacity-50"
+            >
+              {bulkLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              Download
+            </button>
+
             {!trashed && (
               <button
                 onClick={handleBulkTrash}
@@ -774,6 +834,34 @@ export default function DocumentsPage() {
             title="Document date to"
           />
 
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="Min RM"
+            value={amountMin}
+            onChange={(e) => { setAmountMin(e.target.value); setPage(1); }}
+            className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Minimum extracted total amount"
+          />
+          <span className="text-slate-400 text-sm">→</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="Max RM"
+            value={amountMax}
+            onChange={(e) => { setAmountMax(e.target.value); setPage(1); }}
+            className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Maximum extracted total amount"
+          />
+          <input
+            type="text"
+            placeholder="Vendor"
+            value={vendorFilter}
+            onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
+            className="w-32 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Filter by extracted vendor name"
+          />
+
           <button
             onClick={() => { setInbox((v) => !v); setPage(1); }}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
@@ -788,6 +876,34 @@ export default function DocumentsPage() {
 
           {/* Save / clear */}
           <div className="flex items-center gap-2 ml-auto">
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                title="Export the current filtered list"
+              >
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Export
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-lg min-w-32 py-1">
+                  <button
+                    onClick={() => { setShowExportMenu(false); handleExport("csv"); }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    CSV
+                  </button>
+                  <button
+                    onClick={() => { setShowExportMenu(false); handleExport("xlsx"); }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    Excel (.xlsx)
+                  </button>
+                </div>
+              )}
+            </div>
             {hasActiveFilters && (
               <button
                 onClick={resetFilters}

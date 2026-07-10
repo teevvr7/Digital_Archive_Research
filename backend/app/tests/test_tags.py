@@ -84,6 +84,7 @@ class TestMatchesAlgoRegex:
 
 from app.modules.tags.schemas import TagIn, TagPatchIn
 from app.modules.tags.service import (
+    apply_rules_to_existing,
     assign_tag,
     create_tag,
     delete_tag,
@@ -344,3 +345,91 @@ class TestRunDocumentMatching:
         # Should not raise when called directly; caller's try/except is tested via jobs.py
         with pytest.raises(RuntimeError):
             run_document_matching(db, doc, "text")
+
+
+# ---------------------------------------------------------------------------
+# apply_rules_to_existing — Level 3 retroactive backfill
+# ---------------------------------------------------------------------------
+
+class TestApplyRulesToExisting:
+    def _make_doc(self) -> MagicMock:
+        doc = MagicMock()
+        doc.id = uuid.uuid4()
+        doc.extracted_text = "Invoice from Acme"
+        return doc
+
+    def test_calls_run_document_matching_per_doc(self):
+        db = MagicMock()
+        docs = [self._make_doc(), self._make_doc(), self._make_doc()]
+        db.scalar.return_value = 3
+        db.scalars.return_value.all.return_value = docs
+
+        with patch("app.modules.tags.service.run_document_matching") as mock_match:
+            result = apply_rules_to_existing(db, page=1)
+
+        assert mock_match.call_count == 3
+        assert result.processed == 3
+        assert result.total == 3
+        assert result.has_more is False
+
+    def test_has_more_true_when_more_pages_remain(self):
+        db = MagicMock()
+        docs = [self._make_doc() for _ in range(200)]
+        db.scalar.return_value = 450  # total across all pages
+        db.scalars.return_value.all.return_value = docs
+
+        with patch("app.modules.tags.service.run_document_matching"):
+            result = apply_rules_to_existing(db, page=1)
+
+        assert result.processed == 200
+        assert result.has_more is True  # 0 + 200 < 450
+
+    def test_last_page_has_more_false(self):
+        db = MagicMock()
+        docs = [self._make_doc() for _ in range(50)]
+        db.scalar.return_value = 450
+        db.scalars.return_value.all.return_value = docs
+
+        with patch("app.modules.tags.service.run_document_matching"):
+            result = apply_rules_to_existing(db, page=3)  # offset 400, 400+50=450
+
+        assert result.has_more is False
+
+    def test_empty_document_set(self):
+        db = MagicMock()
+        db.scalar.return_value = 0
+        db.scalars.return_value.all.return_value = []
+
+        with patch("app.modules.tags.service.run_document_matching") as mock_match:
+            result = apply_rules_to_existing(db)
+
+        mock_match.assert_not_called()
+        assert result.processed == 0
+        assert result.total == 0
+        assert result.has_more is False
+
+    def test_page_less_than_one_clamped_to_one(self):
+        db = MagicMock()
+        docs = [self._make_doc()]
+        db.scalar.return_value = 1
+        db.scalars.return_value.all.return_value = docs
+
+        with patch("app.modules.tags.service.run_document_matching"):
+            result = apply_rules_to_existing(db, page=0)
+
+        assert result.processed == 1
+
+    def test_uses_extracted_text_or_empty_string(self):
+        """A doc with no extracted_text yet (still processing) must not crash
+        the matcher — passes an empty string, matching the ingest-time call
+        convention in idp/jobs.py."""
+        db = MagicMock()
+        doc = self._make_doc()
+        doc.extracted_text = None
+        db.scalar.return_value = 1
+        db.scalars.return_value.all.return_value = [doc]
+
+        with patch("app.modules.tags.service.run_document_matching") as mock_match:
+            apply_rules_to_existing(db)
+
+        mock_match.assert_called_once_with(db, doc, "")

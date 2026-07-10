@@ -164,6 +164,9 @@ export type DocumentsQuery = {
   correspondent_id?: string;
   date_from?: string;
   date_to?: string;
+  amount_min?: number;
+  amount_max?: number;
+  vendor?: string;
   inbox?: boolean;
   sort?: string;
   q?: string;
@@ -299,6 +302,17 @@ export const apiAssignTag = (docId: string, tagId: string) =>
 export const apiUnassignTag = (docId: string, tagId: string) =>
   delete_<void>(`/documents/${docId}/tags/${tagId}`);
 
+export interface ApplyRulesResponse {
+  processed: number;
+  total: number;
+  hasMore: boolean;
+}
+
+/** Retroactively applies tag/correspondent match rules to existing documents,
+ * one page at a time. Caller loops on hasMore. */
+export const apiApplyRules = (page: number = 1) =>
+  post<ApplyRulesResponse>(`/tags/apply-rules?page=${page}`);
+
 // ---- Correspondents (Phase 4) --------------------------------------------
 
 export type CorrespondentCreateInput = {
@@ -370,3 +384,102 @@ export const apiBulkTag = (
 
 export const apiBulkSetType = (documentIds: string[], documentType: string) =>
   post<{ updated: number }>("/documents/bulk-set-type", { documentIds, documentType });
+
+// ---- Export (Level 3) ------------------------------------------------------
+
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Fetches a binary response with the auth header attached (fetch, not <a href>,
+ * since download endpoints require Authorization) and triggers a browser
+ * save-as. Filename comes from Content-Disposition when the server sets one. */
+async function downloadFile(
+  path: string,
+  opts: { method?: string; body?: unknown; fallbackName: string }
+): Promise<{ truncated: boolean }> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) throw new Error(`${opts.method ?? "GET"} ${path} → ${res.status} ${await res.text()}`);
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition");
+  const filename = disposition?.match(/filename="([^"]+)"/)?.[1] ?? opts.fallbackName;
+  const truncated = res.headers.get("X-Export-Truncated") === "true";
+  triggerBrowserDownload(blob, filename);
+  return { truncated };
+}
+
+/** Exports the current filtered document set as CSV or XLSX. Reuses the same
+ * filter shape as apiDocuments so "export what I'm looking at" is exact. */
+export const apiExportDocuments = (
+  query: DocumentsQuery,
+  format: "csv" | "xlsx"
+) => {
+  const params = new URLSearchParams(
+    Object.fromEntries(
+      Object.entries({ ...query, format })
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, String(v)])
+    )
+  ).toString();
+  return downloadFile(`/documents/export?${params}`, { fallbackName: `documents.${format}` });
+};
+
+export const apiBulkDownload = (documentIds: string[]) =>
+  downloadFile("/documents/bulk-download", {
+    method: "POST",
+    body: { documentIds },
+    fallbackName: "documents.zip",
+  });
+
+// ---- Shares (Level 3) ------------------------------------------------------
+
+export interface DocumentShare {
+  id: string;
+  documentId: string;
+  token: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export const apiCreateShare = (documentId: string, expiresInDays: number) =>
+  post<DocumentShare>(`/documents/${documentId}/share`, { expiresInDays });
+
+export const apiListShares = (documentId: string) =>
+  get<DocumentShare[]>(`/documents/${documentId}/shares`);
+
+export const apiRevokeShare = (shareId: string) => delete_<void>(`/shares/${shareId}`);
+
+export interface ResolvedShare {
+  url: string;
+  filename: string;
+  mimeType: string;
+}
+
+/** Public — resolves a share token to a signed download URL. No auth header;
+ * the token itself is the authorization. Used by the public /shared/[token]
+ * page, which has no logged-in session. */
+export async function apiResolveShare(token: string): Promise<ResolvedShare> {
+  const res = await fetch(`${BASE}/share/${token}`);
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = (JSON.parse(detail).detail as string) ?? detail;
+    } catch {
+      /* non-JSON body — keep raw text */
+    }
+    throw new Error(detail || `Failed to resolve link (${res.status})`);
+  }
+  return res.json() as Promise<ResolvedShare>;
+}

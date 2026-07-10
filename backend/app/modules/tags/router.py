@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_tenant_db
 from app.core.security import TokenData
 from app.modules.tags import service
-from app.modules.tags.schemas import TagIn, TagOut, TagPatchIn
+from app.modules.tags.schemas import ApplyRulesOut, TagIn, TagOut, TagPatchIn
 
 router = APIRouter(tags=["tags"])
 
@@ -63,3 +63,14 @@ def assign_tag(ctx: _DbCtx, doc_id: uuid.UUID, tag_id: uuid.UUID) -> None:
 def unassign_tag(ctx: _DbCtx, doc_id: uuid.UUID, tag_id: uuid.UUID) -> None:
     db, _ = ctx
     service.unassign_tag(db, doc_id, tag_id)
+
+
+@router.post(
+    "/tags/apply-rules",
+    response_model=ApplyRulesOut,
+    response_model_by_alias=True,
+    summary="Retroactively apply tag/correspondent match rules to existing documents",
+)
+def apply_rules_to_existing(ctx: _DbCtx, page: int = 1) -> ApplyRulesOut:
+    db, _ = ctx
+    return service.apply_rules_to_existing(db, page=page)

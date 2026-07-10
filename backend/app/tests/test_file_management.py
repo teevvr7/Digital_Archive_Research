@@ -63,6 +63,7 @@ def _make_doc(
     doc.storage_key = "tenant/docs/test.pdf"
     doc.thumbnail_key = thumbnail_key
     doc.deleted_at = deleted_at
+    doc.duplicate_of_document_id = None
     return doc
 
 

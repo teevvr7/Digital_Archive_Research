@@ -22,6 +22,7 @@ import {
   X,
   Save,
   Plus,
+  Share2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
@@ -42,8 +43,12 @@ import {
   apiDeleteFieldValue,
   apiCorrespondents,
   apiActivity,
+  apiCreateShare,
+  apiListShares,
+  apiRevokeShare,
   type DocumentPatch,
   type ActivityListResponse,
+  type DocumentShare,
 } from "@/lib/api";
 import type { CustomField, Correspondent, Document, DocumentType, FieldValue, Tag } from "@/types";
 
@@ -137,6 +142,14 @@ export default function DocumentViewerPage({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shares, setShares] = useState<DocumentShare[]>([]);
+  const [sharesLoading, setSharesLoading] = useState(false);
+  const [creatingShare, setCreatingShare] = useState(false);
+  const [newShareDays, setNewShareDays] = useState(7);
+  const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
+
   // Edit mode state
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<{
@@ -227,6 +240,45 @@ export default function DocumentViewerPage({
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Download failed");
     }
+  };
+
+  const openShareModal = () => {
+    if (!doc) return;
+    setShowShareModal(true);
+    setSharesLoading(true);
+    apiListShares(doc.id)
+      .then(setShares)
+      .catch(() => {})
+      .finally(() => setSharesLoading(false));
+  };
+
+  const handleCreateShare = async () => {
+    if (!doc) return;
+    setCreatingShare(true);
+    try {
+      const share = await apiCreateShare(doc.id, newShareDays);
+      setShares((prev) => [share, ...prev]);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to create share link");
+    } finally {
+      setCreatingShare(false);
+    }
+  };
+
+  const handleRevokeShare = async (shareId: string) => {
+    try {
+      await apiRevokeShare(shareId);
+      setShares((prev) => prev.filter((s) => s.id !== shareId));
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to revoke share link");
+    }
+  };
+
+  const handleCopyShareLink = (share: DocumentShare) => {
+    const link = `${window.location.origin}/shared/${share.token}`;
+    navigator.clipboard.writeText(link);
+    setCopiedShareId(share.id);
+    setTimeout(() => setCopiedShareId(null), 2000);
   };
 
   const handleRetry = async () => {
@@ -446,6 +498,15 @@ export default function DocumentViewerPage({
               In trash
             </span>
           )}
+          {doc.duplicateOfDocumentId && (
+            <Link
+              href={`/documents/${doc.duplicateOfDocumentId}`}
+              className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium hover:bg-amber-200 transition-colors"
+              title="Same vendor and invoice number as another document — click to compare"
+            >
+              Possible duplicate
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={doc.status} />
@@ -487,6 +548,15 @@ export default function DocumentViewerPage({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
+          {!isTrashed && (
+            <button
+              onClick={openShareModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Share
+            </button>
+          )}
           <button
             onClick={handleDownload}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -496,6 +566,97 @@ export default function DocumentViewerPage({
           </button>
         </div>
       </div>
+
+      {/* Share modal */}
+      {showShareModal && doc && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-slate-400" />
+                Share &quot;{doc.title || doc.originalFilename}&quot;
+              </h2>
+              <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              <label className="text-xs text-slate-500">Expires in</label>
+              <select
+                value={newShareDays}
+                onChange={(e) => setNewShareDays(Number(e.target.value))}
+                className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {[1, 7, 14, 30].map((d) => (
+                  <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleCreateShare}
+                disabled={creatingShare}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+              >
+                {creatingShare ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                New link
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3">
+              {sharesLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                </div>
+              ) : shares.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-6">
+                  No active share links. Create one above to send this document to anyone — no account needed.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {shares.map((share) => {
+                    const expired = new Date(share.expiresAt) < new Date();
+                    return (
+                      <div
+                        key={share.id}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg text-xs"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-mono truncate ${expired ? "text-slate-300 line-through" : "text-slate-600"}`}>
+                            /shared/{share.token.slice(0, 16)}…
+                          </p>
+                          <p className="text-slate-400">
+                            {expired ? "Expired" : `Expires ${new Date(share.expiresAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        {!expired && (
+                          <button
+                            onClick={() => handleCopyShareLink(share)}
+                            className="p-1.5 rounded hover:bg-slate-200 text-slate-500 flex-shrink-0"
+                            title="Copy link"
+                          >
+                            {copiedShareId === share.id ? (
+                              <Check className="w-3.5 h-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRevokeShare(share.id)}
+                          className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 flex-shrink-0"
+                          title="Revoke"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Document preview panel */}

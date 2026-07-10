@@ -69,6 +69,7 @@ def _make_doc() -> MagicMock:
     doc.thumbnail_key = None
     doc.storage_key = "tenant/docs/file.pdf"
     doc.deleted_at = None
+    doc.duplicate_of_document_id = None
     return doc
 
 

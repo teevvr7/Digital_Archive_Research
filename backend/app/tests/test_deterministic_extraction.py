@@ -256,6 +256,59 @@ def test_process_document_skips_vlm_when_deterministic_gate_passes():
     assert doc.extracted_data is not None
 
 
+def test_process_document_populates_typed_columns_on_deterministic_accept():
+    """Level 3: the new vendor/invoice_no/total_amount/currency columns must
+    be derived from whatever extracted_data ends up accepted — verifies the
+    jobs.py wiring calls extract_typed_fields(), not the heuristic's exact
+    field values (those are extract.py's own concern, tested elsewhere)."""
+    from app.models.document import Document, STATUS_COMPLETED
+    from app.modules.idp.normalize import extract_typed_fields
+
+    doc = MagicMock(spec=Document)
+    doc.id = "00000000-0000-0000-0000-000000000005"
+    doc.mime_type = "application/pdf"
+    doc.tenant_id = "00000000-0000-0000-0000-000000000006"
+    doc.status = "queued"
+    doc.original_filename = "test.pdf"
+    doc.title = "test.pdf"
+    doc.extracted_data = None
+
+    mock_db = MagicMock()
+    mock_db.get.return_value = doc
+    mock_db.scalars.return_value.first.return_value = _mock_job()
+
+    extraction_result = MagicMock(
+        text="TAX INVOICE\nInvoice #: 100\nTotal: 100.00",
+        page_count=1, has_text_layer=True, ocr_used=False, ocr_confidence=None,
+    )
+
+    with patch("app.modules.idp.jobs.tenant_session") as mock_ctx, \
+         patch("app.modules.idp.jobs.object_storage") as mock_storage, \
+         patch("app.modules.idp.jobs.run_extraction", return_value=extraction_result), \
+         patch("app.modules.idp.jobs.run_ai_extraction") as mock_vlm, \
+         patch("app.modules.idp.jobs.generate_thumbnail", return_value=None), \
+         patch("app.modules.idp.jobs.ai_budget"):
+        mock_ctx.return_value.__enter__.return_value = mock_db
+        mock_ctx.return_value.__exit__.return_value = False
+        mock_storage.download_file.return_value = b"fake bytes"
+
+        from app.modules.idp.jobs import process_document
+        process_document(doc.id, str(doc.tenant_id))
+
+    mock_vlm.assert_not_called()
+    assert doc.status == STATUS_COMPLETED
+    assert doc.extracted_data is not None
+
+    expected = extract_typed_fields(doc.extracted_data)
+    assert doc.vendor == expected["vendor"]
+    assert doc.invoice_no == expected["invoice_no"]
+    assert doc.total_amount == expected["total_amount"]
+    assert doc.currency == expected["currency"]
+    # And the extraction actually found something real, not just all-None.
+    assert doc.invoice_no == "100"
+    assert doc.total_amount == 100.0
+
+
 def test_process_document_skips_both_tiers_for_non_candidate_content():
     """A contract/report/letter — VLM-eligible mime, but content doesn't look
     invoice/receipt-like — must never reach the deterministic OR VLM tier."""

@@ -172,6 +172,7 @@ def _doc_to_out(
         storage_key=doc.storage_key,
         has_thumbnail=doc.thumbnail_key is not None,
         deleted_at=doc.deleted_at,
+        duplicate_of_document_id=doc.duplicate_of_document_id,
     )
 
 
@@ -337,8 +338,7 @@ def create_documents(
     )
 
 
-def list_documents(
-    db: Session,
+def build_document_query(
     *,
     status_filter: str | None = None,
     type_filter: str | None = None,
@@ -346,18 +346,17 @@ def list_documents(
     correspondent_id: uuid.UUID | None = None,
     date_from: datetime.date | None = None,
     date_to: datetime.date | None = None,
+    amount_min: float | None = None,
+    amount_max: float | None = None,
+    vendor: str | None = None,
     inbox: bool = False,
     q: str | None = None,
-    sort: str = "date_desc",
-    page: int = 1,
     trashed: bool = False,
-) -> DocumentListOut:
-    """Return a paginated, filtered page of documents for the current tenant.
-
-    RLS automatically scopes the query to the tenant set by the GUC.
-    By default only live (non-trashed) documents are returned; pass
-    ``trashed=True`` to list the trash instead.
-    """
+):
+    """Shared WHERE-clause builder for ``list_documents`` and the export
+    endpoint (Level 3) — the two must never drift on what counts as
+    "matching the filters". Returns ``(stmt, rank_order_or_None)``; callers
+    apply their own ORDER BY/pagination on top."""
     stmt = select(Document)
 
     if trashed:
@@ -386,6 +385,12 @@ def list_documents(
             stmt = stmt.where(effective_date >= date_from)
         if date_to is not None:
             stmt = stmt.where(effective_date <= date_to)
+    if amount_min is not None:
+        stmt = stmt.where(Document.total_amount >= amount_min)
+    if amount_max is not None:
+        stmt = stmt.where(Document.total_amount <= amount_max)
+    if vendor:
+        stmt = stmt.where(Document.vendor.ilike(f"%{vendor}%"))
     if inbox:
         # Subquery avoids join conflict with tag_id filter
         inbox_subq = select(DocumentTag.document_id).join(
@@ -399,6 +404,48 @@ def list_documents(
     if q and q.strip():
         stmt, rank_expr = apply_text_search(stmt, q.strip())
         rank_order = rank_expr.desc()
+
+    return stmt, rank_order
+
+
+def list_documents(
+    db: Session,
+    *,
+    status_filter: str | None = None,
+    type_filter: str | None = None,
+    tag_id: uuid.UUID | None = None,
+    correspondent_id: uuid.UUID | None = None,
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    amount_min: float | None = None,
+    amount_max: float | None = None,
+    vendor: str | None = None,
+    inbox: bool = False,
+    q: str | None = None,
+    sort: str = "date_desc",
+    page: int = 1,
+    trashed: bool = False,
+) -> DocumentListOut:
+    """Return a paginated, filtered page of documents for the current tenant.
+
+    RLS automatically scopes the query to the tenant set by the GUC.
+    By default only live (non-trashed) documents are returned; pass
+    ``trashed=True`` to list the trash instead.
+    """
+    stmt, rank_order = build_document_query(
+        status_filter=status_filter,
+        type_filter=type_filter,
+        tag_id=tag_id,
+        correspondent_id=correspondent_id,
+        date_from=date_from,
+        date_to=date_to,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        vendor=vendor,
+        inbox=inbox,
+        q=q,
+        trashed=trashed,
+    )
 
     _sort_map = {
         "date_desc": Document.uploaded_at.desc(),

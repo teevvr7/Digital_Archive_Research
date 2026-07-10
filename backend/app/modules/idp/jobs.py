@@ -20,9 +20,11 @@ from app.core import storage as object_storage
 from app.core.config import settings
 from app.core.tenant_context import tenant_session
 from app.modules.idp import extract, gate, mimetype
+from app.modules.idp.normalize import extract_typed_fields
 from app.modules.idp.thumbnails import generate_thumbnail
 from app.modules.search.query import build_search_text
 from app.models.activity_event import (
+    ACT_DUPLICATE_DETECTED,
     ACT_PROCESSING_COMPLETE,
     ACT_PROCESSING_FAILED,
     ActivityEvent,
@@ -98,6 +100,50 @@ def _attach_thumbnail(db, doc: Document, file_bytes: bytes) -> None:
         doc.thumbnail_key = thumb_key
     except Exception as exc:
         logger.warning("Thumbnail generation crashed (doc=%s): %s", doc.id, exc)
+
+
+def _apply_auto_title_and_duplicate_check(
+    db, doc: Document, tenant_uuid: uuid.UUID
+) -> None:
+    """Sets an auto-generated title (``"{vendor} — {invoiceNo}"``) and flags a
+    possible duplicate invoice. Both advisory, never blocking — CLAUDE.md:
+    ingestion must never block, a resubmitted/corrected invoice must still
+    archive normally. Only called from ``process_document`` (first-time
+    processing), never on manual re-extraction, so this can never clobber a
+    title the user or a prior run already set — at this point in the
+    pipeline ``doc.title`` is always still the original filename set at
+    upload."""
+    if not (doc.vendor and doc.invoice_no):
+        return
+
+    doc.title = f"{doc.vendor} — {doc.invoice_no}"
+
+    existing_id = db.scalars(
+        select(Document.id)
+        .where(
+            Document.tenant_id == tenant_uuid,
+            Document.id != doc.id,
+            Document.deleted_at.is_(None),
+            Document.vendor == doc.vendor,
+            Document.invoice_no == doc.invoice_no,
+        )
+        .limit(1)
+    ).first()
+    if existing_id is not None:
+        doc.duplicate_of_document_id = existing_id
+        db.add(ActivityEvent(
+            tenant_id=tenant_uuid,
+            type=ACT_DUPLICATE_DETECTED,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=None,
+            user_name="system",
+            meta=f"Same vendor ({doc.vendor}) and invoice number ({doc.invoice_no}) as an existing document",
+        ))
+        logger.info(
+            "Possible duplicate invoice: doc=%s matches existing doc=%s (vendor=%r invoice_no=%r)",
+            doc.id, existing_id, doc.vendor, doc.invoice_no,
+        )
 
 
 def process_document(doc_id: str, tenant_id: str) -> None:
@@ -179,6 +225,11 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                         doc.extracted_data = candidate.to_fields()
                         doc.confidence = gate_result.score
                         doc.document_type = candidate.document_type
+                        typed = extract_typed_fields(doc.extracted_data)
+                        doc.vendor = typed["vendor"]
+                        doc.invoice_no = typed["invoice_no"]
+                        doc.total_amount = typed["total_amount"]
+                        doc.currency = typed["currency"]
                         deterministic_accepted = True
                         logger.info(
                             "Deterministic extraction accepted: doc=%s type=%s score=%.2f",
@@ -229,6 +280,11 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                                 doc.extracted_data = ai.fields
                                 doc.confidence = ai.confidence
                                 doc.document_type = ai.document_type
+                                typed = extract_typed_fields(doc.extracted_data)
+                                doc.vendor = typed["vendor"]
+                                doc.invoice_no = typed["invoice_no"]
+                                doc.total_amount = typed["total_amount"]
+                                doc.currency = typed["currency"]
                                 ext_status = (
                                     EXTRACTION_ACCEPTED
                                     if ai.confidence >= settings.confidence_threshold
@@ -289,6 +345,9 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                 )
 
             needs_review = extraction_attempted and not deterministic_accepted and not vlm_accepted
+
+            if deterministic_accepted or vlm_accepted:
+                _apply_auto_title_and_duplicate_check(db, doc, tenant_uuid)
 
             # Persist extraction results.
             doc.extracted_text = result.text or None
@@ -435,6 +494,11 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
                 doc.extracted_data = ai.fields
                 doc.confidence = ai.confidence
                 doc.document_type = ai.document_type
+                typed = extract_typed_fields(doc.extracted_data)
+                doc.vendor = typed["vendor"]
+                doc.invoice_no = typed["invoice_no"]
+                doc.total_amount = typed["total_amount"]
+                doc.currency = typed["currency"]
                 ext_status = (
                     EXTRACTION_ACCEPTED
                     if ai.confidence >= settings.confidence_threshold

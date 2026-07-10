@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, X, Check, Tag as TagIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, X, Check, Tag as TagIcon, Wand2 } from "lucide-react";
 import {
   apiTags,
   apiCreateTag,
   apiPatchTag,
   apiDeleteTag,
+  apiApplyRules,
   type TagCreateInput,
 } from "@/lib/api";
 import type { Tag } from "@/types";
@@ -59,6 +60,7 @@ export default function TagsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [applyingRules, setApplyingRules] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -119,6 +121,32 @@ export default function TagsPage() {
     }
   };
 
+  const handleApplyRules = async () => {
+    if (
+      !confirm(
+        "Re-check every existing document against your current tag and correspondent rules? New matches will be applied — nothing already tagged is removed."
+      )
+    )
+      return;
+    setApplyingRules(true);
+    try {
+      let page = 1;
+      let processed = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const res = await apiApplyRules(page);
+        processed += res.processed;
+        hasMore = res.hasMore;
+        page += 1;
+      }
+      alert(`Done — checked ${processed} document${processed !== 1 ? "s" : ""} against your rules.`);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to apply rules");
+    } finally {
+      setApplyingRules(false);
+    }
+  };
+
   const handleDelete = async (tag: Tag) => {
     if (!confirm(`Delete tag "${tag.name}"? This will remove it from all documents.`)) return;
     setDeletingId(tag.id);
@@ -144,12 +172,23 @@ export default function TagsPage() {
             Organize documents with colored labels. Tags can auto-assign via match rules.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" /> New tag
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleApplyRules}
+            disabled={applyingRules}
+            title="Re-check existing documents against your current match rules"
+            className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {applyingRules ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+            Apply rules to existing documents
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New tag
+          </button>
+        </div>
       </div>
 
       {error && (

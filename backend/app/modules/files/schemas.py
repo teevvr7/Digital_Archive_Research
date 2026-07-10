@@ -78,6 +78,7 @@ class DocumentOut(CamelModel):
     storage_key: str
     has_thumbnail: bool
     deleted_at: datetime.datetime | None
+    duplicate_of_document_id: uuid.UUID | None = None
 
 
 class DocumentListOut(CamelModel):

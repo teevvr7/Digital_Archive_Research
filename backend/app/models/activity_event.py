@@ -19,6 +19,7 @@ ACT_EDIT = "edit"
 ACT_TRASH = "trash"
 ACT_RESTORE = "restore"
 ACT_PERMANENT_DELETE = "permanent_delete"
+ACT_DUPLICATE_DETECTED = "duplicate_detected"
 
 
 class ActivityEvent(Base):

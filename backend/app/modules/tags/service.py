@@ -3,14 +3,22 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.security import TokenData
 from app.models.document import Document
 from app.models.tag import DocumentTag, Tag
-from app.modules.tags.schemas import TagIn, TagOut, TagPatchIn
+from app.modules.tags.matching import run_document_matching
+from app.modules.tags.schemas import ApplyRulesOut, TagIn, TagOut, TagPatchIn
+
+# Cheap in-memory string matching against already-fetched extracted_text, no
+# external calls — unlike extract_missing's VLM-enqueue batches, this can
+# afford a larger page. Ordered oldest-first so repeated calls (page=1, 2, …)
+# eventually cover every document rather than re-processing the same newest
+# batch forever.
+_APPLY_RULES_PAGE_SIZE = 200
 
 
 def _tag_to_out(tag: Tag) -> TagOut:
@@ -123,3 +131,31 @@ def unassign_tag(db: Session, doc_id: uuid.UUID, tag_id: uuid.UUID) -> None:
         return
     db.delete(dt)
     db.flush()
+
+
+def apply_rules_to_existing(db: Session, page: int = 1) -> ApplyRulesOut:
+    """Retroactively run the tag/correspondent match engine over already-
+    ingested documents — the rule engine only ever runs at ingest today, so
+    a rule added or edited later never applies to existing documents without
+    this. Idempotent (tag insert is ON CONFLICT DO NOTHING; correspondent is
+    only set if unset), safe to call repeatedly. Paginated like the rest of
+    the app — the frontend calls page=1, 2, … while ``has_more`` is true."""
+    page = max(1, page)
+    base = select(Document).where(Document.deleted_at.is_(None))
+
+    total: int = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+
+    offset = (page - 1) * _APPLY_RULES_PAGE_SIZE
+    rows = db.scalars(
+        base.order_by(Document.uploaded_at.asc()).offset(offset).limit(_APPLY_RULES_PAGE_SIZE)
+    ).all()
+
+    for doc in rows:
+        run_document_matching(db, doc, doc.extracted_text or "")
+    db.flush()
+
+    return ApplyRulesOut(
+        processed=len(rows),
+        total=total,
+        has_more=offset + len(rows) < total,
+    )

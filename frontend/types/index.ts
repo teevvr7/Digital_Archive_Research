@@ -111,6 +111,7 @@ export interface Document {
   storageKey: string;
   hasThumbnail: boolean;
   deletedAt: string | null;
+  duplicateOfDocumentId: string | null;
 }
 
 export interface ActivityEvent {
@@ -125,7 +126,8 @@ export interface ActivityEvent {
     | "edit"
     | "trash"
     | "restore"
-    | "permanent_delete";
+    | "permanent_delete"
+    | "duplicate_detected";
   documentId?: string;
   documentName?: string;
   userId: string;

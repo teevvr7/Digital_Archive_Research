@@ -34,3 +34,12 @@ class TagOut(CamelModel):
     is_insensitive: bool
     is_inbox_tag: bool
     created_at: datetime.datetime
+
+
+class ApplyRulesOut(CamelModel):
+    """Result of one page of the retroactive rule-backfill run — call again
+    with the next page while ``has_more`` is true."""
+
+    processed: int
+    total: int
+    has_more: bool

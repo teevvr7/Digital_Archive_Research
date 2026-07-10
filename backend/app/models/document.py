@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     REAL,
     String,
     Text,
@@ -96,6 +97,21 @@ class Document(Base):
     # Organisation (Phase 4)
     correspondent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("correspondents.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Typed extraction fields (Level 3 data-value pass) — mirrors of the
+    # relevant extracted_data JSONB values, populated via idp/normalize.py so
+    # amount/vendor filters and export don't have to reach into JSONB. Kept in
+    # sync at write time in idp/jobs.py; backfilled for pre-existing rows in
+    # migration 0012.
+    vendor: Mapped[str | None] = mapped_column(String, nullable=True)
+    invoice_no: Mapped[str | None] = mapped_column(String, nullable=True)
+    total_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # Advisory only (CLAUDE.md: never block ingestion) — set when another
+    # non-trashed document in the tenant shares the same vendor+invoice_no.
+    duplicate_of_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
     )
 
     # Soft-delete / trash (Phase 3): NULL = live, non-NULL = in trash
