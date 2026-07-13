@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import TokenData
@@ -16,6 +17,7 @@ def _to_out(c: Correspondent) -> CorrespondentOut:
         id=c.id,
         tenant_id=c.tenant_id,
         name=c.name,
+        email=c.email,
         match=c.match,
         matching_algorithm=c.matching_algorithm,
         is_insensitive=c.is_insensitive,
@@ -43,9 +45,22 @@ def create_correspondent(db: Session, user: TokenData, data: CorrespondentIn) ->
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Correspondent '{data.name}' already exists.",
         )
+    if data.email:
+        existing_email = db.scalars(
+            select(Correspondent).where(
+                Correspondent.tenant_id == tenant_id,
+                Correspondent.email == data.email,
+            )
+        ).first()
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A correspondent with email '{data.email}' already exists.",
+            )
     c = Correspondent(
         tenant_id=tenant_id,
         name=data.name,
+        email=data.email,
         match=data.match,
         matching_algorithm=data.matching_algorithm,
         is_insensitive=data.is_insensitive,
@@ -65,6 +80,8 @@ def patch_correspondent(
     updated = patch.model_fields_set
     if "name" in updated and patch.name is not None:
         c.name = patch.name
+    if "email" in updated:
+        c.email = patch.email
     if "match" in updated and patch.match is not None:
         c.match = patch.match
     if "matching_algorithm" in updated and patch.matching_algorithm is not None:
@@ -85,3 +102,59 @@ def delete_correspondent(db: Session, correspondent_id: uuid.UUID) -> None:
         raise HTTPException(status_code=404, detail="Correspondent not found.")
     db.delete(c)
     db.flush()
+
+
+def find_or_create_by_sender(
+    db: Session, tenant_id: uuid.UUID, name: str | None, email: str
+) -> Correspondent:
+    """Get-or-create a correspondent for a parsed email sender.
+
+    Called from the auto-matching engine (tags/matching.py) for .eml documents —
+    never raises on a name collision (unlike the public create_correspondent 409):
+    if a correspondent with this display name already exists but has no email
+    yet, that gap is backfilled rather than creating a duplicate. Deterministic,
+    swallowed by the caller on any unexpected error — auto-linking must never
+    block document ingestion.
+    """
+    by_email = db.scalars(
+        select(Correspondent).where(
+            Correspondent.tenant_id == tenant_id, Correspondent.email == email
+        )
+    ).first()
+    if by_email is not None:
+        return by_email
+
+    display_name = (name or email).strip()
+    by_name = db.scalars(
+        select(Correspondent).where(
+            Correspondent.tenant_id == tenant_id, Correspondent.name == display_name
+        )
+    ).first()
+    if by_name is not None:
+        if by_name.email is None:
+            by_name.email = email
+            db.flush()
+        return by_name
+
+    try:
+        # SAVEPOINT, not the outer transaction: this runs deep inside the
+        # worker's larger per-document transaction (alongside status updates,
+        # tag matching, etc.) — a plain db.rollback() here would wipe out all
+        # of that, not just this insert attempt.
+        with db.begin_nested():
+            c = Correspondent(tenant_id=tenant_id, name=display_name, email=email)
+            db.add(c)
+            db.flush()
+    except IntegrityError:
+        # Race: another process created the same name/email between our checks
+        # and this insert. Re-query and use whichever now exists.
+        existing = db.scalars(
+            select(Correspondent).where(
+                Correspondent.tenant_id == tenant_id,
+                (Correspondent.email == email) | (Correspondent.name == display_name),
+            )
+        ).first()
+        if existing is not None:
+            return existing
+        raise
+    return c

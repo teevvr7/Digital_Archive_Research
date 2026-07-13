@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.models.correspondent import Correspondent
 from app.models.document import Document
 from app.models.tag import ALGO_ALL, ALGO_ANY, ALGO_LITERAL, ALGO_NONE, ALGO_REGEX, DocumentTag, Tag
+from app.modules.correspondents.service import find_or_create_by_sender
+from app.modules.idp import mimetype, office_parsing
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,18 @@ def run_document_matching(db: Session, doc: Document, text: str) -> None:
     if doc.correspondent_id is not None:
         # Already linked (e.g. from a previous run) — don't overwrite.
         return
+
+    # For emails, a parsed From: address is a far more precise signal than
+    # free-text rules — try it first and skip the rule engine entirely if it
+    # resolves. Falls through to the rule engine below if the email has no
+    # From: header at all (e.g. malformed/redacted).
+    if doc.mime_type == mimetype.MIME_EML:
+        sender_name, sender_email = office_parsing.parse_sender_from_text(text)
+        if sender_email:
+            doc.correspondent_id = find_or_create_by_sender(
+                db, doc.tenant_id, sender_name, sender_email
+            ).id
+            return
 
     active_correspondents = db.scalars(
         select(Correspondent).where(

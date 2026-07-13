@@ -17,6 +17,8 @@ import {
   Loader2,
   ChevronDown,
   CheckSquare,
+  Camera,
+  FileCode,
 } from "lucide-react";
 import { apiUploadDocument } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -89,6 +91,7 @@ export default function UploadPage() {
   const router = useRouter();
   const { refresh } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -215,7 +218,7 @@ export default function UploadPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Upload Documents</h1>
         <p className="text-slate-500 text-sm mt-0.5">
           Supports PDF, scans, images, Word/Excel/PowerPoint, text/CSV/Markdown,
-          and email (.eml) — up to {MAX_SIZE_MB} MB each.
+          email (.eml), and e-invoices (UBL/MyInvois XML) — up to {MAX_SIZE_MB} MB each.
         </p>
       </div>
 
@@ -254,7 +257,17 @@ export default function UploadPage() {
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif,.docx,.xlsx,.pptx,.txt,.csv,.md,.eml"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif,.docx,.xlsx,.pptx,.txt,.csv,.md,.eml,.xml"
+          className="hidden"
+          onChange={(e) => addFiles(e.target.files)}
+        />
+        {/* Camera-only input — capture="environment" opens the phone's rear
+            camera directly (ignored by browsers with no camera, e.g. desktop). */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />
@@ -265,6 +278,13 @@ export default function UploadPage() {
           {dragging ? "Drop files here" : "Drag & drop files here"}
         </p>
         <p className="text-slate-400 text-sm mb-4">or click to browse</p>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); cameraInputRef.current?.click(); }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-4 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-blue-400 hover:text-blue-700 transition-colors"
+        >
+          <Camera className="w-3.5 h-3.5" /> Take a photo
+        </button>
         <div className="flex items-center justify-center gap-3 text-xs text-slate-400 flex-wrap">
           <span className="flex items-center gap-1"><File className="w-3.5 h-3.5" /> PDF</span>
           <span className="flex items-center gap-1"><FileImage className="w-3.5 h-3.5" /> Image</span>
@@ -272,6 +292,7 @@ export default function UploadPage() {
           <span className="flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5" /> Excel/CSV</span>
           <span className="flex items-center gap-1"><Presentation className="w-3.5 h-3.5" /> PowerPoint</span>
           <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Email</span>
+          <span className="flex items-center gap-1"><FileCode className="w-3.5 h-3.5" /> E-invoice (XML)</span>
         </div>
       </div>
 

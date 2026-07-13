@@ -21,6 +21,7 @@ const ALGORITHMS = [
 
 type FormState = {
   name: string;
+  email: string;
   match: string;
   matchingAlgorithm: string;
   isInsensitive: boolean;
@@ -28,6 +29,7 @@ type FormState = {
 
 const emptyForm = (): FormState => ({
   name: "",
+  email: "",
   match: "",
   matchingAlgorithm: "any",
   isInsensitive: true,
@@ -66,6 +68,7 @@ export default function CorrespondentsPage() {
     setEditingItem(item);
     setForm({
       name: item.name,
+      email: item.email ?? "",
       match: item.match,
       matchingAlgorithm: item.matchingAlgorithm,
       isInsensitive: item.isInsensitive,
@@ -82,6 +85,7 @@ export default function CorrespondentsPage() {
     try {
       const data: CorrespondentCreateInput = {
         name: form.name.trim(),
+        email: form.email.trim() || null,
         match: form.match,
         matchingAlgorithm: form.matchingAlgorithm,
         isInsensitive: form.isInsensitive,
@@ -161,6 +165,20 @@ export default function CorrespondentsPage() {
               </div>
 
               <div>
+                <label className="text-xs text-slate-500 block mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="e.g. billing@tnb.com.my"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Emails from this address auto-link here — no match pattern needed.
+                </p>
+              </div>
+
+              <div>
                 <label className="text-xs text-slate-500 block mb-1">Auto-match pattern</label>
                 <input
                   value={form.match}
@@ -235,6 +253,7 @@ export default function CorrespondentsPage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Match pattern</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Algorithm</th>
                 <th className="px-6 py-3" />
@@ -244,6 +263,9 @@ export default function CorrespondentsPage() {
               {correspondents.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-3.5 font-medium text-slate-800">{item.name}</td>
+                  <td className="px-4 py-3.5 text-slate-500 text-xs">
+                    {item.email || <span className="text-slate-300 italic">—</span>}
+                  </td>
                   <td className="px-4 py-3.5 text-slate-500 text-xs font-mono">
                     {item.match || <span className="text-slate-300 italic">—</span>}
                   </td>

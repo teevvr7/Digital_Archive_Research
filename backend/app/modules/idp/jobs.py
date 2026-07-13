@@ -19,7 +19,7 @@ from app.core import ai_budget
 from app.core import storage as object_storage
 from app.core.config import settings
 from app.core.tenant_context import tenant_session
-from app.modules.idp import extract, gate, mimetype
+from app.modules.idp import extract, gate, mimetype, ubl_invoice
 from app.modules.idp.normalize import extract_typed_fields
 from app.modules.idp.thumbnails import generate_thumbnail
 from app.modules.search.query import build_search_text
@@ -204,11 +204,15 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             extraction_attempted = False
             vlm_accepted = False
 
-            if doc.mime_type in _VLM_ELIGIBLE_MIMES:
+            if doc.mime_type in _VLM_ELIGIBLE_MIMES or doc.mime_type == mimetype.MIME_XML:
                 job.stage = "deterministic_extraction"
                 db.flush()
 
-                candidate = extract.extract_candidate(result.text)
+                if doc.mime_type == mimetype.MIME_XML:
+                    # Already-structured UBL/MyInvois data — no regex needed.
+                    candidate = ubl_invoice.parse_ubl_invoice(file_bytes)
+                else:
+                    candidate = extract.extract_candidate(result.text)
                 if candidate is not None:
                     extraction_attempted = True
                     gate_result = gate.score_extraction(candidate, result.ocr_confidence)
@@ -241,7 +245,14 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                             doc_id, candidate.document_type, gate_result.score, gate_result.breakdown,
                         )
 
-                if not deterministic_accepted and extraction_attempted:
+                # VLM fallback is vision-based (page images) — never applies to
+                # XML, which has none. A gate-failing UBL doc goes straight to
+                # needs_review instead of burning an LLM call it can't use.
+                if (
+                    not deterministic_accepted
+                    and extraction_attempted
+                    and doc.mime_type in _VLM_ELIGIBLE_MIMES
+                ):
                     doc.status = STATUS_AI
                     job.stage = "ai_extraction"
                     db.flush()
@@ -337,6 +348,11 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                     logger.debug(
                         "Structured extraction skipped (doc=%s mime=%s) — content doesn't look like an invoice/receipt",
                         doc_id, doc.mime_type,
+                    )
+                elif not deterministic_accepted:
+                    logger.info(
+                        "UBL extraction gate-failed, no VLM fallback (doc=%s) — needs_review",
+                        doc_id,
                     )
             else:
                 logger.debug(

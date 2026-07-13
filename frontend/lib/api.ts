@@ -334,6 +334,7 @@ export const apiApplyRules = (page: number = 1) =>
 
 export type CorrespondentCreateInput = {
   name: string;
+  email?: string | null;
   match?: string;
   matchingAlgorithm?: string;
   isInsensitive?: boolean;

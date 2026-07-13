@@ -25,6 +25,7 @@ MIME_TXT = "text/plain"
 MIME_CSV = "text/csv"
 MIME_MD = "text/markdown"
 MIME_EML = "message/rfc822"
+MIME_XML = "application/xml"
 
 IMAGE_MIMES = {MIME_PNG, MIME_JPEG, MIME_WEBP, MIME_TIFF}
 OFFICE_MIMES = {MIME_DOCX, MIME_XLSX, MIME_PPTX}
@@ -53,6 +54,7 @@ ALLOWED_MIMES: dict[str, str] = {
     MIME_CSV: "csv",
     MIME_MD: "md",
     MIME_EML: "eml",
+    MIME_XML: "xml",
 }
 
 _OOXML_MARKERS = {
@@ -65,7 +67,9 @@ _OOXML_MARKERS = {
 # subtype once content sniffing has already confirmed the bytes decode as text
 # — never to admit a file that failed decoding, and never to override a
 # binary signature match above.
-_TEXT_EXTENSIONS = {"csv": MIME_CSV, "md": MIME_MD, "markdown": MIME_MD, "txt": MIME_TXT}
+_TEXT_EXTENSIONS = {
+    "csv": MIME_CSV, "md": MIME_MD, "markdown": MIME_MD, "txt": MIME_TXT, "xml": MIME_XML,
+}
 
 _EMAIL_HEADER_KEYS = ("From", "To", "Subject", "Date", "Message-ID", "Return-Path")
 _EMAIL_HEADER_MIN_MATCHES = 2
@@ -144,6 +148,13 @@ def sniff_mime(data: bytes, filename: str | None = None) -> str | None:
 
     if _looks_like_email(text):
         return MIME_EML
+
+    # A genuine magic-prefix check (not extension-based) — virtually all
+    # machine-generated XML, including every UBL/MyInvois e-invoice, opens
+    # with this declaration. The extension fallback below still catches the
+    # rare declaration-less XML file.
+    if text.lstrip()[:5] == "<?xml":
+        return MIME_XML
 
     ext = filename.rsplit(".", 1)[-1].lower() if filename and "." in filename else ""
     return _TEXT_EXTENSIONS.get(ext, MIME_TXT)

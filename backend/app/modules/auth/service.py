@@ -33,10 +33,26 @@ from app.models.activity_event import (
     ACT_USER_ROLE_CHANGED,
     ActivityEvent,
 )
+from app.models.tag import Tag
 from app.models.tenant import Tenant
 from app.models.user import User
 
 _VALID_ROLES = {"admin", "user"}
+
+# Onboarding starter kit — a handful of generic, broadly-useful tags so a brand-new
+# tenant isn't staring at a completely empty archive. Colors match the frontend's
+# PRESET_COLORS swatches. No starter correspondents: a real tenant's vendors/clients
+# can't be guessed, unlike a few generic organizational tags.
+_STARTER_TAGS = [
+    ("Paid", "#10B981"),
+    ("Unpaid", "#EF4444"),
+    ("Important", "#F59E0B"),
+    ("Needs Review", "#8B5CF6"),
+]
+
+
+def _seed_starter_tags(db: Session, tenant_id: uuid.UUID) -> None:
+    db.add_all(Tag(tenant_id=tenant_id, name=name, color=color) for name, color in _STARTER_TAGS)
 
 
 def _supabase_admin():
@@ -97,6 +113,7 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             )
             db.add(tenant)
             db.flush()
+            _seed_starter_tags(db, tenant.id)
 
             # Update Supabase app_metadata so the JWT on next refresh has tenant_id + role.
             _supabase_admin().auth.admin.update_user_by_id(

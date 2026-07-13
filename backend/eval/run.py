@@ -41,7 +41,7 @@ def _load_text(doc_path: Path) -> tuple[str, float | None]:
 
 
 def _find_source(stem: str) -> Path | None:
-    for ext in (".pdf", ".png", ".jpg", ".jpeg"):
+    for ext in (".pdf", ".png", ".jpg", ".jpeg", ".xml"):
         candidate = CORPUS_DIR / f"{stem}{ext}"
         if candidate.exists():
             return candidate
@@ -72,8 +72,18 @@ def run() -> int:
         expected = json.loads(fixture_path.read_text(encoding="utf-8"))
         total += 1
 
-        text, ocr_conf = _load_text(doc_path)
-        candidate = extract_candidate(text)
+        if doc_path.suffix == ".xml":
+            # Already-structured (UBL/MyInvois) — bypasses extract_candidate's
+            # regex entirely, same as the real idp/jobs.py wiring. No OCR
+            # involved, so ocr_conf stays None (scored as a clean 1.0 by the
+            # gate, same as any text-layer source).
+            from app.modules.idp.ubl_invoice import parse_ubl_invoice
+
+            candidate = parse_ubl_invoice(doc_path.read_bytes())
+            ocr_conf = None
+        else:
+            text, ocr_conf = _load_text(doc_path)
+            candidate = extract_candidate(text)
         is_candidate = candidate is not None
 
         print(f"\n=== {stem} ===")

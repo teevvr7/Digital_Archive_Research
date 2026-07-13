@@ -5,10 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from sqlalchemy.exc import IntegrityError
+
 from app.modules.correspondents.schemas import CorrespondentIn, CorrespondentPatchIn
 from app.modules.correspondents.service import (
     create_correspondent,
     delete_correspondent,
+    find_or_create_by_sender,
     list_correspondents,
     patch_correspondent,
 )
@@ -20,11 +23,12 @@ def _make_user(tenant_id: str = "00000000-0000-0000-0000-000000000001") -> Magic
     return user
 
 
-def _make_corresp(name: str = "Acme Corp") -> MagicMock:
+def _make_corresp(name: str = "Acme Corp", email: str | None = None) -> MagicMock:
     c = MagicMock()
     c.id = uuid.uuid4()
     c.tenant_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
     c.name = name
+    c.email = email
     c.match = "acme"
     c.matching_algorithm = "any"
     c.is_insensitive = True
@@ -69,6 +73,19 @@ class TestCreateCorrespondent:
             create_correspondent(db, user, data)
         assert exc_info.value.status_code == 409
 
+    def test_409_on_duplicate_email(self):
+        from fastapi import HTTPException
+        db = MagicMock()
+        no_name_match = MagicMock(first=MagicMock(return_value=None))
+        existing = _make_corresp(email="dup@example.com")
+        email_match = MagicMock(first=MagicMock(return_value=existing))
+        db.scalars.side_effect = [no_name_match, email_match]
+        user = _make_user()
+        data = CorrespondentIn(name="New Co", email="dup@example.com")
+        with pytest.raises(HTTPException) as exc_info:
+            create_correspondent(db, user, data)
+        assert exc_info.value.status_code == 409
+
 
 class TestPatchCorrespondent:
     def test_updates_name(self):
@@ -86,6 +103,77 @@ class TestPatchCorrespondent:
         with pytest.raises(HTTPException) as exc_info:
             patch_correspondent(db, uuid.uuid4(), CorrespondentPatchIn())
         assert exc_info.value.status_code == 404
+
+
+class TestFindOrCreateBySender:
+    def test_returns_existing_match_by_email(self):
+        db = MagicMock()
+        existing = _make_corresp(name="Alice", email="alice@example.com")
+        db.scalars.return_value = MagicMock(first=MagicMock(return_value=existing))
+
+        result = find_or_create_by_sender(
+            db, existing.tenant_id, "Alice Example", "alice@example.com"
+        )
+
+        assert result is existing
+        db.add.assert_not_called()
+
+    def test_backfills_email_onto_existing_name_match(self):
+        db = MagicMock()
+        by_email = MagicMock(first=MagicMock(return_value=None))
+        existing = _make_corresp(name="Alice Example", email=None)
+        by_name = MagicMock(first=MagicMock(return_value=existing))
+        db.scalars.side_effect = [by_email, by_name]
+
+        result = find_or_create_by_sender(
+            db, existing.tenant_id, "Alice Example", "alice@example.com"
+        )
+
+        assert result is existing
+        assert existing.email == "alice@example.com"
+        db.flush.assert_called_once()
+        db.add.assert_not_called()
+
+    def test_creates_new_correspondent_when_no_match(self):
+        db = MagicMock()
+        no_match = MagicMock(first=MagicMock(return_value=None))
+        db.scalars.side_effect = [no_match, no_match]
+        tenant_id = uuid.uuid4()
+
+        result = find_or_create_by_sender(db, tenant_id, "Bob", "bob@example.com")
+
+        db.begin_nested.assert_called_once()
+        db.add.assert_called_once()
+        added = db.add.call_args[0][0]
+        assert added.tenant_id == tenant_id
+        assert added.name == "Bob"
+        assert added.email == "bob@example.com"
+        assert result is added
+
+    def test_falls_back_to_email_when_no_display_name(self):
+        db = MagicMock()
+        no_match = MagicMock(first=MagicMock(return_value=None))
+        db.scalars.side_effect = [no_match, no_match]
+
+        find_or_create_by_sender(db, uuid.uuid4(), None, "bob@example.com")
+
+        added = db.add.call_args[0][0]
+        assert added.name == "bob@example.com"
+
+    def test_race_condition_recovers_via_requery(self):
+        db = MagicMock()
+        no_match = MagicMock(first=MagicMock(return_value=None))
+        winner = _make_corresp(name="Bob", email="bob@example.com")
+        found_after_race = MagicMock(first=MagicMock(return_value=winner))
+        db.scalars.side_effect = [no_match, no_match, found_after_race]
+        db.flush.side_effect = IntegrityError("stmt", {}, Exception("dup"))
+        # A real SAVEPOINT propagates the exception out of `with`; a bare
+        # MagicMock's __exit__ would otherwise swallow it (truthy return).
+        db.begin_nested.return_value.__exit__.return_value = False
+
+        result = find_or_create_by_sender(db, uuid.uuid4(), "Bob", "bob@example.com")
+
+        assert result is winner
 
 
 class TestDeleteCorrespondent:

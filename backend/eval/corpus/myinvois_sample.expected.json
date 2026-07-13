@@ -1,0 +1,14 @@
+{
+  "is_candidate": true,
+  "expected_gate_pass": true,
+  "document_type": "invoice",
+  "fields": {
+    "vendor": "Tenaga Nasional Berhad",
+    "invoiceNumber": "INV-2026-00042",
+    "invoiceDate": "2026-06-15",
+    "dueDate": "2026-07-15",
+    "totalAmount": 200.0,
+    "currency": "MYR"
+  },
+  "notes": "Synthetic MyInvois/UBL 2.1 sample (not a real LHDN-issued e-invoice — no real sample was available). Parsed by idp/ubl_invoice.py directly from the XML tree, bypassing extract.py's regex entirely, since the source is already fully structured. Exercises the same gate.score_extraction() path as every other deterministic source, with ocr_confidence=None (no OCR involved) scored as a clean 1.0 per gate.py's documented behavior. Line item (qty=2, unitPrice=100.00, amount=200.00) reconciles exactly against LegalMonetaryTotal/PayableAmount, so the math-audit component also scores 1.0. Real MyInvois-specific extensions (LHDN validation UUID/QR under cac:AdditionalDocumentReference) are not read by this first slice — see ubl_invoice.py's module docstring."
+}

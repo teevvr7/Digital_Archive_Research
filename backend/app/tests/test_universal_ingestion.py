@@ -85,6 +85,19 @@ def test_sniff_plain_text_with_one_coincidental_header_like_line_is_not_email():
     assert mimetype.sniff_mime(raw, "memo.txt") == mimetype.MIME_TXT
 
 
+def test_sniff_xml_detected_by_declaration_not_extension():
+    raw = b'<?xml version="1.0" encoding="UTF-8"?><Invoice>...</Invoice>'
+    assert mimetype.sniff_mime(raw, "whatever.dat") == mimetype.MIME_XML
+
+
+def test_sniff_xml_without_declaration_falls_back_to_extension():
+    assert mimetype.sniff_mime(b"<Invoice><ID>1</ID></Invoice>", "doc.xml") == mimetype.MIME_XML
+
+
+def test_sniff_xml_not_vlm_eligible():
+    assert mimetype.MIME_XML not in mimetype.VLM_ELIGIBLE_MIMES
+
+
 def test_sniff_unrecognised_binary_returns_none():
     assert mimetype.sniff_mime(b"\x00\x01\x02\x03\x04\xff\xfe\xfd") is None
 
@@ -201,6 +214,52 @@ def test_extract_email_text_html_only_falls_back_to_stripped_text():
     assert "<p>" not in text
 
 
+class TestParseSenderFromText:
+    def test_parses_display_name_and_email(self):
+        from app.modules.idp.office_parsing import parse_sender_from_text
+
+        text = 'From: Alice Example <alice@example.com>\nTo: bob@example.com\n\nBody.'
+        name, email = parse_sender_from_text(text)
+        assert name == "Alice Example"
+        assert email == "alice@example.com"
+
+    def test_lowercases_and_strips_email(self):
+        from app.modules.idp.office_parsing import parse_sender_from_text
+
+        text = "From: BILLING@Example.COM\n\nBody."
+        name, email = parse_sender_from_text(text)
+        assert name is None
+        assert email == "billing@example.com"
+
+    def test_no_from_header_returns_none_none(self):
+        from app.modules.idp.office_parsing import parse_sender_from_text
+
+        name, email = parse_sender_from_text("To: bob@example.com\n\nNo sender here.")
+        assert (name, email) == (None, None)
+
+    def test_matches_only_the_header_not_body_mentions(self):
+        from app.modules.idp.office_parsing import parse_sender_from_text
+
+        text = "From: Alice <alice@example.com>\n\nCc me at fake@evil.com please."
+        _, email = parse_sender_from_text(text)
+        assert email == "alice@example.com"
+
+    def test_integrates_with_extract_email_text_output(self):
+        from email.message import EmailMessage
+
+        from app.modules.idp.office_parsing import extract_email_text, parse_sender_from_text
+
+        msg = EmailMessage()
+        msg["From"] = "Alice Example <alice@example.com>"
+        msg["Subject"] = "Invoice"
+        msg.set_content("Please find the invoice attached.")
+
+        text = extract_email_text(msg.as_bytes())
+        name, email = parse_sender_from_text(text)
+        assert name == "Alice Example"
+        assert email == "alice@example.com"
+
+
 # ---------------------------------------------------------------------------
 # Thumbnail generation
 # ---------------------------------------------------------------------------
@@ -296,6 +355,28 @@ def test_pipeline_dispatches_email():
     result = run_extraction(msg.as_bytes(), mimetype.MIME_EML)
     assert "Body content here." in result.text
     assert result.page_count == 1
+
+
+def test_pipeline_dispatches_ubl_xml_to_richer_flatten():
+    from app.modules.idp.pipeline import run_extraction
+
+    ubl = (
+        b'<?xml version="1.0"?>'
+        b'<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" '
+        b'xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">'
+        b"<cbc:ID>INV-1</cbc:ID></Invoice>"
+    )
+    result = run_extraction(ubl, mimetype.MIME_XML)
+    assert "INV-1" in result.text
+    assert result.has_text_layer is True
+    assert result.ocr_used is False
+
+
+def test_pipeline_dispatches_non_ubl_xml_to_plain_text_decode():
+    from app.modules.idp.pipeline import run_extraction
+
+    result = run_extraction(b"<?xml version='1.0'?><catalog>hello</catalog>", mimetype.MIME_XML)
+    assert "<catalog>hello</catalog>" in result.text
 
 
 def test_pipeline_raises_on_unsupported_mime():

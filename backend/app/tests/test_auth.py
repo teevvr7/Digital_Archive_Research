@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from supabase_auth.errors import AuthApiError
 
 from app.core.security import TokenData
+from app.models.tag import Tag
 from app.models.user import User
 from app.modules.auth import service as auth_service
 
@@ -34,6 +35,25 @@ def _make_user(role: str = "user", tenant_id: uuid.UUID | None = None) -> User:
     u.email = "target@acme.test"
     u.name = "Target User"
     return u
+
+
+# ---------------------------------------------------------------------------
+# _seed_starter_tags (onboarding starter kit)
+# ---------------------------------------------------------------------------
+
+class TestSeedStarterTags:
+    def test_adds_starter_tags_for_new_tenant(self) -> None:
+        db = MagicMock()
+        tenant_id = uuid.uuid4()
+
+        auth_service._seed_starter_tags(db, tenant_id)
+
+        db.add_all.assert_called_once()
+        tags = list(db.add_all.call_args[0][0])
+        assert len(tags) == len(auth_service._STARTER_TAGS)
+        assert all(isinstance(t, Tag) for t in tags)
+        assert all(t.tenant_id == tenant_id for t in tags)
+        assert {t.name for t in tags} == {name for name, _ in auth_service._STARTER_TAGS}
 
 
 # ---------------------------------------------------------------------------

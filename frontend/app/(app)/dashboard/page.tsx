@@ -12,6 +12,8 @@ import {
   ArrowUpRight,
   FileImage,
   FileScan,
+  Tag as TagIcon,
+  UserPlus,
 } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
@@ -20,7 +22,7 @@ import { apiDashboard, type DashboardResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function DashboardPage() {
-  const { tenant } = useAuth();
+  const { tenant, user } = useAuth();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState("");
 
@@ -68,6 +70,45 @@ export default function DashboardPage() {
       {error && (
         <div className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
           {error}
+        </div>
+      )}
+
+      {/* First-run checklist — disappears on its own once totalDocuments > 0 */}
+      {stats && stats.totalDocuments === 0 && (
+        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-5">
+          <h2 className="font-semibold text-blue-900 text-sm mb-3">Get started</h2>
+          <ul className="space-y-2.5">
+            <li>
+              <Link
+                href="/upload"
+                className="flex items-center gap-2.5 text-sm text-blue-800 hover:text-blue-900"
+              >
+                <Upload className="w-4 h-4 flex-shrink-0" />
+                Upload your first document
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/tags"
+                className="flex items-center gap-2.5 text-sm text-blue-800 hover:text-blue-900"
+              >
+                <TagIcon className="w-4 h-4 flex-shrink-0" />
+                Organize with tags — Paid, Unpaid, Important, and Needs Review are
+                already set up for you
+              </Link>
+            </li>
+            {user?.role === "admin" && (
+              <li>
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-2.5 text-sm text-blue-800 hover:text-blue-900"
+                >
+                  <UserPlus className="w-4 h-4 flex-shrink-0" />
+                  Invite your team from Settings &gt; Users &amp; Access
+                </Link>
+              </li>
+            )}
+          </ul>
         </div>
       )}
 

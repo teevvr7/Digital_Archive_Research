@@ -6,8 +6,10 @@ have a meaningful page count, so callers treat them as a single logical page.
 """
 
 import io
+import re
 from email import message_from_bytes, policy
 from email.message import Message
+from email.utils import parseaddr
 from html.parser import HTMLParser
 
 
@@ -132,3 +134,21 @@ def extract_email_text(data: bytes) -> str:
     ]
     body = _email_body_text(msg)
     return "\n".join([*header_lines, "", body])
+
+
+_FROM_LINE_RE = re.compile(r"^From:\s*(.+)$", re.MULTILINE)
+
+
+def parse_sender_from_text(text: str) -> tuple[str | None, str | None]:
+    """Extract (display_name, email_address) from the "From: ..." line that
+    ``extract_email_text`` writes as the first header line — either may be None.
+
+    Operates on the already-flattened text (not raw bytes) so both fresh ingest
+    and retroactive re-matching over already-processed documents can reuse it
+    without re-downloading/re-parsing the original .eml file.
+    """
+    m = _FROM_LINE_RE.search(text)
+    if not m:
+        return None, None
+    display_name, email_addr = parseaddr(m.group(1).strip())
+    return (display_name.strip() or None, email_addr.strip().lower() or None)

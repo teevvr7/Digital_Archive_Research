@@ -38,6 +38,7 @@ export interface Correspondent {
   id: string;
   tenantId: string;
   name: string;
+  email: string | null;
   match: string;
   matchingAlgorithm: string;
   isInsensitive: boolean;

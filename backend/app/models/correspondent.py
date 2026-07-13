@@ -27,6 +27,11 @@ class Correspondent(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Populated automatically when an .eml document's From: address is linked
+    # here (see tags/matching.py); also settable manually. NULL for
+    # non-email-derived correspondents.
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Matching rules — empty match or algorithm=none means manual-only.
     match: Mapped[str] = mapped_column(Text, nullable=False, default="")
     matching_algorithm: Mapped[str] = mapped_column(Text, nullable=False, default=ALGO_ANY)
@@ -38,4 +43,7 @@ class Correspondent(Base):
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_correspondents_tenant_name"),
+        # NULL emails don't collide (standard Postgres unique-constraint behavior) —
+        # only non-null emails must be unique per tenant.
+        UniqueConstraint("tenant_id", "email", name="uq_correspondents_tenant_email"),
     )

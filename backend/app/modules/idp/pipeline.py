@@ -99,6 +99,8 @@ def run_extraction(file_bytes: bytes, mime_type: str) -> ExtractionResult:
         return _extract_office_or_text(file_bytes, mime_type)
     if mime_type == mimetype.MIME_EML:
         return _extract_email(file_bytes)
+    if mime_type == mimetype.MIME_XML:
+        return _extract_xml(file_bytes)
     raise ValueError(f"Unsupported mime type: {mime_type}")
 
 
@@ -151,6 +153,28 @@ def _extract_email(file_bytes: bytes) -> ExtractionResult:
     text = office_parsing.extract_email_text(file_bytes)
     elapsed = time.perf_counter() - t0
     logger.info("Email extract: %.3fs, chars=%d", elapsed, len(text))
+
+    return ExtractionResult(
+        text=text.strip(),
+        page_count=1,
+        has_text_layer=True,
+        ocr_used=False,
+        ocr_confidence=None,
+    )
+
+
+def _extract_xml(file_bytes: bytes) -> ExtractionResult:
+    """UBL invoices (e.g. MyInvois) get a richer text flatten; any other XML
+    falls back to the generic plain-text decode, same as .txt/.csv/.md."""
+    from app.modules.idp import office_parsing, ubl_invoice
+
+    t0 = time.perf_counter()
+    if ubl_invoice.is_ubl_invoice(file_bytes):
+        text = ubl_invoice.extract_ubl_text(file_bytes)
+    else:
+        text = office_parsing.extract_plain_text(file_bytes)
+    elapsed = time.perf_counter() - t0
+    logger.info("XML extract: %.3fs, chars=%d", elapsed, len(text))
 
     return ExtractionResult(
         text=text.strip(),

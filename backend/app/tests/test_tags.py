@@ -334,6 +334,64 @@ class TestRunDocumentMatching:
         # Vendor name == correspondent name → should link
         assert doc.correspondent_id == corresp.id
 
+    def test_email_sender_takes_priority_over_free_text_rules(self):
+        from app.modules.idp import mimetype
+
+        tenant_id = uuid.uuid4()
+        doc = self._make_doc_model(tenant_id)
+        doc.mime_type = mimetype.MIME_EML
+        sender_corresp = self._make_corresp_model("Alice Example")
+
+        db = MagicMock()
+
+        def scalars_side(stmt):
+            stmt_str = str(stmt)
+            if "correspondents" in stmt_str.lower():
+                raise AssertionError(
+                    "free-text correspondent rules should never run when a sender email resolves"
+                )
+            result = MagicMock()
+            result.all.return_value = []  # no tags configured
+            return result
+
+        db.scalars.side_effect = scalars_side
+        text = "From: Alice Example <alice@example.com>\n\nInvoice from Acme Corp"
+
+        with patch(
+            "app.modules.tags.matching.find_or_create_by_sender",
+            return_value=sender_corresp,
+        ) as mock_find:
+            run_document_matching(db, doc, text)
+
+        mock_find.assert_called_once_with(db, tenant_id, "Alice Example", "alice@example.com")
+        assert doc.correspondent_id == sender_corresp.id
+
+    def test_email_with_no_from_header_falls_back_to_free_text_rules(self):
+        from app.modules.idp import mimetype
+
+        tenant_id = uuid.uuid4()
+        doc = self._make_doc_model(tenant_id)
+        doc.mime_type = mimetype.MIME_EML
+        corresp = self._make_corresp_model("Acme Corp", match="", algo=ALGO_NONE)
+
+        db = MagicMock()
+
+        def scalars_side(stmt):
+            result = MagicMock()
+            stmt_str = str(stmt)
+            if "correspondents" in stmt_str.lower():
+                result.all.return_value = [corresp]
+            else:
+                result.all.return_value = []
+            return result
+
+        db.scalars.side_effect = scalars_side
+        with patch("app.modules.tags.matching.find_or_create_by_sender") as mock_find:
+            run_document_matching(db, doc, "no From header in this text")
+
+        mock_find.assert_not_called()
+        assert doc.correspondent_id == corresp.id  # vendor-name fallback still runs
+
     def test_crash_in_matching_does_not_propagate(self):
         """A bad matching rule must never crash — the caller wraps it in try/except."""
         tenant_id = uuid.uuid4()
