@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_user, get_tenant_db, require_admin
 from app.core.rate_limit import limiter
 from app.core.security import TokenData
 from app.modules.auth import schemas, service
@@ -98,3 +98,55 @@ def update_tenant(
     db, user = ctx
     tenant = service.update_tenant_name(db, uuid.UUID(user.tenant_id), patch.name)
     return schemas.TenantOut.model_validate(tenant)
+
+
+@router.get("/users", response_model=list[schemas.UserOut], response_model_by_alias=True)
+def list_users(ctx: tuple[Session, TokenData] = Depends(get_tenant_db)):
+    """List every member of the current tenant. Any authenticated member can view."""
+    db, user = ctx
+    rows = service.list_users(db, uuid.UUID(user.tenant_id))
+    return [schemas.UserOut.model_validate(row) for row in rows]
+
+
+@router.post("/users/invite", response_model=schemas.UserOut, response_model_by_alias=True)
+def invite_user(
+    body: schemas.InviteUserIn,
+    ctx: tuple[Session, TokenData] = Depends(require_admin),
+):
+    """Invite a teammate by email. Admin-only."""
+    db, user = ctx
+    new_user = service.invite_user(
+        db,
+        uuid.UUID(user.tenant_id),
+        email=body.email,
+        name=body.name,
+        role=body.role,
+        invited_by=user,
+    )
+    return schemas.UserOut.model_validate(new_user)
+
+
+@router.patch(
+    "/users/{target_user_id}/role", response_model=schemas.UserOut, response_model_by_alias=True
+)
+def update_user_role(
+    target_user_id: uuid.UUID,
+    body: schemas.UpdateUserRoleIn,
+    ctx: tuple[Session, TokenData] = Depends(require_admin),
+):
+    """Change a teammate's role. Admin-only; refuses to demote the last admin."""
+    db, user = ctx
+    target = service.update_user_role(
+        db, uuid.UUID(user.tenant_id), target_user_id, role=body.role, actor=user
+    )
+    return schemas.UserOut.model_validate(target)
+
+
+@router.delete("/users/{target_user_id}", status_code=204)
+def remove_user(
+    target_user_id: uuid.UUID,
+    ctx: tuple[Session, TokenData] = Depends(require_admin),
+):
+    """Remove a teammate from the tenant. Admin-only; refuses to remove self or the last admin."""
+    db, user = ctx
+    service.remove_user(db, uuid.UUID(user.tenant_id), target_user_id, actor=user)

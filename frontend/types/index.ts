@@ -127,7 +127,9 @@ export interface ActivityEvent {
     | "trash"
     | "restore"
     | "permanent_delete"
-    | "duplicate_detected";
+    | "duplicate_detected"
+    | "user_removed"
+    | "role_changed";
   documentId?: string;
   documentName?: string;
   userId: string;

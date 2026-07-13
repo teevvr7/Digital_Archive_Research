@@ -258,6 +258,23 @@ export const apiSearch = (query: SearchQuery) => {
 export const apiUpdateTenant = (name: string) =>
   patch_<AuthTenant>("/auth/tenant", { name });
 
+// ---- Team / users (Level 4) ------------------------------------------------
+
+/** Every member of the tenant. `lastLoginAt === null` means the invite is pending. */
+export const apiListUsers = () => get<AuthUser[]>("/auth/users");
+
+/** Invite a teammate by email. Admin-only. */
+export const apiInviteUser = (email: string, name: string, role: string) =>
+  post<AuthUser>("/auth/users/invite", { email, name, role });
+
+/** Change a teammate's role. Admin-only; backend refuses to demote the last admin. */
+export const apiUpdateUserRole = (userId: string, role: string) =>
+  patch_<AuthUser>(`/auth/users/${userId}/role`, { role });
+
+/** Remove a teammate from the tenant. Admin-only; backend refuses self-removal
+ *  and removing the last admin. */
+export const apiRemoveUser = (userId: string) => delete_<void>(`/auth/users/${userId}`);
+
 // ---- Activity / audit trail -------------------------------------------------
 
 export interface ActivityListResponse {

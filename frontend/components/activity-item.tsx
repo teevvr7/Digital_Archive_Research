@@ -19,6 +19,8 @@ import {
   XCircle,
   Search,
   UserPlus,
+  UserMinus,
+  Shield,
   Copy,
 } from "lucide-react";
 import type { ActivityEvent } from "@/types";
@@ -47,6 +49,10 @@ export function ActivityIcon({ type }: { type: ActivityEvent["type"] }) {
       return <UserPlus className="w-3.5 h-3.5 text-blue-600" />;
     case "duplicate_detected":
       return <Copy className="w-3.5 h-3.5 text-amber-600" />;
+    case "user_removed":
+      return <UserMinus className="w-3.5 h-3.5 text-red-500" />;
+    case "role_changed":
+      return <Shield className="w-3.5 h-3.5 text-blue-600" />;
     default:
       return <FileText className="w-3.5 h-3.5 text-slate-400" />;
   }
@@ -77,6 +83,10 @@ export function ActivityLabel({ event }: { event: ActivityEvent }) {
       return <>added a new user{event.meta ? ` — ${event.meta}` : ""}</>;
     case "duplicate_detected":
       return <>flagged {doc} as a possible duplicate{event.meta ? ` — ${event.meta}` : ""}</>;
+    case "user_removed":
+      return <>removed a teammate{event.meta ? ` — ${event.meta}` : ""}</>;
+    case "role_changed":
+      return <>changed a teammate&apos;s role{event.meta ? ` — ${event.meta}` : ""}</>;
     default:
       return <>{event.type}</>;
   }

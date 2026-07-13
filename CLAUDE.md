@@ -82,18 +82,17 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 
 **Milestones A–E ✅ complete** (auth, ingestion+RLS, IDP pipeline, search, VLM extraction). See git history + memory for details. The VLM stage shipped but is a **demo placeholder**.
 
-**➡️ CURRENT WORK: production-grade DMS upgrade** (plan: `~/.claude/plans/i-want-you-to-streamed-tiger.md`, paperless-ngx-inspired). Reference DMS at `../paperless`; extraction engines at `../invoice2data-master`, `../TemplatePro_2`, `../docling-main`.
+**Phases 0–6 (production-grade DMS upgrade, paperless-ngx-inspired) ✅ complete** — production hardening (non-bypassrls `app_user` role, Sentry, LLM budget gate, storage quota), universal ingestion, deterministic extraction + gate + eval/corpus, file management/viewer/trash, tags/correspondents, custom fields, saved views/bulk ops/retrieval UX. Reference DMS at `../paperless`; extraction engines at `../invoice2data-master`, `../TemplatePro_2`, `../docling-main`.
 
-**New phase roadmap (executed step by step, one phase at a time):**
-| Phase | Theme |
-|---|---|
-| 0 | Production hardening foundations — **close the RLS bypassrls gap** (non-bypassrls DB role), Sentry, LLM budget gate + `ai_usage`, storage-quota check, pagination audit |
-| 1 | Universal ingestion & baseline processing — parser registry, all MIME types, text+thumbnail+generic metadata, sha256 dedup, `document_date`/`title` |
-| 2 | Deterministic extraction + quality gate + `eval/corpus` — VLM demoted to gate-fail fallback (target pass rate ≥80%, LLM share 10–20%) |
-| 3 | File management & viewer — soft-delete/trash, PATCH/DELETE, editable fields, multi-format viewer |
-| 4 | Organization — tags + correspondents (rule-match + ML classifier), auto-tag/auto-link |
-| 5 | Metadata — custom fields catalog + typed values (hybrid relational + JSONB) + correction UI |
-| 6 | Retrieval & UX — structured filters, saved views, grid/thumbnail list, bulk ops, inbox view |
+**➡️ CURRENT WORK: Production Level-Up Roadmap** (full detail: `~/.claude/plans/compiled-moseying-tulip.md`) — closing the gaps between "working demo" and "buyable product," on branch `mvp3-prod`:
+
+| Level | Theme | Status |
+|---|---|---|
+| 1 | Trust & credibility — real Settings/org profile, Sentry wired, rate limiting, audit trail, forgot-password | ✅ done, committed (`38b3341`) |
+| 2 | IDP pipeline upgrade — port `paddle_qwen` (remote-HTTP, gate-fail-only Tier 4), canonical `extracted_data` schema, IDP Control Center | ⏸ blocked — needs user-deployed Lightning AI PaddleOCR-VL endpoint + license check |
+| 3 | Data value — typed extraction columns (`vendor`/`invoice_no`/`total_amount`/`currency`), amount/vendor filters, CSV/XLSX/zip export, retroactive rule backfill, shareable links (token-gated public endpoint), auto-title + duplicate-invoice detection | ✅ done, committed (`6a013d6`) |
+| 4 | Team accounts — invite-by-email (Supabase Auth admin), enforced admin/member roles beyond the existing `require_admin`, real multi-row Users tab replacing the single-user Settings view | 🔄 in progress |
+| 5 | SME growth & differentiators — onboarding starter kit, PWA/camera capture, email-sender→correspondent linking, email-in ingestion, MyInvois UBL-XML ingestion, Malay FTS config, trash auto-retention | not started |
 
 **Decisions locked:**
 - Infrastructure: Supabase (DB + Auth + Storage), Redis + RQ (queue), vLLM on Lightning AI Studio
@@ -102,8 +101,10 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 - OCR engine: **RapidOCR** (`rapidocr-onnxruntime`); PyMuPDF for parsing (LiteParse dropped — Rust beta, unstable on Windows)
 - **Deterministic-first:** the VLM runs ONLY after `gate.py` fails (score < 0.75). Changing the 0.75 threshold needs human sign-off.
 - **SaaS-friendly model licensing:** any ML/layout/table/OCR model weights must be **MIT or Apache-2.0**. Banned: YOLOv10 (AGPL), LayoutLMv3/LayoutXLM (CC BY-NC, non-commercial). Approved substitutes: TATR, LiLT, PaddleOCR/PP-Structure, docling/TableFormer, Donut, img2table, RapidOCR/Tesseract. Surya = defer (restricted weights).
+- **Shareable links (Level 3):** one deliberate, narrow RLS exception — `GET /api/share/{token}` is public/unauthenticated, using a raw `SessionLocal()` session (same precedent as `auth/service.py::bootstrap`). The unguessable `secrets.token_urlsafe(32)` token is the authorization instead of a JWT. Approved by the user before implementation; expiry capped 1–30 days.
+- **Team accounts (Level 4):** invites use Supabase Auth's admin `invite_user_by_email` (its own templated email — no SMTP infra added), followed by `admin.update_user_by_id(app_metadata={tenant_id, role})` so the accepted session's JWT carries the right tenant/role immediately, mirroring the existing `bootstrap()` pattern. The local `users` row is created at invite time (not deferred to first login) so admins can see pending invites; `last_login_at IS NULL` is the "pending" signal — no new status column. `email` stays globally unique (matches Supabase Auth's global-per-project identity); inviting an email that already has an account anywhere is rejected, not merged.
 
-**Now approved (previously out-of-scope — built in the phases above):** deterministic extraction path, ML auto-classification, type-promotion / template-field management UI, exception-review/correction UI, structured metadata filtering, bulk ops, trash.
+**Now approved (previously out-of-scope — built in the phases above):** deterministic extraction path, ML auto-classification, type-promotion / template-field management UI, exception-review/correction UI, structured metadata filtering, bulk ops, trash, data export (CSV/XLSX/zip), shareable public links, multi-user team accounts with roles.
 
 **Still out of scope (do NOT build without explicit approval):** cold-tiering, analytics dashboards, public API beyond API-key auth, microservices, Elasticsearch/external search cluster, multi-region, SSO/SAML, mobile app, cross-encoder reranking. (pgvector semantic search is a later, optional Tier-3 item.)
 
@@ -129,6 +130,8 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 │   │   │   ├── metadata/       # custom-field catalog + typed values + correction
 │   │   │   ├── views/          # saved views (filter-rule sets)
 │   │   │   ├── bulk/           # bulk operations on documents
+│   │   │   ├── export/         # CSV/XLSX export, zip bulk-download
+│   │   │   ├── shares/         # shareable links: authenticated CRUD + public token-resolve
 │   │   │   └── idp/            # pipeline: parsing, ocr, extract, gate, classifier, extraction(VLM)
 │   │   ├── models/             # SQLAlchemy models (tenant_id on all tenant-owned tables)
 │   │   ├── migrations/         # Alembic

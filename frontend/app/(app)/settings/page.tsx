@@ -13,10 +13,23 @@ import {
   Check,
   Loader2,
   Clock,
+  X,
+  Mail,
 } from "lucide-react";
 import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { apiUpdateTenant, apiDashboard, apiActivity, type DashboardResponse, type ActivityListResponse } from "@/lib/api";
+import {
+  apiUpdateTenant,
+  apiDashboard,
+  apiActivity,
+  apiListUsers,
+  apiInviteUser,
+  apiUpdateUserRole,
+  apiRemoveUser,
+  type DashboardResponse,
+  type ActivityListResponse,
+  type AuthUser,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 type Tab = "organisation" | "users" | "activity" | "security" | "api" | "notifications";
@@ -81,6 +94,19 @@ export default function SettingsPage() {
   const [activityFeed, setActivityFeed] = useState<ActivityListResponse | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
 
+  const isAdmin = user?.role === "admin";
+  const [teamUsers, setTeamUsers] = useState<AuthUser[] | null>(null);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamError, setTeamError] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<"user" | "admin">("user");
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
   useEffect(() => {
     if (tenant) setOrgName(tenant.name);
   }, [tenant]);
@@ -113,6 +139,65 @@ export default function SettingsPage() {
       })
       .catch(() => {})
       .finally(() => setActivityLoading(false));
+  };
+
+  const loadTeam = () => {
+    setTeamLoading(true);
+    apiListUsers()
+      .then(setTeamUsers)
+      .catch((e) => setTeamError(e instanceof Error ? e.message : "Failed to load users."))
+      .finally(() => setTeamLoading(false));
+  };
+
+  useEffect(() => {
+    if (activeTab !== "users") return;
+    setTeamError("");
+    loadTeam();
+  }, [activeTab]);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim() || !inviteName.trim()) return;
+    setInviteError("");
+    setInviteSubmitting(true);
+    try {
+      await apiInviteUser(inviteEmail.trim(), inviteName.trim(), inviteRole);
+      setInviteOpen(false);
+      setInviteEmail("");
+      setInviteName("");
+      setInviteRole("user");
+      loadTeam();
+    } catch (e) {
+      setInviteError(e instanceof Error ? e.message : "Failed to send invite.");
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
+  const handleRoleChange = async (targetId: string, role: string) => {
+    setRoleUpdatingId(targetId);
+    try {
+      await apiUpdateUserRole(targetId, role);
+      loadTeam();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to change role.");
+    } finally {
+      setRoleUpdatingId(null);
+    }
+  };
+
+  const handleRemoveUser = async (row: AuthUser) => {
+    if (!confirm(`Remove ${row.name} (${row.email}) from your organisation? This cannot be undone.`))
+      return;
+    setRemovingId(row.id);
+    try {
+      await apiRemoveUser(row.id);
+      loadTeam();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to remove user.");
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   const handleSaveOrg = async () => {
@@ -278,45 +363,90 @@ export default function SettingsPage() {
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-slate-900">Users & Access</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">1 member</p>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {teamUsers ? `${teamUsers.length} member${teamUsers.length === 1 ? "" : "s"}` : "…"}
+                  </p>
                 </div>
                 <button
-                  disabled
-                  title="Team accounts are coming in a future update"
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
+                  onClick={() => isAdmin && setInviteOpen(true)}
+                  disabled={!isAdmin}
+                  title={isAdmin ? undefined : "Admin access required"}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isAdmin
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  }`}
                 >
                   <Plus className="w-4 h-4" />
                   Invite user
                 </button>
               </div>
-              <div className="px-6 divide-y divide-slate-50">
-                {user && (
-                  <div className="flex items-center gap-4 py-3.5">
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-blue-700 text-sm font-semibold">
-                        {user.avatarInitials}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-800">{user.name}</p>
-                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                          You
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400">{user.email}</p>
-                    </div>
-                    <span className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50 text-slate-600 capitalize">
-                      {user.role}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
-                <p className="text-xs text-slate-500">
-                  Inviting teammates with admin/member roles is on the roadmap — for now each
-                  organisation has a single account.
+              {teamError && (
+                <p className="px-6 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100">
+                  {teamError}
                 </p>
+              )}
+              <div className="px-6 divide-y divide-slate-50">
+                {!teamUsers ? (
+                  <p className="py-8 text-center text-slate-400 text-sm">
+                    {teamLoading ? "Loading…" : "No members found."}
+                  </p>
+                ) : (
+                  teamUsers.map((row) => {
+                    const isSelf = row.id === user?.id;
+                    const pending = row.lastLoginAt === null;
+                    return (
+                      <div key={row.id} className="flex items-center gap-4 py-3.5">
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-blue-700 text-sm font-semibold">
+                            {row.avatarInitials}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-800">{row.name}</p>
+                            {isSelf && (
+                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                You
+                              </span>
+                            )}
+                            {pending && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+                                Invite pending
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400">{row.email}</p>
+                        </div>
+                        {isAdmin && !isSelf ? (
+                          <select
+                            value={row.role}
+                            disabled={roleUpdatingId === row.id}
+                            onChange={(e) => handleRoleChange(row.id, e.target.value)}
+                            className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 bg-white text-slate-600 capitalize focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50 text-slate-600 capitalize">
+                            {row.role}
+                          </span>
+                        )}
+                        {isAdmin && !isSelf && (
+                          <button
+                            onClick={() => handleRemoveUser(row)}
+                            disabled={removingId === row.id}
+                            title="Remove from organisation"
+                            className="text-slate-300 hover:text-red-600 disabled:opacity-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -421,6 +551,82 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {inviteOpen && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-slate-800">Invite a teammate</h2>
+              <button
+                onClick={() => setInviteOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleInvite} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Name *</label>
+                <input
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  placeholder="Jane Doe"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="jane@company.com"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Role</label>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as "user" | "admin")}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              {inviteError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {inviteError}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={inviteSubmitting || !inviteEmail.trim() || !inviteName.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {inviteSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4" />
+                  )}
+                  {inviteSubmitting ? "Sending…" : "Send invite"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteOpen(false)}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

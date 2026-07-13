@@ -37,3 +37,13 @@ class TenantPatchIn(CamelModel):
     persist anywhere."""
 
     name: str
+
+
+class InviteUserIn(CamelModel):
+    email: str
+    name: str
+    role: str = "user"
+
+
+class UpdateUserRoleIn(CamelModel):
+    role: str
