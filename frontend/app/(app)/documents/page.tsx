@@ -49,9 +49,19 @@ import {
   apiBulkSetType,
   apiExportDocuments,
   apiBulkDownload,
+  apiPredefinedFields,
   type DocumentListResponse,
 } from "@/lib/api";
-import type { Correspondent, Document, DocumentType, ProcessingStatus, SavedView, Tag } from "@/types";
+import { CustomFieldInput } from "@/components/custom-field-input";
+import type {
+  Correspondent,
+  Document,
+  DocumentType,
+  PredefinedField,
+  ProcessingStatus,
+  SavedView,
+  Tag,
+} from "@/types";
 
 const TERMINAL_STATUSES = new Set<ProcessingStatus>(["completed", "needs_review", "failed"]);
 const POLL_INTERVAL_MS = 3000;
@@ -184,13 +194,26 @@ export default function DocumentsPage() {
   const [correspondentFilter, setCorrespondentFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [amountMin, setAmountMin] = useState<string>("");
-  const [amountMax, setAmountMax] = useState<string>("");
-  const [vendorFilter, setVendorFilter] = useState<string>("");
   const [inbox, setInbox] = useState(false);
   const [sortBy, setSortBy] = useState("date_desc");
   const [page, setPage] = useState(1);
   const [trashed, setTrashed] = useState(false);
+
+  // Custom-field filter — gated behind typeFilter (only fields predefined
+  // for the selected type are offered), so it never has to show a tenant's
+  // entire field catalog at once.
+  const [customFieldId, setCustomFieldId] = useState<string>("all");
+  const [customFieldValue, setCustomFieldValue] = useState<string>("");
+  const [customFieldMin, setCustomFieldMin] = useState<string>("");
+  const [customFieldMax, setCustomFieldMax] = useState<string>("");
+  const [customFieldDateFrom, setCustomFieldDateFrom] = useState<string>("");
+  const [customFieldDateTo, setCustomFieldDateTo] = useState<string>("");
+  // A number field can be a real quantity (Amount) or a reference number
+  // someone only half-remembers (Order Number) — "contains" lets the latter
+  // be found by typing a few digits instead of guessing a min/max range.
+  const [customFieldNumberMode, setCustomFieldNumberMode] = useState<"contains" | "range">(
+    "contains"
+  );
 
   // ---- View ----
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
@@ -201,6 +224,7 @@ export default function DocumentsPage() {
   const [error, setError] = useState("");
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [allCorrespondents, setAllCorrespondents] = useState<Correspondent[]>([]);
+  const [predefinedFields, setPredefinedFields] = useState<Record<string, PredefinedField[]>>({});
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   // ---- Bulk selection ----
@@ -229,6 +253,7 @@ export default function DocumentsPage() {
     apiTags().then(setAllTags).catch(() => {});
     apiCorrespondents().then(setAllCorrespondents).catch(() => {});
     apiSavedViews().then(setSavedViews).catch(() => {});
+    apiPredefinedFields().then(setPredefinedFields).catch(() => {});
   }, []);
 
   // Close bulk menus on outside click
@@ -245,6 +270,13 @@ export default function DocumentsPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // The field the custom-field picker resolves to, scoped to the selected
+  // type — used to decide which value/range inputs to render and send.
+  const selectedCustomField: PredefinedField | undefined =
+    typeFilter !== "all"
+      ? predefinedFields[typeFilter]?.find((f) => f.fieldId === customFieldId)
+      : undefined;
+
   const buildQuery = () => ({
     status: statusFilter === "all" ? undefined : statusFilter,
     type: typeFilter === "all" ? undefined : typeFilter,
@@ -252,14 +284,41 @@ export default function DocumentsPage() {
     correspondent_id: correspondentFilter !== "all" ? correspondentFilter : undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
-    amount_min: amountMin ? Number(amountMin) : undefined,
-    amount_max: amountMax ? Number(amountMax) : undefined,
-    vendor: vendorFilter || undefined,
     inbox: inbox || undefined,
     q: query || undefined,
     sort: sortBy,
     page,
     trashed: trashed || undefined,
+    custom_field_id: selectedCustomField ? customFieldId : undefined,
+    custom_field_value:
+      selectedCustomField &&
+      (selectedCustomField.fieldType === "text" ||
+        selectedCustomField.fieldType === "select" ||
+        selectedCustomField.fieldType === "boolean" ||
+        (selectedCustomField.fieldType === "number" && customFieldNumberMode === "contains")) &&
+      customFieldValue
+        ? customFieldValue
+        : undefined,
+    custom_field_min:
+      selectedCustomField?.fieldType === "number" &&
+      customFieldNumberMode === "range" &&
+      customFieldMin
+        ? Number(customFieldMin)
+        : undefined,
+    custom_field_max:
+      selectedCustomField?.fieldType === "number" &&
+      customFieldNumberMode === "range" &&
+      customFieldMax
+        ? Number(customFieldMax)
+        : undefined,
+    custom_field_date_from:
+      selectedCustomField?.fieldType === "date" && customFieldDateFrom
+        ? customFieldDateFrom
+        : undefined,
+    custom_field_date_to:
+      selectedCustomField?.fieldType === "date" && customFieldDateTo
+        ? customFieldDateTo
+        : undefined,
   });
 
   const refreshDocuments = () => {
@@ -271,10 +330,17 @@ export default function DocumentsPage() {
       .finally(() => setLoading(false));
   };
 
+  const filterDeps = [
+    statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo,
+    inbox, sortBy, page, query, trashed,
+    customFieldId, customFieldValue, customFieldMin, customFieldMax,
+    customFieldDateFrom, customFieldDateTo, customFieldNumberMode,
+  ];
+
   useEffect(() => {
     refreshDocuments();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, amountMin, amountMax, vendorFilter, inbox, sortBy, page, query, trashed]);
+  }, filterDeps);
 
   // Silent poll while any doc is still processing
   useEffect(() => {
@@ -285,7 +351,7 @@ export default function DocumentsPage() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo, amountMin, amountMax, vendorFilter, inbox, sortBy, page, query, trashed]);
+  }, [data, ...filterDeps]);
 
   const docs = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -293,6 +359,16 @@ export default function DocumentsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   // ---- Filter helpers ----
+  const resetCustomFieldFilter = () => {
+    setCustomFieldId("all");
+    setCustomFieldValue("");
+    setCustomFieldMin("");
+    setCustomFieldMax("");
+    setCustomFieldDateFrom("");
+    setCustomFieldDateTo("");
+    setCustomFieldNumberMode("contains");
+  };
+
   const resetFilters = () => {
     setQuery("");
     setStatusFilter("all");
@@ -301,18 +377,16 @@ export default function DocumentsPage() {
     setCorrespondentFilter("all");
     setDateFrom("");
     setDateTo("");
-    setAmountMin("");
-    setAmountMax("");
-    setVendorFilter("");
     setInbox(false);
     setSortBy("date_desc");
     setPage(1);
+    resetCustomFieldFilter();
   };
 
   const hasActiveFilters =
     query || statusFilter !== "all" || typeFilter !== "all" || tagFilter !== "all" ||
-    correspondentFilter !== "all" || dateFrom || dateTo || amountMin || amountMax ||
-    vendorFilter || inbox;
+    correspondentFilter !== "all" || dateFrom || dateTo ||
+    inbox || customFieldId !== "all";
 
   // ---- Apply saved view ----
   const applyView = (view: SavedView) => {
@@ -324,12 +398,16 @@ export default function DocumentsPage() {
     setCorrespondentFilter((s.correspondent_id as string) || "all");
     setDateFrom((s.date_from as string) || "");
     setDateTo((s.date_to as string) || "");
-    setAmountMin(s.amount_min !== undefined ? String(s.amount_min) : "");
-    setAmountMax(s.amount_max !== undefined ? String(s.amount_max) : "");
-    setVendorFilter((s.vendor as string) || "");
     setInbox(Boolean(s.inbox));
     setSortBy((s.sort as string) || "date_desc");
     setPage(1);
+    setCustomFieldId((s.custom_field_id as string) || "all");
+    setCustomFieldValue((s.custom_field_value as string) || "");
+    setCustomFieldMin(s.custom_field_min !== undefined ? String(s.custom_field_min) : "");
+    setCustomFieldMax(s.custom_field_max !== undefined ? String(s.custom_field_max) : "");
+    setCustomFieldDateFrom((s.custom_field_date_from as string) || "");
+    setCustomFieldDateTo((s.custom_field_date_to as string) || "");
+    setCustomFieldNumberMode((s.custom_field_number_mode as "contains" | "range") || "contains");
   };
 
   const currentFilterState = () => ({
@@ -340,11 +418,15 @@ export default function DocumentsPage() {
     ...(correspondentFilter !== "all" && { correspondent_id: correspondentFilter }),
     ...(dateFrom && { date_from: dateFrom }),
     ...(dateTo && { date_to: dateTo }),
-    ...(amountMin && { amount_min: Number(amountMin) }),
-    ...(amountMax && { amount_max: Number(amountMax) }),
-    ...(vendorFilter && { vendor: vendorFilter }),
     ...(inbox && { inbox: true }),
     ...(sortBy !== "date_desc" && { sort: sortBy }),
+    ...(customFieldId !== "all" && { custom_field_id: customFieldId }),
+    ...(customFieldValue && { custom_field_value: customFieldValue }),
+    ...(customFieldMin && { custom_field_min: Number(customFieldMin) }),
+    ...(customFieldMax && { custom_field_max: Number(customFieldMax) }),
+    ...(customFieldDateFrom && { custom_field_date_from: customFieldDateFrom }),
+    ...(customFieldDateTo && { custom_field_date_to: customFieldDateTo }),
+    ...(customFieldNumberMode !== "contains" && { custom_field_number_mode: customFieldNumberMode }),
   });
 
   const handleSaveView = async () => {
@@ -758,7 +840,13 @@ export default function DocumentsPage() {
           <div className="relative">
             <select
               value={typeFilter}
-              onChange={(e) => { setTypeFilter(e.target.value as DocumentType | "all"); setPage(1); }}
+              onChange={(e) => {
+                setTypeFilter(e.target.value as DocumentType | "all");
+                setPage(1);
+                // The custom-field picker is scoped to the selected type — a
+                // field picked for the old type may not exist for the new one.
+                resetCustomFieldFilter();
+              }}
               className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white cursor-pointer"
             >
               <option value="all">All Types</option>
@@ -834,33 +922,124 @@ export default function DocumentsPage() {
             title="Document date to"
           />
 
-          <input
-            type="number"
-            inputMode="decimal"
-            placeholder="Min RM"
-            value={amountMin}
-            onChange={(e) => { setAmountMin(e.target.value); setPage(1); }}
-            className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
-            title="Minimum extracted total amount"
-          />
-          <span className="text-slate-400 text-sm">→</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            placeholder="Max RM"
-            value={amountMax}
-            onChange={(e) => { setAmountMax(e.target.value); setPage(1); }}
-            className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
-            title="Maximum extracted total amount"
-          />
-          <input
-            type="text"
-            placeholder="Vendor"
-            value={vendorFilter}
-            onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
-            className="w-32 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
-            title="Filter by extracted vendor name"
-          />
+          {/* Custom-field filter — only unlocks once a Type is picked, and
+              only offers fields predefined for that type (never the whole
+              tenant catalog at once). */}
+          {typeFilter !== "all" && (predefinedFields[typeFilter]?.length ?? 0) > 0 && (
+            <>
+              <div className="relative">
+                <select
+                  value={customFieldId}
+                  onChange={(e) => {
+                    setCustomFieldId(e.target.value);
+                    setCustomFieldValue("");
+                    setCustomFieldMin("");
+                    setCustomFieldMax("");
+                    setCustomFieldDateFrom("");
+                    setCustomFieldDateTo("");
+                    setCustomFieldNumberMode("contains");
+                    setPage(1);
+                  }}
+                  className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white cursor-pointer"
+                >
+                  <option value="all">Any custom field</option>
+                  {predefinedFields[typeFilter].map((f) => (
+                    <option key={f.fieldId} value={f.fieldId}>{f.fieldName}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              </div>
+
+              {selectedCustomField && (
+                selectedCustomField.fieldType === "number" ? (
+                  <>
+                    <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => { setCustomFieldNumberMode("contains"); setPage(1); }}
+                        className={`px-2.5 py-2 font-medium transition-colors ${
+                          customFieldNumberMode === "contains"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white text-slate-500 hover:bg-slate-50"
+                        }`}
+                        title="Find by typing part of the number (e.g. an order number you half-remember)"
+                      >
+                        Contains
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setCustomFieldNumberMode("range"); setPage(1); }}
+                        className={`px-2.5 py-2 font-medium border-l border-slate-200 transition-colors ${
+                          customFieldNumberMode === "range"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white text-slate-500 hover:bg-slate-50"
+                        }`}
+                        title="Filter by a min/max range (for quantities/amounts)"
+                      >
+                        Range
+                      </button>
+                    </div>
+                    {customFieldNumberMode === "contains" ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Contains…"
+                        value={customFieldValue}
+                        onChange={(e) => { setCustomFieldValue(e.target.value); setPage(1); }}
+                        className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+                      />
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="Min"
+                          value={customFieldMin}
+                          onChange={(e) => { setCustomFieldMin(e.target.value); setPage(1); }}
+                          className="w-20 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+                        />
+                        <span className="text-slate-400 text-sm">→</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="Max"
+                          value={customFieldMax}
+                          onChange={(e) => { setCustomFieldMax(e.target.value); setPage(1); }}
+                          className="w-20 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+                        />
+                      </>
+                    )}
+                  </>
+                ) : selectedCustomField.fieldType === "date" ? (
+                  <>
+                    <input
+                      type="date"
+                      value={customFieldDateFrom}
+                      onChange={(e) => { setCustomFieldDateFrom(e.target.value); setPage(1); }}
+                      className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                    />
+                    <span className="text-slate-400 text-sm">→</span>
+                    <input
+                      type="date"
+                      value={customFieldDateTo}
+                      onChange={(e) => { setCustomFieldDateTo(e.target.value); setPage(1); }}
+                      className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                    />
+                  </>
+                ) : (
+                  <div className="w-36">
+                    <CustomFieldInput
+                      fieldType={selectedCustomField.fieldType}
+                      options={selectedCustomField.options}
+                      value={customFieldValue}
+                      onChange={(v) => { setCustomFieldValue(v); setPage(1); }}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                    />
+                  </div>
+                )
+              )}
+            </>
+          )}
 
           <button
             onClick={() => { setInbox((v) => !v); setPage(1); }}

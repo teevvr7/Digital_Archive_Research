@@ -22,6 +22,18 @@ export interface FieldValue {
   value: unknown;
 }
 
+/** A custom field predefined for a document type (Level 6 — Metadata). */
+export interface PredefinedField {
+  id: string;
+  documentType: string;
+  fieldId: string;
+  fieldName: string;
+  fieldType: string; // text | number | date | boolean | select
+  options: string[];
+  required: boolean;
+  position: number;
+}
+
 export interface Tag {
   id: string;
   tenantId: string;

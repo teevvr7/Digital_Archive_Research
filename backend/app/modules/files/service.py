@@ -2,10 +2,12 @@
 
 import datetime
 import hashlib
+import json
+import logging
 import uuid
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import Date, delete, func, select, update
+from sqlalchemy import Date, Numeric, cast, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,7 @@ from app.models.document import (
     STATUS_QUEUED,
     Document,
 )
+from app.models.custom_field import CustomField, DocumentFieldValue
 from app.models.processing_job import JOB_QUEUED, ProcessingJob
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -45,10 +48,18 @@ from app.modules.files.schemas import (
     FieldValueOut,
     TagOut,
 )
-from app.modules.metadata.service import fetch_field_values_for_docs
+from app.modules.metadata.schemas import CustomFieldIn, FieldValueIn, PredefinedFieldIn
+from app.modules.metadata.service import (
+    add_predefined_field,
+    create_custom_field,
+    fetch_field_values_for_docs,
+    set_field_value,
+)
 from app.modules.idp import mimetype
 from app.modules.idp.queue import enqueue_ai_extraction, enqueue_document
 from app.modules.search.query import apply_text_search, build_search_text
+
+logger = logging.getLogger(__name__)
 
 # Sniffed-mime -> storage extension. Source of truth lives in idp/mimetype.py
 # so the worker's parser registry and the upload allow-list never drift apart.
@@ -139,6 +150,94 @@ def _check_storage_quota(db: Session, tenant_id: uuid.UUID, incoming_bytes: int)
         )
 
 
+def _apply_upload_time_fields(
+    db: Session,
+    tenant_id: uuid.UUID,
+    doc: Document,
+    field_values_json: str,
+    new_fields_json: str,
+    attach_fields_json: str = "",
+) -> None:
+    """Create/attach ad-hoc fields and set values from the upload popup (Level 6).
+
+    Best-effort by design: any parse/validation failure is logged and skipped,
+    never raised — a bad field value must never prevent the document itself
+    from archiving (CLAUDE.md's "ingestion never blocks" rule).
+    """
+    if attach_fields_json:
+        try:
+            to_attach = json.loads(attach_fields_json)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning("doc=%s: could not parse attach_fields JSON: %s", doc.id, exc)
+            to_attach = []
+        for spec in to_attach:
+            try:
+                field_id = uuid.UUID(spec["fieldId"])
+                try:
+                    add_predefined_field(
+                        db, tenant_id, doc.document_type, PredefinedFieldIn(field_id=field_id)
+                    )
+                except HTTPException as exc:
+                    # 409 = already predefined for this type (e.g. picked twice,
+                    # or attached by someone else meanwhile) — not an error, the
+                    # field is attached either way, so still set its value below.
+                    if exc.status_code != status.HTTP_409_CONFLICT:
+                        raise
+                if "value" in spec:
+                    set_field_value(db, tenant_id, doc.id, field_id, FieldValueIn(value=spec["value"]))
+            except (HTTPException, KeyError, TypeError, ValueError) as exc:
+                logger.warning(
+                    "doc=%s: could not attach existing field %r: %s", doc.id, spec, exc
+                )
+
+    if new_fields_json:
+        try:
+            new_fields = json.loads(new_fields_json)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning("doc=%s: could not parse new_fields JSON: %s", doc.id, exc)
+            new_fields = []
+        for spec in new_fields:
+            try:
+                created = create_custom_field(
+                    db,
+                    tenant_id,
+                    CustomFieldIn(
+                        name=spec["name"],
+                        field_type=spec["fieldType"],
+                        options=spec.get("options", []),
+                    ),
+                )
+                add_predefined_field(
+                    db, tenant_id, doc.document_type, PredefinedFieldIn(field_id=created.id)
+                )
+                # The frontend can't know the new field's server-generated id
+                # ahead of time to reference it in field_values, so a filled-in
+                # value for a brand-new field rides along on the same spec.
+                if "value" in spec:
+                    set_field_value(
+                        db, tenant_id, doc.id, created.id, FieldValueIn(value=spec["value"])
+                    )
+            except (HTTPException, KeyError, TypeError) as exc:
+                logger.warning(
+                    "doc=%s: could not create ad-hoc field %r: %s", doc.id, spec, exc
+                )
+
+    if field_values_json:
+        try:
+            values: dict[str, object] = json.loads(field_values_json)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning("doc=%s: could not parse field_values JSON: %s", doc.id, exc)
+            values = {}
+        for field_id_str, value in values.items():
+            try:
+                field_id = uuid.UUID(field_id_str)
+                set_field_value(db, tenant_id, doc.id, field_id, FieldValueIn(value=value))
+            except (HTTPException, ValueError) as exc:
+                logger.warning(
+                    "doc=%s: could not set field %s: %s", doc.id, field_id_str, exc
+                )
+
+
 def _doc_to_out(
     doc: Document,
     uploader_name: str,
@@ -199,12 +298,25 @@ def create_documents(
     user: TokenData,
     uploads: list[UploadFile],
     type_hints: list[str],
+    field_values_raw: list[str] | None = None,
+    new_fields_raw: list[str] | None = None,
+    attach_fields_raw: list[str] | None = None,
 ) -> DocumentListOut:
     """Validate, store in object storage, and register uploaded files.
 
     Each file gets a ProcessingJob (queued) and an upload ActivityEvent.
     Jobs are enqueued on the IDP queue after the DB transaction commits, so
     the worker never races an uncommitted row.
+
+    ``field_values_raw``/``new_fields_raw``/``attach_fields_raw`` are optional
+    per-file JSON strings from the upload popup (Level 6 — predefined fields):
+    the first a ``{field_id: value}`` object of values to set, the second a
+    ``[{name, fieldType, options}]`` array of brand-new catalog fields to
+    create and auto-attach as predefined for that file's document type, the
+    third a ``[{fieldId, value}]`` array of already-existing catalog fields to
+    attach as predefined and set a value for. All three are best-effort — a
+    malformed entry is logged and skipped so a bad field value can never
+    block the document itself from archiving.
     """
     if len(uploads) > _MAX_FILES_PER_UPLOAD:
         raise HTTPException(
@@ -220,12 +332,25 @@ def create_documents(
     uploader_id = uuid.UUID(user.user_id)
     uploader_name = _user_name(db, uploader_id)
 
+    # Pad the per-file field extras to match uploads, same as type_hints.
+    field_values_list = list(field_values_raw or [])
+    if len(field_values_list) < len(uploads):
+        field_values_list += [""] * (len(uploads) - len(field_values_list))
+    new_fields_list = list(new_fields_raw or [])
+    if len(new_fields_list) < len(uploads):
+        new_fields_list += [""] * (len(uploads) - len(new_fields_list))
+    attach_fields_list = list(attach_fields_raw or [])
+    if len(attach_fields_list) < len(uploads):
+        attach_fields_list += [""] * (len(uploads) - len(attach_fields_list))
+
     # Pass 1: sniff the real type from content (never the client-declared
     # content-type or filename — see idp/mimetype.py), validate size, and
     # compute a checksum for every file before writing anything, so a
     # rejection never leaves an orphaned storage object.
-    validated: list[tuple[UploadFile, str, bytes, str, str, str]] = []
-    for upload, type_hint in zip(uploads, type_hints):
+    validated: list[tuple[UploadFile, str, bytes, str, str, str, str, str, str]] = []
+    for upload, type_hint, field_values_json, new_fields_json, attach_fields_json in zip(
+        uploads, type_hints, field_values_list, new_fields_list, attach_fields_list
+    ):
         data = upload.file.read()
         sniffed = mimetype.sniff_mime(data, upload.filename)
         ext = ALLOWED_MIMES.get(sniffed) if sniffed else None
@@ -245,7 +370,12 @@ def create_documents(
                 ),
             )
         checksum = hashlib.sha256(data).hexdigest()
-        validated.append((upload, type_hint, data, sniffed, ext, checksum))
+        validated.append(
+            (
+                upload, type_hint, data, sniffed, ext, checksum,
+                field_values_json, new_fields_json, attach_fields_json,
+            )
+        )
 
     # Dedup against this tenant's existing documents AND within the same
     # batch (uploading the same file twice in one request). Duplicates are
@@ -262,22 +392,33 @@ def create_documents(
         existing_checksums = {row[0] for row in rows}
 
     duplicates: list[str] = []
-    deduped: list[tuple[UploadFile, str, bytes, str, str, str]] = []
+    deduped: list[tuple[UploadFile, str, bytes, str, str, str, str, str, str]] = []
     seen_in_batch: set[str] = set()
-    for upload, type_hint, data, sniffed, ext, checksum in validated:
+    for (
+        upload, type_hint, data, sniffed, ext, checksum,
+        field_values_json, new_fields_json, attach_fields_json,
+    ) in validated:
         if checksum in existing_checksums or checksum in seen_in_batch:
             duplicates.append(upload.filename or "unnamed")
             continue
         seen_in_batch.add(checksum)
-        deduped.append((upload, type_hint, data, sniffed, ext, checksum))
+        deduped.append(
+            (
+                upload, type_hint, data, sniffed, ext, checksum,
+                field_values_json, new_fields_json, attach_fields_json,
+            )
+        )
 
-    incoming_total = sum(len(data) for _, _, data, _, _, _ in deduped)
+    incoming_total = sum(len(data) for _, _, data, *_ in deduped)
     _check_storage_quota(db, tenant_id, incoming_total)
 
     created: list[Document] = []
     total_size = 0
 
-    for upload, type_hint, data, sniffed, ext, checksum in deduped:
+    for (
+        upload, type_hint, data, sniffed, ext, checksum,
+        field_values_json, new_fields_json, attach_fields_json,
+    ) in deduped:
         doc_id = uuid.uuid4()
         safe_name = upload.filename or f"document_{doc_id}.{ext}"
         storage_key = f"{tenant_id}/docs/{doc_id}.{ext}"
@@ -301,6 +442,9 @@ def create_documents(
         )
         db.add(doc)
         db.flush()  # populate doc.id for FK references
+        _apply_upload_time_fields(
+            db, tenant_id, doc, field_values_json, new_fields_json, attach_fields_json
+        )
 
         db.add(ProcessingJob(
             tenant_id=tenant_id,
@@ -338,6 +482,19 @@ def create_documents(
     )
 
 
+def resolve_custom_field_type(db: Session, custom_field_id: uuid.UUID | None) -> str | None:
+    """Look up a custom field's type for ``build_document_query``.
+
+    Kept as a separate, caller-invoked step (not done inside the query
+    builder) so ``build_document_query`` stays a pure, session-free builder —
+    every other filter it applies is just column comparisons, no DB access.
+    """
+    if custom_field_id is None:
+        return None
+    field = db.get(CustomField, custom_field_id)
+    return field.field_type if field else None
+
+
 def build_document_query(
     *,
     status_filter: str | None = None,
@@ -352,11 +509,22 @@ def build_document_query(
     inbox: bool = False,
     q: str | None = None,
     trashed: bool = False,
+    custom_field_id: uuid.UUID | None = None,
+    custom_field_type: str | None = None,
+    custom_field_value: str | None = None,
+    custom_field_min: float | None = None,
+    custom_field_max: float | None = None,
+    custom_field_date_from: datetime.date | None = None,
+    custom_field_date_to: datetime.date | None = None,
 ):
     """Shared WHERE-clause builder for ``list_documents`` and the export
     endpoint (Level 3) — the two must never drift on what counts as
     "matching the filters". Returns ``(stmt, rank_order_or_None)``; callers
-    apply their own ORDER BY/pagination on top."""
+    apply their own ORDER BY/pagination on top.
+
+    ``custom_field_type`` must be resolved by the caller via
+    ``resolve_custom_field_type`` (never trust a client-supplied type — it
+    decides exact-vs-partial matching, so it has to come from the DB)."""
     stmt = select(Document)
 
     if trashed:
@@ -397,6 +565,45 @@ def build_document_query(
             Tag, Tag.id == DocumentTag.tag_id
         ).where(Tag.is_inbox_tag.is_(True))
         stmt = stmt.where(Document.id.in_(inbox_subq))
+    if custom_field_id is not None:
+        # JSONB values need the Postgres "as text" extraction (#>>'{}') before
+        # ILIKE/cast comparisons — .astext isn't available on a whole (un-indexed)
+        # JSONB column in SQLAlchemy, only on an indexed sub-value.
+        astext = DocumentFieldValue.value.op("#>>")(text("'{}'"))
+        conditions = [DocumentFieldValue.field_id == custom_field_id]
+        has_value_condition = False
+        if custom_field_type in ("select", "boolean"):
+            # Exact match — a blind ILIKE would let "Travel" match "International
+            # Travel" for a fixed-option field, which is never the intent.
+            if custom_field_value is not None:
+                conditions.append(astext == custom_field_value)
+                has_value_condition = True
+        else:
+            # text, number, or an unresolved/unknown type — partial "Contains"
+            # match when a value is given. Also lets a reference-number-style
+            # field (e.g. "Order Number") be found by typing a few remembered
+            # digits, rather than forcing a min/max range on something that
+            # isn't really a quantity.
+            if custom_field_value is not None:
+                conditions.append(astext.ilike(f"%{custom_field_value}%"))
+                has_value_condition = True
+            if custom_field_type == "number":
+                if custom_field_min is not None:
+                    conditions.append(cast(astext, Numeric) >= custom_field_min)
+                    has_value_condition = True
+                if custom_field_max is not None:
+                    conditions.append(cast(astext, Numeric) <= custom_field_max)
+                    has_value_condition = True
+            elif custom_field_type == "date":
+                if custom_field_date_from is not None:
+                    conditions.append(cast(astext, Date) >= custom_field_date_from)
+                    has_value_condition = True
+                if custom_field_date_to is not None:
+                    conditions.append(cast(astext, Date) <= custom_field_date_to)
+                    has_value_condition = True
+        if has_value_condition:
+            subq = select(DocumentFieldValue.document_id).where(*conditions)
+            stmt = stmt.where(Document.id.in_(subq))
 
     # When a query is present, match on full-text content OR fuzzy filename
     # (shared with /search so ranking is identical). Otherwise plain browse.
@@ -425,6 +632,12 @@ def list_documents(
     sort: str = "date_desc",
     page: int = 1,
     trashed: bool = False,
+    custom_field_id: uuid.UUID | None = None,
+    custom_field_value: str | None = None,
+    custom_field_min: float | None = None,
+    custom_field_max: float | None = None,
+    custom_field_date_from: datetime.date | None = None,
+    custom_field_date_to: datetime.date | None = None,
 ) -> DocumentListOut:
     """Return a paginated, filtered page of documents for the current tenant.
 
@@ -445,6 +658,13 @@ def list_documents(
         inbox=inbox,
         q=q,
         trashed=trashed,
+        custom_field_id=custom_field_id,
+        custom_field_type=resolve_custom_field_type(db, custom_field_id),
+        custom_field_value=custom_field_value,
+        custom_field_min=custom_field_min,
+        custom_field_max=custom_field_max,
+        custom_field_date_from=custom_field_date_from,
+        custom_field_date_to=custom_field_date_to,
     )
 
     _sort_map = {

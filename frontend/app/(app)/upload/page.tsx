@@ -19,10 +19,26 @@ import {
   CheckSquare,
   Camera,
   FileCode,
+  ListChecks,
+  Plus,
+  Save,
 } from "lucide-react";
-import { apiUploadDocument } from "@/lib/api";
+import { apiUploadDocument, apiPredefinedFields, apiCustomFields } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { DocumentType } from "@/types";
+import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
+import type { CustomField, DocumentType, PredefinedField } from "@/types";
+
+interface PendingNewField {
+  name: string;
+  fieldType: string;
+  options: string[];
+  value: unknown;
+}
+
+interface PendingAttachField {
+  fieldId: string;
+  value: unknown;
+}
 
 interface PendingFile {
   id: string;
@@ -30,7 +46,18 @@ interface PendingFile {
   docType: DocumentType;
   status: "pending" | "uploading" | "queued" | "duplicate" | "error";
   error?: string;
+  fieldValues: Record<string, unknown>;
+  newFields: PendingNewField[];
+  attachFields: PendingAttachField[];
 }
+
+const NEW_FIELD_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "boolean", label: "Yes / No" },
+  { value: "select", label: "Select (dropdown)" },
+];
 
 const DOC_TYPES: { value: DocumentType; label: string }[] = [
   { value: "invoice", label: "Invoice" },
@@ -87,6 +114,412 @@ function formatSize(bytes: number) {
   return `${(bytes / 1_024).toFixed(0)} KB`;
 }
 
+/** Renders a filled-in value back to the draft-string format CustomFieldInput expects. */
+function valueToDraft(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return String(value);
+}
+
+interface FieldsModalProps {
+  title: string;
+  predefined: PredefinedField[];
+  allFields: CustomField[];
+  initialFieldValues: Record<string, unknown>;
+  initialNewFields: PendingNewField[];
+  initialAttachFields: PendingAttachField[];
+  onSave: (
+    fieldValues: Record<string, unknown>,
+    newFields: PendingNewField[],
+    attachFields: PendingAttachField[]
+  ) => void;
+  onClose: () => void;
+}
+
+/**
+ * Popup for filling in a document type's predefined fields, attaching an
+ * existing catalog field, or defining a brand-new one — all before the file
+ * is even uploaded. Shared visual language with the Custom Fields page's
+ * create form and the document detail page's inline field editor.
+ */
+function FieldsModal({
+  title,
+  predefined,
+  allFields,
+  initialFieldValues,
+  initialNewFields,
+  initialAttachFields,
+  onSave,
+  onClose,
+}: FieldsModalProps) {
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => {
+    const seeded: Record<string, string> = {};
+    for (const field of predefined) {
+      seeded[field.fieldId] = valueToDraft(initialFieldValues[field.fieldId]);
+    }
+    return seeded;
+  });
+  const [newFields, setNewFields] = useState<PendingNewField[]>(initialNewFields);
+  const [attachFields, setAttachFields] = useState<PendingAttachField[]>(initialAttachFields);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("text");
+  const [newOptions, setNewOptions] = useState<string[]>([]);
+  const [newOptionInput, setNewOptionInput] = useState("");
+  const [newValueDraft, setNewValueDraft] = useState("");
+  const [showExistingPicker, setShowExistingPicker] = useState(false);
+  const [pickedFieldId, setPickedFieldId] = useState("");
+  const [pickedValueDraft, setPickedValueDraft] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const availableExisting = allFields.filter(
+    (f) =>
+      !predefined.some((p) => p.fieldId === f.id) &&
+      !attachFields.some((a) => a.fieldId === f.id) &&
+      !newFields.some((nf) => nf.name === f.name)
+  );
+
+  const addOption = () => {
+    const opt = newOptionInput.trim();
+    if (!opt || newOptions.includes(opt)) return;
+    setNewOptions((prev) => [...prev, opt]);
+    setNewOptionInput("");
+  };
+
+  const resetAddForm = () => {
+    setShowAddForm(false);
+    setNewName("");
+    setNewType("text");
+    setNewOptions([]);
+    setNewOptionInput("");
+    setNewValueDraft("");
+  };
+
+  const handleAddNewField = () => {
+    if (!newName.trim()) {
+      setFormError("New field needs a name.");
+      return;
+    }
+    if (newType === "select" && newOptions.length === 0) {
+      setFormError("Select fields need at least one option.");
+      return;
+    }
+    setFormError("");
+    setNewFields((prev) => [
+      ...prev,
+      {
+        name: newName.trim(),
+        fieldType: newType,
+        options: newOptions,
+        value: parseCustomFieldValue(newType, newValueDraft),
+      },
+    ]);
+    resetAddForm();
+  };
+
+  const removeNewField = (index: number) =>
+    setNewFields((prev) => prev.filter((_, i) => i !== index));
+
+  const resetExistingPicker = () => {
+    setShowExistingPicker(false);
+    setPickedFieldId("");
+    setPickedValueDraft("");
+  };
+
+  const handleAttachExisting = () => {
+    if (!pickedFieldId) return;
+    const field = allFields.find((f) => f.id === pickedFieldId);
+    if (!field) return;
+    setAttachFields((prev) => [
+      ...prev,
+      { fieldId: pickedFieldId, value: parseCustomFieldValue(field.fieldType, pickedValueDraft) },
+    ]);
+    resetExistingPicker();
+  };
+
+  const removeAttachField = (index: number) =>
+    setAttachFields((prev) => prev.filter((_, i) => i !== index));
+
+  const handleSave = () => {
+    const missingRequired = predefined.find(
+      (f) => f.required && !drafts[f.fieldId]?.trim()
+    );
+    if (missingRequired) {
+      setFormError(`"${missingRequired.fieldName}" is required.`);
+      return;
+    }
+    const fieldValues: Record<string, unknown> = {};
+    for (const field of predefined) {
+      const draft = drafts[field.fieldId];
+      if (draft != null && draft !== "") {
+        fieldValues[field.fieldId] = parseCustomFieldValue(field.fieldType, draft);
+      }
+    }
+    onSave(fieldValues, newFields, attachFields);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-slate-800 text-sm truncate pr-2">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {predefined.length === 0 &&
+          newFields.length === 0 &&
+          attachFields.length === 0 &&
+          !showAddForm &&
+          !showExistingPicker && (
+            <p className="text-xs text-slate-400 mb-3">
+              No predefined fields for this document type yet.
+            </p>
+          )}
+
+        <div className="space-y-3 mb-4">
+          {predefined.map((field) => (
+            <div key={field.fieldId}>
+              <label className="text-xs text-slate-500 block mb-1">
+                {field.fieldName}
+                {field.required && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              <CustomFieldInput
+                fieldType={field.fieldType}
+                options={field.options}
+                value={drafts[field.fieldId] ?? ""}
+                onChange={(v) => setDrafts((prev) => ({ ...prev, [field.fieldId]: v }))}
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+            </div>
+          ))}
+
+          {newFields.map((nf, i) => (
+            <div key={`${nf.name}-${i}`} className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-slate-500 block mb-1">
+                  {nf.name} <span className="text-slate-300">(new)</span>
+                </label>
+                <CustomFieldInput
+                  fieldType={nf.fieldType}
+                  options={nf.options}
+                  value={valueToDraft(nf.value)}
+                  onChange={(v) =>
+                    setNewFields((prev) =>
+                      prev.map((f, idx) =>
+                        idx === i ? { ...f, value: parseCustomFieldValue(nf.fieldType, v) } : f
+                      )
+                    )
+                  }
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+              <button
+                onClick={() => removeNewField(i)}
+                className="p-1.5 text-slate-300 hover:text-red-500"
+                title="Remove"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {attachFields.map((af, i) => {
+            const field = allFields.find((f) => f.id === af.fieldId);
+            if (!field) return null;
+            return (
+              <div key={af.fieldId} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 block mb-1">{field.name}</label>
+                  <CustomFieldInput
+                    fieldType={field.fieldType}
+                    options={field.options}
+                    value={valueToDraft(af.value)}
+                    onChange={(v) =>
+                      setAttachFields((prev) =>
+                        prev.map((a, idx) =>
+                          idx === i ? { ...a, value: parseCustomFieldValue(field.fieldType, v) } : a
+                        )
+                      )
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+                <button
+                  onClick={() => removeAttachField(i)}
+                  className="p-1.5 text-slate-300 hover:text-red-500"
+                  title="Remove"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {showExistingPicker ? (
+          <div className="border border-slate-200 rounded-lg p-3 mb-4 space-y-2.5 bg-slate-50">
+            <select
+              value={pickedFieldId}
+              onChange={(e) => { setPickedFieldId(e.target.value); setPickedValueDraft(""); }}
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Pick a field…</option>
+              {availableExisting.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+
+            {pickedFieldId && (() => {
+              const field = allFields.find((f) => f.id === pickedFieldId);
+              if (!field) return null;
+              return (
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Value for this file</label>
+                  <CustomFieldInput
+                    fieldType={field.fieldType}
+                    options={field.options}
+                    value={pickedValueDraft}
+                    onChange={setPickedValueDraft}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+              );
+            })()}
+
+            <div className="flex gap-1.5">
+              <button
+                onClick={handleAttachExisting}
+                disabled={!pickedFieldId}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs rounded-lg"
+              >
+                <Save className="w-3 h-3" /> Add field
+              </button>
+              <button
+                onClick={resetExistingPicker}
+                className="px-3 py-1.5 border border-slate-200 hover:bg-white text-slate-600 text-xs rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : showAddForm ? (
+          <div className="border border-slate-200 rounded-lg p-3 mb-4 space-y-2.5 bg-slate-50">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Field name"
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <select
+                value={newType}
+                onChange={(e) => { setNewType(e.target.value); setNewOptions([]); }}
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {NEW_FIELD_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {newType === "select" && (
+              <div>
+                <div className="flex gap-1.5 mb-1.5">
+                  <input
+                    value={newOptionInput}
+                    onChange={(e) => setNewOptionInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addOption())}
+                    placeholder="Add option, press Enter"
+                    className="flex-1 px-2.5 py-1 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={addOption}
+                    className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs rounded-lg"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {newOptions.map((o) => (
+                    <span key={o} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-slate-200 rounded text-xs">
+                      {o}
+                      <button onClick={() => setNewOptions((prev) => prev.filter((x) => x !== o))} className="opacity-60 hover:opacity-100">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Value for this file</label>
+              <CustomFieldInput
+                fieldType={newType}
+                options={newOptions}
+                value={newValueDraft}
+                onChange={setNewValueDraft}
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+            </div>
+
+            <div className="flex gap-1.5">
+              <button
+                onClick={handleAddNewField}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg"
+              >
+                <Save className="w-3 h-3" /> Add field
+              </button>
+              <button
+                onClick={resetAddForm}
+                className="px-3 py-1.5 border border-slate-200 hover:bg-white text-slate-600 text-xs rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setShowExistingPicker(true)}
+              disabled={availableExisting.length === 0}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-dashed border-slate-300 text-slate-500 rounded-lg text-xs hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:text-slate-500"
+              title={availableExisting.length === 0 ? "No other fields to reuse yet" : undefined}
+            >
+              <ListChecks className="w-3.5 h-3.5" /> Use existing field
+            </button>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-dashed border-slate-300 text-slate-500 rounded-lg text-xs hover:border-blue-400 hover:text-blue-600 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create new field
+            </button>
+          </div>
+        )}
+
+        {formError && <p className="text-xs text-red-600 mb-3">{formError}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            Save details
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const { refresh } = useAuth();
@@ -95,9 +528,19 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [defaultType, setDefaultType] = useState<DocumentType>("invoice");
+  const [defaultType, setDefaultType] = useState<DocumentType>("other");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkType, setBulkType] = useState<DocumentType>("invoice");
+  const [bulkType, setBulkType] = useState<DocumentType>("other");
+  const [predefinedFields, setPredefinedFields] = useState<Record<string, PredefinedField[]>>({});
+  const [allFields, setAllFields] = useState<CustomField[]>([]);
+  const [fieldsModalTarget, setFieldsModalTarget] = useState<
+    { mode: "single"; fileId: string } | { mode: "bulk"; fileIds: string[] } | null
+  >(null);
+
+  useEffect(() => {
+    apiPredefinedFields().then(setPredefinedFields).catch(() => {});
+    apiCustomFields().then(setAllFields).catch(() => {});
+  }, []);
 
   const addFiles = useCallback(
     (incoming: FileList | null) => {
@@ -111,6 +554,9 @@ export default function UploadPage() {
           file: f,
           docType: defaultType,
           status: "pending",
+          fieldValues: {},
+          newFields: [],
+          attachFields: [],
         });
       }
       setFiles((prev) => [...prev, ...newItems]);
@@ -162,6 +608,21 @@ export default function UploadPage() {
     setSelectedIds(new Set());
   };
 
+  const handleFieldsModalSave = (
+    fieldValues: Record<string, unknown>,
+    newFields: PendingNewField[],
+    attachFields: PendingAttachField[]
+  ) => {
+    if (!fieldsModalTarget) return;
+    const targetIds =
+      fieldsModalTarget.mode === "single" ? [fieldsModalTarget.fileId] : fieldsModalTarget.fileIds;
+    setFiles((prev) =>
+      prev.map((f) => (targetIds.includes(f.id) ? { ...f, fieldValues, newFields, attachFields } : f))
+    );
+    setFieldsModalTarget(null);
+    if (fieldsModalTarget.mode === "bulk") setSelectedIds(new Set());
+  };
+
   const handleUpload = async () => {
     const pending = files.filter((f) => f.status === "pending");
     if (pending.length === 0) return;
@@ -178,6 +639,15 @@ export default function UploadPage() {
         const form = new FormData();
         form.append("files", pf.file);
         form.append("document_type", pf.docType);
+        if (Object.keys(pf.fieldValues).length > 0) {
+          form.append("field_values", JSON.stringify(pf.fieldValues));
+        }
+        if (pf.newFields.length > 0) {
+          form.append("new_fields", JSON.stringify(pf.newFields));
+        }
+        if (pf.attachFields.length > 0) {
+          form.append("attach_fields", JSON.stringify(pf.attachFields));
+        }
         const result = await apiUploadDocument(form);
         const isDuplicate = result.duplicates.length > 0;
         if (!isDuplicate) anyStored = true;
@@ -198,6 +668,10 @@ export default function UploadPage() {
     // A new file bumped tenant storage server-side — refresh so the sidebar
     // storage meter reflects it (duplicates don't change usage).
     if (anyStored) await refresh();
+    // A file may have just created and/or attached a predefined field
+    // (new-field or use-existing-field flows) — refetch so the next file
+    // added in this same session sees it without needing a page reload.
+    apiPredefinedFields().then(setPredefinedFields).catch(() => {});
   };
 
   const isTerminal = (s: PendingFile["status"]) => s === "queued" || s === "duplicate";
@@ -352,6 +826,14 @@ export default function UploadPage() {
               >
                 Apply to {selectedIds.size}
               </button>
+              <button
+                onClick={() =>
+                  setFieldsModalTarget({ mode: "bulk", fileIds: Array.from(selectedIds) })
+                }
+                className="text-xs font-medium px-3 py-1.5 border border-blue-200 bg-white hover:bg-blue-100 text-blue-700 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              >
+                <ListChecks className="w-3.5 h-3.5" /> Fill details for {selectedIds.size}
+              </button>
             </div>
           )}
 
@@ -404,17 +886,37 @@ export default function UploadPage() {
                       {pf.error ?? "Upload failed"}
                     </div>
                   ) : (
-                    <div className="relative inline-block">
-                      <select
-                        value={pf.docType}
-                        onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
-                        className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative inline-block">
+                        <select
+                          value={pf.docType}
+                          onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
+                          className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          {DOC_TYPES.map(({ value, label }) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                      </div>
+                      <button
+                        onClick={() => setFieldsModalTarget({ mode: "single", fileId: pf.id })}
+                        className={`relative p-1 rounded border transition-colors ${
+                          Object.keys(pf.fieldValues).length > 0 ||
+                          pf.newFields.length > 0 ||
+                          pf.attachFields.length > 0
+                            ? "border-blue-300 bg-blue-50 text-blue-600"
+                            : "border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600"
+                        }`}
+                        title="Fill in details for this file"
                       >
-                        {DOC_TYPES.map(({ value, label }) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                        <ListChecks className="w-3.5 h-3.5" />
+                        {(Object.keys(pf.fieldValues).length > 0 ||
+                          pf.newFields.length > 0 ||
+                          pf.attachFields.length > 0) && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500" />
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -480,6 +982,39 @@ export default function UploadPage() {
           Cancel
         </button>
       </div>
+
+      {fieldsModalTarget && (() => {
+        if (fieldsModalTarget.mode === "single") {
+          const target = files.find((f) => f.id === fieldsModalTarget.fileId);
+          if (!target) return null;
+          return (
+            <FieldsModal
+              title={`Add details — ${target.file.name}`}
+              predefined={predefinedFields[target.docType] ?? []}
+              allFields={allFields}
+              initialFieldValues={target.fieldValues}
+              initialNewFields={target.newFields}
+              initialAttachFields={target.attachFields}
+              onSave={handleFieldsModalSave}
+              onClose={() => setFieldsModalTarget(null)}
+            />
+          );
+        }
+        const bulkDocType =
+          files.find((f) => f.id === fieldsModalTarget.fileIds[0])?.docType ?? "other";
+        return (
+          <FieldsModal
+            title={`Add details — ${fieldsModalTarget.fileIds.length} files`}
+            predefined={predefinedFields[bulkDocType] ?? []}
+            allFields={allFields}
+            initialFieldValues={{}}
+            initialNewFields={[]}
+            initialAttachFields={[]}
+            onSave={handleFieldsModalSave}
+            onClose={() => setFieldsModalTarget(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -36,6 +36,12 @@ def export_documents(
     vendor: str | None = None,
     inbox: bool = False,
     q: str | None = None,
+    custom_field_id: uuid.UUID | None = None,
+    custom_field_value: str | None = None,
+    custom_field_min: float | None = None,
+    custom_field_max: float | None = None,
+    custom_field_date_from: datetime.date | None = None,
+    custom_field_date_to: datetime.date | None = None,
 ) -> Response:
     db, _ = ctx
     content, media_type, filename, truncated = service.export_documents(
@@ -52,6 +58,12 @@ def export_documents(
         vendor=vendor,
         inbox=inbox,
         q=q,
+        custom_field_id=custom_field_id,
+        custom_field_value=custom_field_value,
+        custom_field_min=custom_field_min,
+        custom_field_max=custom_field_max,
+        custom_field_date_from=custom_field_date_from,
+        custom_field_date_to=custom_field_date_to,
     )
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',

@@ -15,6 +15,9 @@ from app.modules.metadata.schemas import (
     CustomFieldPatchIn,
     FieldValueIn,
     FieldValueOut,
+    PredefinedFieldIn,
+    PredefinedFieldOut,
+    PredefinedFieldPatchIn,
 )
 
 router = APIRouter(tags=["metadata"])
@@ -100,3 +103,55 @@ def delete_field_value(
 ) -> None:
     db, _ = ctx
     service.delete_field_value(db, doc_id, field_id)
+
+
+# ---- Predefined fields per document type ---------------------------------
+
+
+@router.get(
+    "/document-type-fields",
+    response_model=dict[str, list[PredefinedFieldOut]],
+    response_model_by_alias=True,
+    summary="List predefined custom fields for every document type",
+)
+def list_predefined_fields(ctx: _DbCtx) -> dict[str, list[PredefinedFieldOut]]:
+    db, _ = ctx
+    return service.list_predefined_fields(db)
+
+
+@router.post(
+    "/document-types/{document_type}/fields",
+    response_model=PredefinedFieldOut,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+    summary="Attach an existing custom field as predefined for a document type",
+)
+def add_predefined_field(
+    ctx: _DbCtx, document_type: str, data: PredefinedFieldIn
+) -> PredefinedFieldOut:
+    db, user = ctx
+    tenant_id = uuid.UUID(user.tenant_id)  # type: ignore[arg-type]
+    return service.add_predefined_field(db, tenant_id, document_type, data)
+
+
+@router.patch(
+    "/document-types/{document_type}/fields/{field_id}",
+    response_model=PredefinedFieldOut,
+    response_model_by_alias=True,
+    summary="Update a predefined-field attachment (required/position)",
+)
+def patch_predefined_field(
+    ctx: _DbCtx, document_type: str, field_id: uuid.UUID, patch: PredefinedFieldPatchIn
+) -> PredefinedFieldOut:
+    db, _ = ctx
+    return service.patch_predefined_field(db, document_type, field_id, patch)
+
+
+@router.delete(
+    "/document-types/{document_type}/fields/{field_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Detach a predefined field from a document type",
+)
+def remove_predefined_field(ctx: _DbCtx, document_type: str, field_id: uuid.UUID) -> None:
+    db, _ = ctx
+    service.remove_predefined_field(db, document_type, field_id)

@@ -41,6 +41,7 @@ import {
   apiCustomFields,
   apiSetFieldValue,
   apiDeleteFieldValue,
+  apiPredefinedFields,
   apiCorrespondents,
   apiActivity,
   apiCreateShare,
@@ -50,7 +51,16 @@ import {
   type ActivityListResponse,
   type DocumentShare,
 } from "@/lib/api";
-import type { CustomField, Correspondent, Document, DocumentType, FieldValue, Tag } from "@/types";
+import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
+import type {
+  CustomField,
+  Correspondent,
+  Document,
+  DocumentType,
+  FieldValue,
+  PredefinedField,
+  Tag,
+} from "@/types";
 
 const NON_RENDERABLE_MIMES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -174,6 +184,8 @@ export default function DocumentViewerPage({
 
   // Custom field state
   const [allCustomFields, setAllCustomFields] = useState<CustomField[]>([]);
+  const [predefinedFields, setPredefinedFields] = useState<Record<string, PredefinedField[]>>({});
+  const [manuallyShownFieldIds, setManuallyShownFieldIds] = useState<Set<string>>(new Set());
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [fieldDraft, setFieldDraft] = useState<string>("");
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
@@ -182,6 +194,7 @@ export default function DocumentViewerPage({
   useEffect(() => {
     apiTags().then(setAllTags).catch(() => {});
     apiCustomFields().then(setAllCustomFields).catch(() => {});
+    apiPredefinedFields().then(setPredefinedFields).catch(() => {});
     apiCorrespondents().then(setAllCorrespondents).catch(() => {});
   }, []);
 
@@ -905,117 +918,139 @@ export default function DocumentViewerPage({
                 )}
 
                 {/* ---- Custom fields section ---- */}
-                {allCustomFields.length > 0 && (
-                  <div className="pt-3 border-t border-slate-100">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                      Custom Fields
-                    </p>
-                    <div className="space-y-2">
-                      {allCustomFields.map((field) => {
-                        const existing = doc.customFieldValues?.find(
-                          (v: FieldValue) => v.fieldId === field.id
-                        );
-                        const isEditing = editingFieldId === field.id;
+                {/* Scoped to fields predefined for this doc's type, plus any
+                    field that already has a value (so ad-hoc/legacy values
+                    never silently disappear) or was just manually added below. */}
+                {allCustomFields.length > 0 && (() => {
+                  const predefinedIds = new Set(
+                    (predefinedFields[doc.documentType] ?? []).map((p) => p.fieldId)
+                  );
+                  const valueIds = new Set((doc.customFieldValues ?? []).map((v) => v.fieldId));
+                  const visibleFields = allCustomFields.filter(
+                    (f) => predefinedIds.has(f.id) || valueIds.has(f.id) || manuallyShownFieldIds.has(f.id)
+                  );
+                  const addableFields = allCustomFields.filter(
+                    (f) => !predefinedIds.has(f.id) && !valueIds.has(f.id) && !manuallyShownFieldIds.has(f.id)
+                  );
 
-                        return (
-                          <div key={field.id} className="flex items-center gap-2 py-1.5 border-b border-slate-50">
-                            <span className="text-xs text-slate-500 flex-shrink-0 w-28 truncate">{field.name}</span>
-                            {isEditing ? (
-                              <>
-                                {field.fieldType === "boolean" ? (
-                                  <select
+                  return (
+                    <div className="pt-3 border-t border-slate-100">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                        Custom Fields
+                      </p>
+                      <div className="space-y-2">
+                        {visibleFields.map((field) => {
+                          const existing = doc.customFieldValues?.find(
+                            (v: FieldValue) => v.fieldId === field.id
+                          );
+                          const isEditing = editingFieldId === field.id;
+
+                          return (
+                            <div key={field.id} className="flex items-center gap-2 py-1.5 border-b border-slate-50">
+                              <span className="text-xs text-slate-500 flex-shrink-0 w-28 truncate">{field.name}</span>
+                              {isEditing ? (
+                                <>
+                                  <CustomFieldInput
+                                    fieldType={field.fieldType}
+                                    options={field.options}
                                     value={fieldDraft}
-                                    onChange={(e) => setFieldDraft(e.target.value)}
-                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                                  >
-                                    <option value="true">Yes</option>
-                                    <option value="false">No</option>
-                                  </select>
-                                ) : field.fieldType === "select" ? (
-                                  <select
-                                    value={fieldDraft}
-                                    onChange={(e) => setFieldDraft(e.target.value)}
-                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                                  >
-                                    <option value="">— pick one —</option>
-                                    {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                                  </select>
-                                ) : (
-                                  <input
-                                    type={field.fieldType === "number" ? "number" : field.fieldType === "date" ? "date" : "text"}
-                                    value={fieldDraft}
-                                    onChange={(e) => setFieldDraft(e.target.value)}
-                                    className="flex-1 px-2 py-0.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    onChange={setFieldDraft}
                                   />
-                                )}
-                                <button
-                                  onClick={() => {
-                                    const parsed =
-                                      field.fieldType === "number"
-                                        ? parseFloat(fieldDraft)
-                                        : field.fieldType === "boolean"
-                                        ? fieldDraft === "true"
-                                        : fieldDraft;
-                                    handleSetFieldValue(field.id, parsed);
-                                  }}
-                                  disabled={savingFieldId === field.id}
-                                  className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                >
-                                  {savingFieldId === field.id ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Save className="w-3 h-3" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => setEditingFieldId(null)}
-                                  className="p-1 text-slate-400 hover:text-slate-600"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <span className="flex-1 text-xs text-slate-700 font-medium">
-                                  {existing != null
-                                    ? field.fieldType === "boolean"
-                                      ? existing.value ? "Yes" : "No"
-                                      : String(existing.value)
-                                    : <span className="text-slate-300">—</span>}
-                                </span>
-                                {!isTrashed && (
-                                  <>
-                                    <button
-                                      onClick={() => {
-                                        setEditingFieldId(field.id);
-                                        setFieldDraft(
-                                          existing != null ? String(existing.value) : ""
-                                        );
-                                      }}
-                                      className="p-1 text-slate-300 hover:text-blue-500"
-                                      title="Edit"
-                                    >
-                                      <Pencil className="w-3 h-3" />
-                                    </button>
-                                    {existing != null && (
-                                      <button
-                                        onClick={() => handleClearFieldValue(field.id)}
-                                        className="p-1 text-slate-300 hover:text-red-500"
-                                        title="Clear"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
+                                  <button
+                                    onClick={() =>
+                                      handleSetFieldValue(
+                                        field.id,
+                                        parseCustomFieldValue(field.fieldType, fieldDraft)
+                                      )
+                                    }
+                                    disabled={savingFieldId === field.id}
+                                    className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                  >
+                                    {savingFieldId === field.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Save className="w-3 h-3" />
                                     )}
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingFieldId(null)}
+                                    className="p-1 text-slate-400 hover:text-slate-600"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="flex-1 text-xs text-slate-700 font-medium">
+                                    {existing != null
+                                      ? field.fieldType === "boolean"
+                                        ? existing.value ? "Yes" : "No"
+                                        : String(existing.value)
+                                      : <span className="text-slate-300">—</span>}
+                                  </span>
+                                  {!isTrashed && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setEditingFieldId(field.id);
+                                          setFieldDraft(
+                                            existing != null ? String(existing.value) : ""
+                                          );
+                                        }}
+                                        className="p-1 text-slate-300 hover:text-blue-500"
+                                        title="Edit"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      {existing != null && (
+                                        <button
+                                          onClick={() => handleClearFieldValue(field.id)}
+                                          className="p-1 text-slate-300 hover:text-red-500"
+                                          title="Clear"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {!isTrashed && addableFields.length > 0 && (
+                        <div className="relative mt-2">
+                          <button
+                            onClick={() => setShowFieldPicker((v) => !v)}
+                            className="px-2.5 py-1 border border-dashed border-slate-300 text-slate-400 rounded text-xs hover:border-blue-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add field
+                          </button>
+                          {showFieldPicker && (
+                            <div className="absolute top-full mt-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10 min-w-36 max-h-44 overflow-y-auto">
+                              {addableFields.map((f) => (
+                                <button
+                                  key={f.id}
+                                  onClick={() => {
+                                    setManuallyShownFieldIds((prev) => new Set(prev).add(f.id));
+                                    setEditingFieldId(f.id);
+                                    setFieldDraft("");
+                                    setShowFieldPicker(false);
+                                  }}
+                                  className="w-full px-3 py-2 hover:bg-slate-50 text-xs text-left"
+                                >
+                                  {f.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 

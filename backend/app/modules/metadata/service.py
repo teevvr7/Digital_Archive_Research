@@ -10,12 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.models.custom_field import VALID_FIELD_TYPES, CustomField, DocumentFieldValue
 from app.models.document import Document
+from app.models.document_type_field import VALID_DOCUMENT_TYPES, DocumentTypeField
 from app.modules.metadata.schemas import (
     CustomFieldIn,
     CustomFieldOut,
     CustomFieldPatchIn,
     FieldValueIn,
     FieldValueOut,
+    PredefinedFieldIn,
+    PredefinedFieldOut,
+    PredefinedFieldPatchIn,
 )
 
 
@@ -206,3 +210,127 @@ def fetch_field_values_for_docs(
             )
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Predefined fields per document type
+# ---------------------------------------------------------------------------
+
+
+def _predefined_to_out(link: DocumentTypeField, field: CustomField) -> PredefinedFieldOut:
+    return PredefinedFieldOut(
+        id=link.id,
+        document_type=link.document_type,
+        field_id=field.id,
+        field_name=field.name,
+        field_type=field.field_type,
+        options=field.options or [],
+        required=link.required,
+        position=link.position,
+    )
+
+
+def _validate_document_type(document_type: str) -> None:
+    if document_type not in VALID_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Invalid document_type '{document_type}'. "
+                f"Must be one of: {sorted(VALID_DOCUMENT_TYPES)}"
+            ),
+        )
+
+
+def list_predefined_fields(db: Session) -> dict[str, list[PredefinedFieldOut]]:
+    """All predefined-field attachments for the current tenant, grouped by document_type.
+
+    One joined query covers every type — used by both the upload popup and the
+    Custom Fields management page's "predefined fields by type" section.
+    """
+    rows = db.execute(
+        select(DocumentTypeField, CustomField)
+        .join(CustomField, CustomField.id == DocumentTypeField.field_id)
+        .order_by(DocumentTypeField.document_type, DocumentTypeField.position, CustomField.name)
+    ).all()
+    result: dict[str, list[PredefinedFieldOut]] = {t: [] for t in VALID_DOCUMENT_TYPES}
+    for link, field in rows:
+        result.setdefault(link.document_type, []).append(_predefined_to_out(link, field))
+    return result
+
+
+def add_predefined_field(
+    db: Session, tenant_id: uuid.UUID, document_type: str, data: PredefinedFieldIn
+) -> PredefinedFieldOut:
+    """Attach an existing custom field as predefined for a document type.
+
+    422 on invalid document_type, 404 if the field doesn't exist, 409 if
+    already attached.
+    """
+    _validate_document_type(document_type)
+    field = db.get(CustomField, data.field_id)
+    if field is None:
+        raise HTTPException(status_code=404, detail="Custom field not found.")
+    existing = db.scalars(
+        select(DocumentTypeField).where(
+            DocumentTypeField.tenant_id == tenant_id,
+            DocumentTypeField.document_type == document_type,
+            DocumentTypeField.field_id == data.field_id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"'{field.name}' is already predefined for document type '{document_type}'.",
+        )
+    link = DocumentTypeField(
+        tenant_id=tenant_id,
+        document_type=document_type,
+        field_id=data.field_id,
+        required=data.required,
+        position=data.position,
+    )
+    db.add(link)
+    db.flush()
+    return _predefined_to_out(link, field)
+
+
+def patch_predefined_field(
+    db: Session, document_type: str, field_id: uuid.UUID, patch: PredefinedFieldPatchIn
+) -> PredefinedFieldOut:
+    """Toggle required/reorder a predefined-field attachment without detach+reattach."""
+    link = db.scalars(
+        select(DocumentTypeField).where(
+            DocumentTypeField.document_type == document_type,
+            DocumentTypeField.field_id == field_id,
+        )
+    ).first()
+    if link is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No predefined-field attachment for '{document_type}'/{field_id}.",
+        )
+    updated = patch.model_fields_set
+    if "required" in updated and patch.required is not None:
+        link.required = patch.required
+    if "position" in updated and patch.position is not None:
+        link.position = patch.position
+    db.flush()
+    field = db.get(CustomField, field_id)
+    return _predefined_to_out(link, field)
+
+
+def remove_predefined_field(db: Session, document_type: str, field_id: uuid.UUID) -> None:
+    """Detach a predefined field from a document type. 404 if not attached."""
+    link = db.scalars(
+        select(DocumentTypeField).where(
+            DocumentTypeField.document_type == document_type,
+            DocumentTypeField.field_id == field_id,
+        )
+    ).first()
+    if link is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No predefined-field attachment for '{document_type}'/{field_id}.",
+        )
+    db.delete(link)
+    db.flush()

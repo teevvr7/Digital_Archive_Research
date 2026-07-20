@@ -7,9 +7,13 @@ import {
   apiCreateCustomField,
   apiPatchCustomField,
   apiDeleteCustomField,
+  apiPredefinedFields,
+  apiAddPredefinedField,
+  apiPatchPredefinedField,
+  apiRemovePredefinedField,
   type CustomFieldCreateInput,
 } from "@/lib/api";
-import type { CustomField } from "@/types";
+import type { CustomField, PredefinedField } from "@/types";
 
 const FIELD_TYPES = [
   { value: "text", label: "Text" },
@@ -17,6 +21,17 @@ const FIELD_TYPES = [
   { value: "date", label: "Date" },
   { value: "boolean", label: "Yes / No" },
   { value: "select", label: "Select (dropdown)" },
+];
+
+// Same fixed 7-value set used by the upload page and document detail page.
+const DOC_TYPES = [
+  { value: "invoice", label: "Invoice" },
+  { value: "receipt", label: "Receipt" },
+  { value: "contract", label: "Contract" },
+  { value: "report", label: "Report" },
+  { value: "letter", label: "Letter" },
+  { value: "form", label: "Form" },
+  { value: "other", label: "Other" },
 ];
 
 const EMPTY_FORM: CustomFieldCreateInput = {
@@ -38,11 +53,19 @@ export default function CustomFieldsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
+  // Predefined-fields-by-type state
+  const [predefined, setPredefined] = useState<Record<string, PredefinedField[]>>({});
+  const [addingForType, setAddingForType] = useState<string | null>(null);
+  const [selectedFieldToAdd, setSelectedFieldToAdd] = useState("");
+  const [addRequired, setAddRequired] = useState(false);
+  const [predefinedError, setPredefinedError] = useState("");
+
   useEffect(() => {
     apiCustomFields()
       .then(setFields)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+    apiPredefinedFields().then(setPredefined).catch(() => {});
   }, []);
 
   const openCreate = () => {
@@ -121,6 +144,60 @@ export default function CustomFieldsPage() {
       setFields((prev) => prev.filter((f) => f.id !== id));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
+
+  const openAddPredefined = (docType: string) => {
+    setAddingForType(docType);
+    setSelectedFieldToAdd("");
+    setAddRequired(false);
+    setPredefinedError("");
+  };
+
+  const handleAddPredefined = async (docType: string) => {
+    if (!selectedFieldToAdd) return;
+    setPredefinedError("");
+    try {
+      const created = await apiAddPredefinedField(docType, {
+        fieldId: selectedFieldToAdd,
+        required: addRequired,
+      });
+      setPredefined((prev) => ({
+        ...prev,
+        [docType]: [...(prev[docType] ?? []), created],
+      }));
+      setAddingForType(null);
+    } catch (e: unknown) {
+      setPredefinedError(e instanceof Error ? e.message : "Could not attach field");
+    }
+  };
+
+  const handleTogglePredefinedRequired = async (
+    docType: string,
+    field: PredefinedField,
+  ) => {
+    try {
+      const updated = await apiPatchPredefinedField(docType, field.fieldId, {
+        required: !field.required,
+      });
+      setPredefined((prev) => ({
+        ...prev,
+        [docType]: (prev[docType] ?? []).map((f) => (f.fieldId === field.fieldId ? updated : f)),
+      }));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not update field");
+    }
+  };
+
+  const handleRemovePredefined = async (docType: string, fieldId: string) => {
+    try {
+      await apiRemovePredefinedField(docType, fieldId);
+      setPredefined((prev) => ({
+        ...prev,
+        [docType]: (prev[docType] ?? []).filter((f) => f.fieldId !== fieldId),
+      }));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not remove field");
     }
   };
 
@@ -305,6 +382,110 @@ export default function CustomFieldsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Predefined fields by document type */}
+      {fields.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-slate-800 mb-1">Predefined fields by document type</h2>
+          <p className="text-sm text-slate-500 mb-4">
+            Fields marked predefined for a type are prompted for at upload time and shown by
+            default on that document&apos;s detail page.
+          </p>
+
+          {predefinedError && <p className="text-red-500 text-xs mb-3">{predefinedError}</p>}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {DOC_TYPES.map((docType) => {
+              const attached = predefined[docType.value] ?? [];
+              const attachedIds = new Set(attached.map((f) => f.fieldId));
+              const availableToAdd = fields.filter((f) => !attachedIds.has(f.id));
+
+              return (
+                <div
+                  key={docType.value}
+                  className="bg-white border border-slate-200 rounded-xl p-4"
+                >
+                  <p className="text-sm font-semibold text-slate-700 mb-2">{docType.label}</p>
+
+                  {attached.length === 0 ? (
+                    <p className="text-xs text-slate-400 mb-2">No predefined fields.</p>
+                  ) : (
+                    <div className="space-y-1.5 mb-2">
+                      {attached.map((f) => (
+                        <div key={f.fieldId} className="flex items-center gap-2 text-xs">
+                          <span className="flex-1 text-slate-700">{f.fieldName}</span>
+                          <label className="flex items-center gap-1 text-slate-500 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={f.required}
+                              onChange={() => handleTogglePredefinedRequired(docType.value, f)}
+                              className="rounded"
+                            />
+                            Required
+                          </label>
+                          <button
+                            onClick={() => handleRemovePredefined(docType.value, f.fieldId)}
+                            className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500"
+                            title="Remove"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {addingForType === docType.value ? (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <select
+                        value={selectedFieldToAdd}
+                        onChange={(e) => setSelectedFieldToAdd(e.target.value)}
+                        className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Pick a field…</option>
+                        {availableToAdd.map((f) => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                      <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={addRequired}
+                          onChange={(e) => setAddRequired(e.target.checked)}
+                          className="rounded"
+                        />
+                        Req.
+                      </label>
+                      <button
+                        onClick={() => handleAddPredefined(docType.value)}
+                        disabled={!selectedFieldToAdd}
+                        className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-40"
+                        title="Add"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setAddingForType(null)}
+                        className="p-1 text-slate-400 hover:text-slate-600"
+                        title="Cancel"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : availableToAdd.length > 0 ? (
+                    <button
+                      onClick={() => openAddPredefined(docType.value)}
+                      className="px-2.5 py-1 border border-dashed border-slate-300 text-slate-400 rounded text-xs hover:border-blue-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add field
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

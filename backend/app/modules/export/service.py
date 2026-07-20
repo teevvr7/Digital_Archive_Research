@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core import storage as object_storage
 from app.models.document import Document
-from app.modules.files.service import build_document_query
+from app.modules.files.service import build_document_query, resolve_custom_field_type
 
 _EXPORT_ROW_LIMIT = 5000
 # Zip bulk-download is synchronous in the request handler (CLAUDE.md: keep
@@ -71,6 +71,12 @@ def export_documents(
     vendor: str | None = None,
     inbox: bool = False,
     q: str | None = None,
+    custom_field_id: uuid.UUID | None = None,
+    custom_field_value: str | None = None,
+    custom_field_min: float | None = None,
+    custom_field_max: float | None = None,
+    custom_field_date_from: datetime.date | None = None,
+    custom_field_date_to: datetime.date | None = None,
 ) -> tuple[bytes, str, str, bool]:
     """Returns ``(content, media_type, filename, truncated)``. ``fmt`` is
     ``"csv"`` or ``"xlsx"``; anything else raises 400."""
@@ -93,6 +99,13 @@ def export_documents(
         inbox=inbox,
         q=q,
         trashed=False,
+        custom_field_id=custom_field_id,
+        custom_field_type=resolve_custom_field_type(db, custom_field_id),
+        custom_field_value=custom_field_value,
+        custom_field_min=custom_field_min,
+        custom_field_max=custom_field_max,
+        custom_field_date_from=custom_field_date_from,
+        custom_field_date_to=custom_field_date_to,
     )
     stmt = stmt.order_by(Document.uploaded_at.desc())
 

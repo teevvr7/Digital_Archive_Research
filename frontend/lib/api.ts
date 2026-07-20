@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { Correspondent, CustomField, Document, ActivityEvent, FieldValue, SavedView, SearchListResponse, Tag } from "@/types";
+import type { Correspondent, CustomField, Document, ActivityEvent, FieldValue, PredefinedField, SavedView, SearchListResponse, Tag } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
@@ -172,6 +172,12 @@ export type DocumentsQuery = {
   q?: string;
   page?: number;
   trashed?: boolean;
+  custom_field_id?: string;
+  custom_field_value?: string;
+  custom_field_min?: number;
+  custom_field_max?: number;
+  custom_field_date_from?: string;
+  custom_field_date_to?: string;
 };
 
 export const apiDocuments = (query: DocumentsQuery = {}) => {
@@ -370,6 +376,22 @@ export const apiSetFieldValue = (docId: string, fieldId: string, value: unknown)
   post<FieldValue>(`/documents/${docId}/fields/${fieldId}`, { value });
 export const apiDeleteFieldValue = (docId: string, fieldId: string) =>
   delete_<void>(`/documents/${docId}/fields/${fieldId}`);
+
+// ---- Predefined fields per document type (Level 6) -----------------------
+
+export const apiPredefinedFields = () =>
+  get<Record<string, PredefinedField[]>>("/document-type-fields");
+export const apiAddPredefinedField = (
+  documentType: string,
+  data: { fieldId: string; required?: boolean; position?: number }
+) => post<PredefinedField>(`/document-types/${documentType}/fields`, data);
+export const apiPatchPredefinedField = (
+  documentType: string,
+  fieldId: string,
+  data: { required?: boolean; position?: number }
+) => patch_<PredefinedField>(`/document-types/${documentType}/fields/${fieldId}`, data);
+export const apiRemovePredefinedField = (documentType: string, fieldId: string) =>
+  delete_<void>(`/document-types/${documentType}/fields/${fieldId}`);
 
 // ---- Saved Views (Phase 6) -----------------------------------------------
 

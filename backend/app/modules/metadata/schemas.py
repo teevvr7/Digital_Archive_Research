@@ -52,3 +52,31 @@ class FieldValueOut(CamelModel):
     field_name: str
     field_type: str
     value: Any
+
+
+class PredefinedFieldIn(CamelModel):
+    """Input for attaching an existing custom field as predefined for a document type."""
+
+    field_id: uuid.UUID
+    required: bool = False
+    position: int = 0
+
+
+class PredefinedFieldPatchIn(CamelModel):
+    """Partial update for a predefined-field attachment."""
+
+    required: bool | None = None
+    position: int | None = None
+
+
+class PredefinedFieldOut(CamelModel):
+    """A custom field predefined for a document type, with its display metadata."""
+
+    id: uuid.UUID
+    document_type: str
+    field_id: uuid.UUID
+    field_name: str
+    field_type: str
+    options: list[str]
+    required: bool
+    position: int

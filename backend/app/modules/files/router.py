@@ -45,13 +45,27 @@ async def upload_documents(
     ctx: _DbCtx,
     files: Annotated[list[UploadFile], File(description="Files to upload")],
     document_type: Annotated[list[str] | None, Form()] = None,
+    field_values: Annotated[
+        list[str] | None,
+        Form(description="Per-file JSON {field_id: value} from the upload popup"),
+    ] = None,
+    new_fields: Annotated[
+        list[str] | None,
+        Form(description="Per-file JSON [{name, fieldType, options}] to create + attach"),
+    ] = None,
+    attach_fields: Annotated[
+        list[str] | None,
+        Form(description="Per-file JSON [{fieldId, value}] of existing fields to attach + set"),
+    ] = None,
 ) -> DocumentListOut:
     db, user = ctx
     types = document_type or []
     # Pad with "other" so every file has a type hint
     if len(types) < len(files):
         types += ["other"] * (len(files) - len(types))
-    return service.create_documents(db, user, files, types)
+    return service.create_documents(
+        db, user, files, types, field_values, new_fields, attach_fields
+    )
 
 
 @router.get(
@@ -76,6 +90,12 @@ def list_documents(
     sort: str = "date_desc",
     page: int = 1,
     trashed: bool = False,
+    custom_field_id: uuid.UUID | None = None,
+    custom_field_value: str | None = None,
+    custom_field_min: float | None = None,
+    custom_field_max: float | None = None,
+    custom_field_date_from: datetime.date | None = None,
+    custom_field_date_to: datetime.date | None = None,
 ) -> DocumentListOut:
     db, _ = ctx
     return service.list_documents(
@@ -94,6 +114,12 @@ def list_documents(
         sort=sort,
         page=max(1, page),
         trashed=trashed,
+        custom_field_id=custom_field_id,
+        custom_field_value=custom_field_value,
+        custom_field_min=custom_field_min,
+        custom_field_max=custom_field_max,
+        custom_field_date_from=custom_field_date_from,
+        custom_field_date_to=custom_field_date_to,
     )
 
 
