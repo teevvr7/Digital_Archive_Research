@@ -35,6 +35,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // pass — `document` exists on the client immediately, but not on the server,
   // so rendering based on that check alone mismatches and breaks hydration.
   const [mounted, setMounted] = useState(false);
+  // The standard SSR-safe portal pattern — this setState-in-effect is the point,
+  // not an oversight: it defers the portal to strictly after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const dismiss = useCallback((id: string) => {

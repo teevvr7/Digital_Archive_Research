@@ -11,6 +11,7 @@ interface CustomFieldInputProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  testId?: string;
 }
 
 const DEFAULT_CLASSNAME =
@@ -22,12 +23,13 @@ export function CustomFieldInput({
   value,
   onChange,
   className,
+  testId,
 }: CustomFieldInputProps) {
   const cls = className ?? DEFAULT_CLASSNAME;
 
   if (fieldType === "boolean") {
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
+      <select data-testid={testId} value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
         <option value="true">Yes</option>
         <option value="false">No</option>
       </select>
@@ -36,7 +38,7 @@ export function CustomFieldInput({
 
   if (fieldType === "select") {
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
+      <select data-testid={testId} value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
         <option value="">— pick one —</option>
         {options.map((o) => (
           <option key={o} value={o}>{o}</option>
@@ -47,6 +49,7 @@ export function CustomFieldInput({
 
   return (
     <input
+      data-testid={testId}
       type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
       value={value}
       onChange={(e) => onChange(e.target.value)}

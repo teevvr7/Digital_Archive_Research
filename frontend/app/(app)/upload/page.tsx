@@ -284,6 +284,7 @@ function FieldsModal({
                 value={drafts[field.fieldId] ?? ""}
                 onChange={(v) => setDrafts((prev) => ({ ...prev, [field.fieldId]: v }))}
                 className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                testId={`predefined-field-input-${field.fieldName}`}
               />
             </div>
           ))}

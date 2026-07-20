@@ -242,6 +242,7 @@ export default function CustomFieldsPage() {
             <div>
               <label className="text-xs text-slate-500 block mb-1">Name *</label>
               <input
+                data-testid="new-field-name"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Project Code"
@@ -251,6 +252,7 @@ export default function CustomFieldsPage() {
             <div>
               <label className="text-xs text-slate-500 block mb-1">Type</label>
               <select
+                data-testid="new-field-type"
                 value={form.fieldType}
                 onChange={(e) => setForm((f) => ({ ...f, fieldType: e.target.value, options: [] }))}
                 disabled={!!editingId}
@@ -413,6 +415,7 @@ export default function CustomFieldsPage() {
               return (
                 <div
                   key={docType.value}
+                  data-testid={`predefined-card-${docType.value}`}
                   className="bg-white border border-slate-200 rounded-xl p-4"
                 >
                   <p className="text-sm font-semibold text-slate-700 mb-2">{docType.label}</p>
@@ -448,6 +451,7 @@ export default function CustomFieldsPage() {
                   {addingForType === docType.value ? (
                     <div className="flex items-center gap-1.5 mt-2">
                       <select
+                        data-testid={`predefined-picker-${docType.value}`}
                         value={selectedFieldToAdd}
                         onChange={(e) => setSelectedFieldToAdd(e.target.value)}
                         className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -467,6 +471,7 @@ export default function CustomFieldsPage() {
                         Req.
                       </label>
                       <button
+                        data-testid={`predefined-confirm-${docType.value}`}
                         onClick={() => handleAddPredefined(docType.value)}
                         disabled={!selectedFieldToAdd}
                         className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-40"
@@ -484,6 +489,7 @@ export default function CustomFieldsPage() {
                     </div>
                   ) : availableToAdd.length > 0 ? (
                     <button
+                      data-testid={`predefined-add-open-${docType.value}`}
                       onClick={() => openAddPredefined(docType.value)}
                       className="px-2.5 py-1 border border-dashed border-slate-300 text-slate-400 rounded text-xs hover:border-blue-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1.5"
                     >
