@@ -19,6 +19,7 @@ import {
   apiDeleteSavedView,
   type SavedViewCreateInput,
 } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SavedView } from "@/types";
 
 function filterStateLabel(state: Record<string, unknown>): string {
@@ -59,6 +60,7 @@ function viewToQueryString(state: Record<string, unknown>): string {
 const EMPTY_FORM: SavedViewCreateInput = { name: "", filterState: {}, isDefault: false };
 
 export default function SavedViewsPage() {
+  const confirm = useConfirm();
   const [views, setViews] = useState<SavedView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -121,7 +123,13 @@ export default function SavedViewsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this saved view?")) return;
+    const ok = await confirm({
+      title: "Delete saved view?",
+      body: "Delete this saved view?",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await apiDeleteSavedView(id);
       setViews((prev) => prev.filter((v) => v.id !== id));

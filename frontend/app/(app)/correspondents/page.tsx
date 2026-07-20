@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, X, Check, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Check, Users } from "lucide-react";
 import {
   apiCorrespondents,
   apiCreateCorrespondent,
@@ -9,6 +9,9 @@ import {
   apiDeleteCorrespondent,
   type CorrespondentCreateInput,
 } from "@/lib/api";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Correspondent } from "@/types";
 
 const ALGORITHMS = [
@@ -36,6 +39,8 @@ const emptyForm = (): FormState => ({
 });
 
 export default function CorrespondentsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [correspondents, setCorrespondents] = useState<Correspondent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -105,13 +110,20 @@ export default function CorrespondentsPage() {
   };
 
   const handleDelete = async (item: Correspondent) => {
-    if (!confirm(`Delete correspondent "${item.name}"? Documents linked to it will be unlinked.`)) return;
+    const ok = await confirm({
+      title: "Delete correspondent?",
+      body: `Delete correspondent "${item.name}"? Documents linked to it will be unlinked.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingId(item.id);
     try {
       await apiDeleteCorrespondent(item.id);
       load();
+      toast.success(`Correspondent "${item.name}" deleted.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeletingId(null);
     }
@@ -142,17 +154,11 @@ export default function CorrespondentsPage() {
       )}
 
       {/* Form modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800">
-                {editingItem ? "Edit correspondent" : "New correspondent"}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editingItem ? "Edit correspondent" : "New correspondent"}
+      >
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Name *</label>
@@ -231,9 +237,7 @@ export default function CorrespondentsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* List */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">

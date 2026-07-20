@@ -13,7 +13,6 @@ import {
   Check,
   Loader2,
   Clock,
-  X,
   Mail,
 } from "lucide-react";
 import { ActivityIcon, ActivityLabel } from "@/components/activity-item";
@@ -31,6 +30,9 @@ import {
   type AuthUser,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Tab = "organisation" | "users" | "activity" | "security" | "api" | "notifications";
 
@@ -83,6 +85,8 @@ function ComingSoonPanel({
 
 export default function SettingsPage() {
   const { user, tenant, refresh } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<Tab>("organisation");
 
   const [orgName, setOrgName] = useState("");
@@ -167,6 +171,7 @@ export default function SettingsPage() {
       setInviteName("");
       setInviteRole("user");
       loadTeam();
+      toast.success(`Invite sent to ${inviteEmail.trim()}.`);
     } catch (e) {
       setInviteError(e instanceof Error ? e.message : "Failed to send invite.");
     } finally {
@@ -179,22 +184,29 @@ export default function SettingsPage() {
     try {
       await apiUpdateUserRole(targetId, role);
       loadTeam();
+      toast.success("Role updated.");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to change role.");
+      toast.error(e instanceof Error ? e.message : "Failed to change role.");
     } finally {
       setRoleUpdatingId(null);
     }
   };
 
   const handleRemoveUser = async (row: AuthUser) => {
-    if (!confirm(`Remove ${row.name} (${row.email}) from your organisation? This cannot be undone.`))
-      return;
+    const ok = await confirm({
+      title: "Remove user?",
+      body: `Remove ${row.name} (${row.email}) from your organisation? This cannot be undone.`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     setRemovingId(row.id);
     try {
       await apiRemoveUser(row.id);
       loadTeam();
+      toast.success(`${row.name} removed from your organisation.`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to remove user.");
+      toast.error(e instanceof Error ? e.message : "Failed to remove user.");
     } finally {
       setRemovingId(null);
     }
@@ -552,18 +564,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {inviteOpen && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800">Invite a teammate</h2>
-              <button
-                onClick={() => setInviteOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite a teammate">
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Name *</label>
@@ -624,9 +625,7 @@ export default function SettingsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

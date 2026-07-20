@@ -52,6 +52,9 @@ import {
   type DocumentShare,
 } from "@/lib/api";
 import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import { DetailSkeleton } from "@/components/ui/skeleton";
 import type {
   CustomField,
   Correspondent,
@@ -142,6 +145,7 @@ export default function DocumentViewerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const toast = useToast();
   const [doc, setDoc] = useState<Document | null>(null);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -271,8 +275,9 @@ export default function DocumentViewerPage({
     try {
       const share = await apiCreateShare(doc.id, newShareDays);
       setShares((prev) => [share, ...prev]);
+      toast.success("Share link created.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to create share link");
+      toast.error(e instanceof Error ? e.message : "Failed to create share link");
     } finally {
       setCreatingShare(false);
     }
@@ -282,8 +287,9 @@ export default function DocumentViewerPage({
     try {
       await apiRevokeShare(shareId);
       setShares((prev) => prev.filter((s) => s.id !== shareId));
+      toast.success("Share link revoked.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to revoke share link");
+      toast.error(e instanceof Error ? e.message : "Failed to revoke share link");
     }
   };
 
@@ -482,8 +488,8 @@ export default function DocumentViewerPage({
 
   if (!doc) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      <div className="p-8">
+        <DetailSkeleton />
       </div>
     );
   }
@@ -581,19 +587,11 @@ export default function DocumentViewerPage({
       </div>
 
       {/* Share modal */}
-      {showShareModal && doc && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-slate-400" />
-                Share &quot;{doc.title || doc.originalFilename}&quot;
-              </h2>
-              <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      <Modal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title={`Share "${doc.title || doc.originalFilename}"`}
+      >
             <div className="flex items-center gap-2 mb-4">
               <label className="text-xs text-slate-500">Expires in</label>
               <select
@@ -667,9 +665,7 @@ export default function DocumentViewerPage({
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Document preview panel */}

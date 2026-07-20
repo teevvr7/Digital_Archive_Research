@@ -26,6 +26,7 @@ import {
 import { apiUploadDocument, apiPredefinedFields, apiCustomFields } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
+import { Modal } from "@/components/ui/modal";
 import type { CustomField, DocumentType, PredefinedField } from "@/types";
 
 interface PendingNewField {
@@ -259,15 +260,7 @@ function FieldsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-800 text-sm truncate pr-2">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <Modal open onClose={onClose} title={title}>
         {predefined.length === 0 &&
           newFields.length === 0 &&
           attachFields.length === 0 &&
@@ -515,8 +508,7 @@ function FieldsModal({
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

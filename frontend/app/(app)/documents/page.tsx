@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   FileImage,
@@ -53,6 +54,10 @@ import {
   type DocumentListResponse,
 } from "@/lib/api";
 import { CustomFieldInput } from "@/components/custom-field-input";
+import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { TableRowsSkeleton, CardGridSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import type {
   Correspondent,
   Document,
@@ -185,6 +190,9 @@ function DocCard({
 
 export default function DocumentsPage() {
   const { refresh: refreshAuth } = useAuth();
+  const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   // ---- Filters ----
   const [query, setQuery] = useState("");
@@ -388,6 +396,26 @@ export default function DocumentsPage() {
     correspondentFilter !== "all" || dateFrom || dateTo ||
     inbox || customFieldId !== "all";
 
+  const emptyStateProps = trashed
+    ? {
+        icon: Trash2,
+        title: "Trash is empty",
+        description: "Documents you move to trash will show up here.",
+      }
+    : hasActiveFilters
+      ? {
+          icon: Search,
+          title: "No documents match these filters",
+          description: "Try adjusting or clearing your filters.",
+          action: { label: "Clear filters", onClick: resetFilters },
+        }
+      : {
+          icon: Upload,
+          title: "No documents yet",
+          description: "Upload your first document to get started.",
+          action: { label: "Upload", onClick: () => router.push("/upload") },
+        };
+
   // ---- Apply saved view ----
   const applyView = (view: SavedView) => {
     const s = view.filterState as Record<string, unknown>;
@@ -440,8 +468,9 @@ export default function DocumentsPage() {
       setSavedViews((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setShowSaveView(false);
       setSaveViewName("");
+      toast.success(`Saved view "${created.name}".`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to save view");
+      toast.error(e instanceof Error ? e.message : "Failed to save view");
     } finally {
       setSavingView(false);
     }
@@ -466,14 +495,22 @@ export default function DocumentsPage() {
 
   // ---- Bulk actions ----
   const handleBulkTrash = async () => {
-    if (!confirm(`Move ${selectedIds.size} document${selectedIds.size !== 1 ? "s" : ""} to trash?`)) return;
+    const count = selectedIds.size;
+    const ok = await confirm({
+      title: "Move to trash?",
+      body: `Move ${count} document${count !== 1 ? "s" : ""} to trash?`,
+      confirmLabel: "Move to trash",
+      danger: true,
+    });
+    if (!ok) return;
     setBulkLoading(true);
     try {
       await apiBulkTrash([...selectedIds]);
       setSelectedIds(new Set());
       refreshDocuments();
+      toast.success(`Moved ${count} document${count !== 1 ? "s" : ""} to trash.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Bulk trash failed");
+      toast.error(e instanceof Error ? e.message : "Bulk trash failed");
     } finally {
       setBulkLoading(false);
     }
@@ -484,7 +521,7 @@ export default function DocumentsPage() {
     try {
       await apiBulkDownload([...selectedIds]);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Bulk download failed");
+      toast.error(e instanceof Error ? e.message : "Bulk download failed");
     } finally {
       setBulkLoading(false);
     }
@@ -495,38 +532,44 @@ export default function DocumentsPage() {
     try {
       const { truncated } = await apiExportDocuments(buildQuery(), format);
       if (truncated) {
-        alert(
+        toast.info(
           `Export capped at the first 5,000 matching documents — narrow your filters to get everything.`
         );
+      } else {
+        toast.success("Export ready — check your downloads.");
       }
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Export failed");
+      toast.error(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExporting(false);
     }
   };
 
   const handleBulkTag = async (tagId: string, action: "assign" | "remove") => {
+    const count = selectedIds.size;
     setBulkLoading(true);
     setShowBulkTagMenu(false);
     try {
       await apiBulkTag([...selectedIds], tagId, action);
       refreshDocuments();
+      toast.success(`Tag ${action === "assign" ? "assigned to" : "removed from"} ${count} document${count !== 1 ? "s" : ""}.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Bulk tag failed");
+      toast.error(e instanceof Error ? e.message : "Bulk tag failed");
     } finally {
       setBulkLoading(false);
     }
   };
 
   const handleBulkSetType = async (docType: string) => {
+    const count = selectedIds.size;
     setBulkLoading(true);
     setShowBulkTypeMenu(false);
     try {
       await apiBulkSetType([...selectedIds], docType);
       refreshDocuments();
+      toast.success(`Type set to "${docType}" for ${count} document${count !== 1 ? "s" : ""}.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Bulk set type failed");
+      toast.error(e instanceof Error ? e.message : "Bulk set type failed");
     } finally {
       setBulkLoading(false);
     }
@@ -538,7 +581,7 @@ export default function DocumentsPage() {
       const { url } = await apiDownloadUrl(doc.id);
       window.open(url, "_blank");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Download failed");
+      toast.error(e instanceof Error ? e.message : "Download failed");
     }
   };
 
@@ -546,8 +589,9 @@ export default function DocumentsPage() {
     try {
       await apiRetryDocument(doc.id);
       setPage((p) => p);
+      toast.success("Retry queued.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Retry failed");
+      toast.error(e instanceof Error ? e.message : "Retry failed");
     }
   };
 
@@ -555,8 +599,9 @@ export default function DocumentsPage() {
     try {
       await apiTrashDocument(doc.id);
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+      toast.success("Moved to trash.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Move to trash failed");
+      toast.error(e instanceof Error ? e.message : "Move to trash failed");
     }
   };
 
@@ -564,36 +609,50 @@ export default function DocumentsPage() {
     try {
       await apiRestoreDocument(doc.id);
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+      toast.success("Restored from trash.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Restore failed");
+      toast.error(e instanceof Error ? e.message : "Restore failed");
     }
   };
 
   const handleEmptyTrash = async () => {
-    if (!confirm("Permanently delete all trashed documents? This cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Empty trash?",
+      body: "Permanently delete all trashed documents? This cannot be undone.",
+      confirmLabel: "Delete permanently",
+      danger: true,
+    });
+    if (!ok) return;
     setEmptyingTrash(true);
     try {
       const { deleted } = await apiEmptyTrash();
-      alert(`Permanently deleted ${deleted} document${deleted !== 1 ? "s" : ""}.`);
+      toast.success(`Permanently deleted ${deleted} document${deleted !== 1 ? "s" : ""}.`);
       refreshDocuments();
       // Freed real storage — the sidebar's tenant snapshot won't know unless told.
       refreshAuth();
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to empty trash");
+      toast.error(e instanceof Error ? e.message : "Failed to empty trash");
     } finally {
       setEmptyingTrash(false);
     }
   };
 
   const handlePermanentDelete = async (doc: Document) => {
-    if (!confirm(`Permanently delete "${doc.title || doc.originalFilename}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: "Delete permanently?",
+      body: `Permanently delete "${doc.title || doc.originalFilename}"? This cannot be undone.`,
+      confirmLabel: "Delete permanently",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await apiPermanentDelete(doc.id);
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
+      toast.success("Document permanently deleted.");
       // Freed real storage — the sidebar's tenant snapshot won't know unless told.
       refreshAuth();
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Permanent delete failed");
+      toast.error(e instanceof Error ? e.message : "Permanent delete failed");
     }
   };
 
@@ -601,9 +660,9 @@ export default function DocumentsPage() {
     setExtractingMissing(true);
     try {
       const { enqueued } = await apiExtractMissing();
-      alert(`Queued AI extraction for ${enqueued} document${enqueued !== 1 ? "s" : ""}.`);
+      toast.success(`Queued AI extraction for ${enqueued} document${enqueued !== 1 ? "s" : ""}.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to queue extraction");
+      toast.error(e instanceof Error ? e.message : "Failed to queue extraction");
     } finally {
       setExtractingMissing(false);
     }
@@ -697,6 +756,7 @@ export default function DocumentsPage() {
             {allTags.length > 0 && (
               <div className="relative" ref={bulkTagRef}>
                 <button
+                  data-testid="bulk-tag-button"
                   onClick={() => setShowBulkTagMenu((v) => !v)}
                   disabled={bulkLoading}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg disabled:opacity-50"
@@ -739,6 +799,7 @@ export default function DocumentsPage() {
             {/* Set type menu */}
             <div className="relative" ref={bulkTypeRef}>
               <button
+                data-testid="bulk-set-type-button"
                 onClick={() => setShowBulkTypeMenu((v) => !v)}
                 disabled={bulkLoading}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg disabled:opacity-50"
@@ -762,6 +823,7 @@ export default function DocumentsPage() {
             </div>
 
             <button
+              data-testid="bulk-download-button"
               onClick={handleBulkDownload}
               disabled={bulkLoading || selectedIds.size > 100}
               title={selectedIds.size > 100 ? "Download at most 100 files at a time" : "Download originals as a zip"}
@@ -773,6 +835,7 @@ export default function DocumentsPage() {
 
             {!trashed && (
               <button
+                data-testid="bulk-trash-button"
                 onClick={handleBulkTrash}
                 disabled={bulkLoading}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 text-sm rounded-lg disabled:opacity-50"
@@ -839,6 +902,7 @@ export default function DocumentsPage() {
 
           <div className="relative">
             <select
+              data-testid="type-filter"
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value as DocumentType | "all");
@@ -929,6 +993,7 @@ export default function DocumentsPage() {
             <>
               <div className="relative">
                 <select
+                  data-testid="custom-field-picker"
                   value={customFieldId}
                   onChange={(e) => {
                     setCustomFieldId(e.target.value);
@@ -1140,15 +1205,11 @@ export default function DocumentsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-        </div>
+        viewMode === "grid" ? <CardGridSkeleton /> : <TableRowsSkeleton />
       ) : viewMode === "grid" ? (
         <>
           {docs.length === 0 ? (
-            <div className="text-center py-16 text-slate-400 text-sm">
-              No documents match your filters.
-            </div>
+            <EmptyState {...emptyStateProps} />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {docs.map((doc) => (
@@ -1186,8 +1247,8 @@ export default function DocumentsPage() {
             <tbody className="divide-y divide-slate-50">
               {docs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
-                    No documents match your filters.
+                  <td colSpan={7} className="p-0">
+                    <EmptyState {...emptyStateProps} />
                   </td>
                 </tr>
               ) : (

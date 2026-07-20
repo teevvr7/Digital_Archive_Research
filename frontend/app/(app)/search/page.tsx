@@ -19,6 +19,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { apiSearch, apiDownloadUrl } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
 import type { Document, DocumentType, SearchResult } from "@/types";
 
 const SUGGESTIONS = [
@@ -56,6 +57,7 @@ function DocIcon({ doc }: { doc: Document }) {
 }
 
 export default function SearchPage() {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [typeFilter, setTypeFilter] = useState<DocumentType | "all">("all");
@@ -108,7 +110,7 @@ export default function SearchPage() {
       const { url } = await apiDownloadUrl(doc.id);
       window.open(url, "_blank");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Download failed");
+      toast.error(e instanceof Error ? e.message : "Download failed");
     }
   };
 

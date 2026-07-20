@@ -13,6 +13,7 @@ import {
   apiRemovePredefinedField,
   type CustomFieldCreateInput,
 } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { CustomField, PredefinedField } from "@/types";
 
 const FIELD_TYPES = [
@@ -42,6 +43,7 @@ const EMPTY_FORM: CustomFieldCreateInput = {
 };
 
 export default function CustomFieldsPage() {
+  const confirm = useConfirm();
   const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -138,7 +140,13 @@ export default function CustomFieldsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this custom field? All values set on documents will also be removed.")) return;
+    const ok = await confirm({
+      title: "Delete custom field?",
+      body: "Delete this custom field? All values set on documents will also be removed.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await apiDeleteCustomField(id);
       setFields((prev) => prev.filter((f) => f.id !== id));

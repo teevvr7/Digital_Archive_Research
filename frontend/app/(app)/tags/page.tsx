@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, X, Check, Tag as TagIcon, Wand2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Check, Tag as TagIcon, Wand2 } from "lucide-react";
 import {
   apiTags,
   apiCreateTag,
@@ -10,6 +10,9 @@ import {
   apiApplyRules,
   type TagCreateInput,
 } from "@/lib/api";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Tag } from "@/types";
 
 const PRESET_COLORS = [
@@ -50,6 +53,8 @@ const emptyForm = (): FormState => ({
 });
 
 export default function TagsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -122,12 +127,12 @@ export default function TagsPage() {
   };
 
   const handleApplyRules = async () => {
-    if (
-      !confirm(
-        "Re-check every existing document against your current tag and correspondent rules? New matches will be applied — nothing already tagged is removed."
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Apply rules to existing documents?",
+      body: "Re-check every existing document against your current tag and correspondent rules? New matches will be applied — nothing already tagged is removed.",
+      confirmLabel: "Apply rules",
+    });
+    if (!ok) return;
     setApplyingRules(true);
     try {
       let page = 1;
@@ -139,22 +144,29 @@ export default function TagsPage() {
         hasMore = res.hasMore;
         page += 1;
       }
-      alert(`Done — checked ${processed} document${processed !== 1 ? "s" : ""} against your rules.`);
+      toast.success(`Done — checked ${processed} document${processed !== 1 ? "s" : ""} against your rules.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to apply rules");
+      toast.error(e instanceof Error ? e.message : "Failed to apply rules");
     } finally {
       setApplyingRules(false);
     }
   };
 
   const handleDelete = async (tag: Tag) => {
-    if (!confirm(`Delete tag "${tag.name}"? This will remove it from all documents.`)) return;
+    const ok = await confirm({
+      title: "Delete tag?",
+      body: `Delete tag "${tag.name}"? This will remove it from all documents.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingId(tag.id);
     try {
       await apiDeleteTag(tag.id);
       load();
+      toast.success(`Tag "${tag.name}" deleted.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeletingId(null);
     }
@@ -196,15 +208,7 @@ export default function TagsPage() {
       )}
 
       {/* Form modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800">{editingTag ? "Edit tag" : "New tag"}</h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingTag ? "Edit tag" : "New tag"}>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Name *</label>
@@ -305,9 +309,7 @@ export default function TagsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Tag list */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
