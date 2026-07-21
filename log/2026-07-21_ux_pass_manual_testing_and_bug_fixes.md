@@ -44,6 +44,23 @@ Also root-caused, while chasing an apparent "document vanished after upload" mys
 - `pytest`: not re-run — zero backend files touched by any fix today.
 - Tenant left in a fully clean state (verified: 0 active docs, 0 trashed docs, 0 custom fields, only the 4 legitimate onboarding-kit starter tags).
 
+## Visual testing pass (post-fix, on demand)
+
+User asked directly "can you do the visual testing?" — re-ran a fresh Playwright walkthrough on the current (post-fix) code and reviewed screenshots directly rather than trusting only DOM-level assertions, since today's whole investigation started from an automated-checks-passed-but-real-bug-present situation.
+
+12 screenshots reviewed: clean login page, empty-state Documents, table/grid loading skeletons (first attempt accidentally captured `AuthProvider`'s own session-check spinner from a full `page.reload()`, not the component's own `TableRowsSkeleton` — re-tested correctly by triggering a client-side sort change instead, which is the actual code path the skeleton covers), the image preview that was the origin of the whole bug report, the share modal + its toast, the "Empty trash?" danger dialog, the migrated Tags modal (Escape-closes confirmed), the bulk-select toolbar, and the "Move to trash?" bulk danger dialog + its success toast (the exact flow behind Bug 2's fix, confirmed visually holding up).
+
+One non-bug learned along the way: single-row trash (the row's own trash icon) has no confirmation dialog by design — it's reversible, only bulk-trash/permanent-delete warrant a confirm. Tenant cleaned up after.
+
+## Known-issues audit (not yet acted on)
+
+User asked "what issues might still be there" — answered from a position of having just spent a full day finding bugs automated checks missed, so erred toward flagging real gaps rather than declaring victory:
+
+- **The same race-condition pattern (poll + optimistic `setDoc`, no generation guard) almost certainly exists on `documents/[id]/page.tsx`** — confirmed via grep: a `setInterval` poll identical in shape to the one fixed in `documents/page.tsx`, plus 10+ separate handlers calling `setDoc(...)` directly (trash, restore, save metadata, tag assign/unassign, custom-field value set/clear, extraction correction save, share create/revoke). Not fixed, not tested today.
+- **The IDP worker has not run at all this session** — confirmed via `Get-CimInstance Win32_Process`: only the backend API server process exists, no worker. Every test document created today sat at `status=queued` forever. OCR, text extraction, thumbnailing, and the deterministic-extraction/VLM-fallback pipeline are entirely unverified against today's changes.
+- Untested surface area: `/search` page, Dashboard, Saved Views, Correspondents, Settings' Security/API Keys/Notifications tabs, the document detail page's Metadata/Extraction-correction/Raw-JSON/History tabs, real Supabase team-invite email flow, MyInvois/UBL ingestion. Only 4 E2E specs exist total (auth, upload, documents-filter, bulk-ops) — correspondents, custom-fields CRUD, saved views, export file content, and the public shares page have zero automated coverage.
+- Pre-existing and not concerning: 2 unrelated TS errors in `search/page.tsx`, `sentry_sdk` missing from the local venv (local-only test failure), the Windows RQ scheduler gap for stuck job retries (documented, production runs on Linux).
+
 ## Next
 
-Still not pushed to `origin/mvp3-prod` — 9 commits now sitting locally since `2990bc3`. Recommend pushing now given the depth of verification today (both the manual/visual walkthrough and the now-3x-stable E2E suite).
+Still not pushed to `origin/mvp3-prod` — 9 commits now sitting locally since `2990bc3`. Recommend pushing now given the depth of verification today (both the manual/visual walkthrough and the now-3x-stable E2E suite). Before further feature work: fix the detail-page race condition (same pattern, same fix, already understood) and do a real worker-processing pass (start the worker, let a document actually complete, verify the UI holds up through a real status transition) — both flagged above, neither started.
