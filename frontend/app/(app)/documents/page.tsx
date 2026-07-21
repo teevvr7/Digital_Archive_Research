@@ -256,6 +256,13 @@ export default function DocumentsPage() {
   const bulkTypeRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
+  // Bumped by every fetch (initial load, poll tick) and every optimistic
+  // single-doc mutation. A fetch only applies its response if the counter
+  // hasn't moved since it started — otherwise a poll response that was
+  // already in flight when e.g. a permanent-delete's optimistic update
+  // landed can silently overwrite it with stale data a moment later.
+  const dataGenerationRef = useRef(0);
+
   // Load static lists once
   useEffect(() => {
     apiTags().then(setAllTags).catch(() => {});
@@ -332,8 +339,13 @@ export default function DocumentsPage() {
   const refreshDocuments = () => {
     setLoading(true);
     setError("");
+    const gen = ++dataGenerationRef.current;
     apiDocuments(buildQuery())
-      .then((d) => { setData(d); setSelectedIds(new Set()); })
+      .then((d) => {
+        if (gen !== dataGenerationRef.current) return; // superseded by a newer fetch/mutation
+        setData(d);
+        setSelectedIds(new Set());
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
@@ -355,7 +367,13 @@ export default function DocumentsPage() {
     const hasInProgress = data?.items.some((d) => !TERMINAL_STATUSES.has(d.status));
     if (!hasInProgress) return;
     const timerId = setInterval(() => {
-      apiDocuments(buildQuery()).then(setData).catch(() => {});
+      const gen = ++dataGenerationRef.current;
+      apiDocuments(buildQuery())
+        .then((d) => {
+          if (gen !== dataGenerationRef.current) return; // superseded by a newer fetch/mutation
+          setData(d);
+        })
+        .catch(() => {});
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -598,6 +616,9 @@ export default function DocumentsPage() {
   const handleTrash = async (doc: Document) => {
     try {
       await apiTrashDocument(doc.id);
+      // Invalidate any poll/fetch already in flight before this mutation, so
+      // its response can't land afterward and silently undo this update.
+      dataGenerationRef.current++;
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
       toast.success("Moved to trash.");
     } catch (e: unknown) {
@@ -608,6 +629,7 @@ export default function DocumentsPage() {
   const handleRestore = async (doc: Document) => {
     try {
       await apiRestoreDocument(doc.id);
+      dataGenerationRef.current++;
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
       toast.success("Restored from trash.");
     } catch (e: unknown) {
@@ -647,6 +669,7 @@ export default function DocumentsPage() {
     if (!ok) return;
     try {
       await apiPermanentDelete(doc.id);
+      dataGenerationRef.current++;
       setData((d) => d ? { ...d, items: d.items.filter((i) => i.id !== doc.id), total: d.total - 1 } : d);
       toast.success("Document permanently deleted.");
       // Freed real storage — the sidebar's tenant snapshot won't know unless told.
