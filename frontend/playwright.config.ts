@@ -12,6 +12,12 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
+  // Playwright's default expect() timeout (5s) is too tight for this dev
+  // environment — Turbopack cold-compiles a route on its first hit and the
+  // project's own dev server already logs "Slow filesystem detected" for
+  // its .next/dev cache. 15s matches what most individual assertions in
+  // these specs already override to explicitly.
+  expect: { timeout: 15_000 },
   globalSetup: hasCreds ? "./e2e/global.setup.ts" : undefined,
   use: {
     baseURL,
