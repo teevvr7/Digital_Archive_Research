@@ -34,6 +34,11 @@ _B_TEXT = "The maintenance schedule and the cleaning schedule are reviewed weekl
 # pg_trgm word_similarity overlap with any other query term in this file.
 _C_ORIGINAL_FILENAME = "Bluefox Import 2024.pdf"
 _C_TITLE = "Renamed Budget Report.pdf"
+# Doc D — regression fixture for the search-snippet stored-XSS fix: content a
+# real attacker could get extracted from a malicious upload (e.g. embedded in
+# a document's text layer). Must never reach the client un-escaped.
+_D_FILENAME = "Payload Report.pdf"
+_D_TEXT = "Summary widget <img src=x onerror=alert(document.cookie)> total due."
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +55,7 @@ def seeds(direct_engine):
 
     t_id = uuid.uuid4()
     u_id = uuid.uuid4()
-    a_id, b_id, c_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    a_id, b_id, c_id, d_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
     insert_doc = text(
         "INSERT INTO documents (id, tenant_id, uploaded_by, filename, original_filename,"
@@ -77,6 +82,7 @@ def seeds(direct_engine):
             (a_id, _A_FILENAME, _A_FILENAME, "report", _A_TEXT),
             (b_id, _B_FILENAME, _B_FILENAME, "contract", _B_TEXT),
             (c_id, _C_ORIGINAL_FILENAME, _C_TITLE, "report", None),
+            (d_id, _D_FILENAME, _D_FILENAME, "report", _D_TEXT),
         ]:
             conn.execute(
                 insert_doc,
@@ -96,11 +102,11 @@ def seeds(direct_engine):
         conn.execute(text("SET session_replication_role = 'origin'"))
         conn.commit()
 
-    yield {"t": t_id, "u": u_id, "a": a_id, "b": b_id, "c": c_id}
+    yield {"t": t_id, "u": u_id, "a": a_id, "b": b_id, "c": c_id, "d": d_id}
 
     with direct_engine.connect() as conn:
         conn.execute(text("SET session_replication_role = 'replica'"))
-        for did in (a_id, b_id, c_id):
+        for did in (a_id, b_id, c_id, d_id):
             conn.execute(text("DELETE FROM documents WHERE id = :id"), {"id": str(did)})
         conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": str(u_id)})
         conn.execute(text("DELETE FROM tenants WHERE id = :id"), {"id": str(t_id)})
@@ -233,5 +239,29 @@ def test_no_match_returns_empty(direct_engine, seeds):
     db = _search_session(direct_engine, seeds["t"])
     out = service.search_documents(db, q="zxqwvnomatchxyz")
     assert out.total == 0
+    db.rollback()
+    db.close()
+
+
+def test_snippet_neutralizes_html_in_extracted_text(direct_engine, seeds):
+    """Regression for the stored-XSS fix: a document whose extracted text
+    contains executable HTML (e.g. an ``<img onerror=...>`` payload) must come
+    back with that markup escaped — only the server-inserted <mark> highlight
+    tags may survive, since the frontend renders `snippet` via
+    dangerouslySetInnerHTML (search/page.tsx)."""
+    from app.modules.search import service
+
+    db = _search_session(direct_engine, seeds["t"])
+    out = service.search_documents(db, q="widget total")
+    ids = _ids(out)
+    assert str(seeds["d"]) in ids
+    hit = next(i for i in out.items if str(i.document.id) == str(seeds["d"]))
+    assert hit.snippet is not None
+    assert "<img" not in hit.snippet
+    assert "<script" not in hit.snippet
+    # The highlight wrapper itself must still come through as real tags...
+    assert "<mark>" in hit.snippet
+    # ...while the escaped source text survives only as inert entities.
+    assert "&lt;img" in hit.snippet
     db.rollback()
     db.close()

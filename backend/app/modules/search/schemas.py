@@ -3,9 +3,11 @@
 Field names mirror ``frontend/types/index.ts`` (``SearchResult`` /
 ``SearchListResponse``) once converted to camelCase by ``CamelModel``.
 
-``snippet`` is server-rendered HTML from Postgres ``ts_headline`` — it contains
-only ``<mark>`` highlight tags around source text that ``ts_headline`` has
-already escaped, so it is safe for the client to render.
+``snippet`` is server-rendered HTML: source text is HTML-escaped in Python
+(``search/query.py::snippet_html_safe``) before ``<mark>`` highlight tags are
+reinserted, so it is safe for the client to render via
+``dangerouslySetInnerHTML``. ``ts_headline`` itself does NOT escape the
+source text — only ``snippet_html_safe`` makes this safe.
 """
 
 from app.core.camel import CamelModel

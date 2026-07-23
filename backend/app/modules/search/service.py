@@ -76,7 +76,7 @@ def search_documents(
             SearchResultOut(
                 document=_doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by))),
                 score=float(score or 0.0),
-                snippet=snip,
+                snippet=q_builders.snippet_html_safe(snip),
                 matched_fields=matched,
             )
         )

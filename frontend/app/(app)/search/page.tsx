@@ -317,7 +317,10 @@ export default function SearchPage() {
                         <StatusBadge status={doc.status} />
                       </div>
 
-                      {/* Content snippet (server-highlighted via ts_headline). */}
+                      {/* Content snippet (server-highlighted via ts_headline).
+                          Safe to render as HTML: the backend (search/query.py::snippet_html_safe)
+                          HTML-escapes the source text before reinserting <mark> tags — never
+                          render `snippet` from anywhere that skips that step. */}
                       {snippet && (
                         <p
                           className="text-xs text-slate-500 mb-2 line-clamp-2 [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:rounded [&_mark]:px-0.5"

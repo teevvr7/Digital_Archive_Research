@@ -11,6 +11,7 @@ All matching runs on indexes already in the schema (migration 0001):
 """
 
 import datetime
+import html
 import re
 
 from sqlalchemy import Select, case, func, or_
@@ -25,8 +26,34 @@ def _prefix_tsquery_str(q: str) -> str | None:
         return None
     return " & ".join(f"{t}:*" for t in tokens)
 
-# ts_headline options: wrap matches in <mark>, return up to 2 short fragments.
-_HEADLINE_OPTS = "StartSel=<mark>,StopSel=</mark>,MaxFragments=2,MinWords=5,MaxWords=24,ShortWord=2"
+
+# ts_headline options: wrap matches in sentinel control characters (never legal
+# in extracted text), return up to 2 short fragments. The sentinels — not
+# literal <mark> tags — are what make snippet_html_safe() below sound: they
+# survive html.escape() untouched (it only touches &, <, > and quotes) and are
+# swapped for real <mark>/</mark> tags only *after* the rest of the string has
+# been escaped, so nothing from the source document can inject markup.
+_MARK_START = "\x01"
+_MARK_END = "\x02"
+_HEADLINE_OPTS = (
+    f"StartSel={_MARK_START},StopSel={_MARK_END},MaxFragments=2,MinWords=5,MaxWords=24,ShortWord=2"
+)
+
+
+def snippet_html_safe(raw: str | None) -> str | None:
+    """Turn a raw ``ts_headline`` result into HTML that is safe to render.
+
+    ``ts_headline`` does NOT escape the source text it quotes — it only
+    inserts the literal StartSel/StopSel strings around matched terms. Any
+    ``<``, ``>``, or ``&`` present in a document's extracted text would
+    otherwise pass straight into the client's ``dangerouslySetInnerHTML``
+    (search/page.tsx), a stored-XSS vector. Escape the whole string first,
+    then turn the (escape-proof) sentinel characters into real mark tags.
+    """
+    if raw is None:
+        return None
+    escaped = html.escape(raw, quote=False)
+    return escaped.replace(_MARK_START, "<mark>").replace(_MARK_END, "</mark>")
 
 
 def build_search_text(title: str, original_filename: str, extracted_text: str | None) -> str:
@@ -101,10 +128,11 @@ def rank_expr(q: str, tsquery):
 
 
 def snippet_expr(tsquery, matched):
-    """``ts_headline`` snippet with ``<mark>`` highlights — only when content matched.
+    """``ts_headline`` snippet, only when content matched.
 
-    ``ts_headline`` escapes the source text and inserts only the literal
-    StartSel/StopSel tags, so the resulting HTML is safe for the client to render.
+    Returns the **raw** ``ts_headline`` output — sentinel-wrapped, not yet
+    HTML-safe. Callers must pass it through :func:`snippet_html_safe` before
+    it ever reaches a client that renders it as HTML.
     """
     return case(
         (matched, func.ts_headline("english", Document.extracted_text, tsquery, _HEADLINE_OPTS)),
