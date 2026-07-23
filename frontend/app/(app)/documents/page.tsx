@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { StatusBadge } from "@/components/status-badge";
-import { formatBytes, formatRelativeTime } from "@/lib/format";
+import { daysUntilTrashPurge, formatBytes, formatRelativeTime } from "@/lib/format";
 import {
   apiDocuments,
   apiDownloadUrl,
@@ -189,7 +189,7 @@ function DocCard({
 // ---------------------------------------------------------------------------
 
 export default function DocumentsPage() {
-  const { refresh: refreshAuth } = useAuth();
+  const { tenant, refresh: refreshAuth } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
@@ -1275,7 +1275,12 @@ export default function DocumentsPage() {
                   </td>
                 </tr>
               ) : (
-                docs.map((doc) => (
+                docs.map((doc) => {
+                  const daysLeft =
+                    trashed && doc.deletedAt
+                      ? daysUntilTrashPurge(doc.deletedAt, tenant?.effectiveTrashRetentionDays ?? 30)
+                      : null;
+                  return (
                   <tr key={doc.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.has(doc.id) ? "bg-blue-50" : ""}`}>
                     <td className="px-4 py-3.5">
                       <input
@@ -1299,6 +1304,14 @@ export default function DocumentsPage() {
                             {doc.title || doc.originalFilename}
                           </Link>
                           <div className="flex items-center gap-1.5 mt-0.5">
+                            {daysLeft !== null && (
+                              <span
+                                className="text-xs text-red-500"
+                                title="Automatically deleted forever once the retention window elapses"
+                              >
+                                Purges in {daysLeft} {daysLeft === 1 ? "day" : "days"}
+                              </span>
+                            )}
                             {doc.correspondent && (
                               <span className="text-xs text-slate-400">{doc.correspondent.name}</span>
                             )}
@@ -1387,7 +1400,8 @@ export default function DocumentsPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

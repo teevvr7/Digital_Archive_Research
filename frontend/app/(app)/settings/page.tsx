@@ -90,6 +90,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("organisation");
 
   const [orgName, setOrgName] = useState("");
+  // Text, not number: empty string means "no override, use the default" —
+  // distinct from "0", which isn't a valid retention window anyway.
+  const [retentionDaysInput, setRetentionDaysInput] = useState("");
   const [orgSaving, setOrgSaving] = useState(false);
   const [orgSaved, setOrgSaved] = useState(false);
   const [orgError, setOrgError] = useState("");
@@ -112,7 +115,10 @@ export default function SettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (tenant) setOrgName(tenant.name);
+    if (tenant) {
+      setOrgName(tenant.name);
+      setRetentionDaysInput(tenant.trashRetentionDays?.toString() ?? "");
+    }
   }, [tenant]);
 
   useEffect(() => {
@@ -214,10 +220,16 @@ export default function SettingsPage() {
 
   const handleSaveOrg = async () => {
     if (!orgName.trim()) return;
+    const trimmedRetention = retentionDaysInput.trim();
+    const retentionDays = trimmedRetention === "" ? null : Number(trimmedRetention);
+    if (retentionDays !== null && (!Number.isInteger(retentionDays) || retentionDays < 1)) {
+      setOrgError("Trash retention must be a whole number of days (1 or more), or blank.");
+      return;
+    }
     setOrgSaving(true);
     setOrgError("");
     try {
-      await apiUpdateTenant(orgName.trim());
+      await apiUpdateTenant(orgName.trim(), retentionDays);
       await refresh();
       setOrgSaved(true);
       setTimeout(() => setOrgSaved(false), 2500);
@@ -300,6 +312,23 @@ export default function SettingsPage() {
                     <span className="inline-block px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold capitalize">
                       {tenant?.plan ?? "—"}
                     </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Trash retention (days)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={retentionDaysInput}
+                      onChange={(e) => setRetentionDaysInput(e.target.value)}
+                      placeholder={`Default: ${tenant?.effectiveTrashRetentionDays ?? 30}`}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">
+                      Documents in the trash longer than this are permanently deleted
+                      automatically. Leave blank to use the default.
+                    </p>
                   </div>
                   {orgError && <p className="text-sm text-red-600">{orgError}</p>}
                   <button

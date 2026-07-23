@@ -16,3 +16,15 @@ export function formatRelativeTime(isoString: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${Math.floor(diffHours / 24)}d ago`;
 }
+
+/**
+ * Days remaining before a trashed document is auto-purged, given when it was
+ * trashed and the tenant's effective retention window. Floored, never
+ * negative — a document past its window still shows 0 (auto-retention is
+ * opportunistic, not instant, so it can briefly still be visible after
+ * "0 days left" until the next check runs).
+ */
+export function daysUntilTrashPurge(deletedAtIso: string, retentionDays: number): number {
+  const daysSinceDeleted = (Date.now() - new Date(deletedAtIso).getTime()) / 86_400_000;
+  return Math.max(0, Math.ceil(retentionDays - daysSinceDeleted));
+}

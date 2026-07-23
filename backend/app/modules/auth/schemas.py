@@ -3,9 +3,10 @@
 import datetime
 import uuid
 
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from app.core.camel import CamelModel
+from app.core.config import settings
 from app.core.validation import EmailField
 
 
@@ -27,6 +28,22 @@ class TenantOut(CamelModel):
     storage_used_bytes: int
     storage_limit_bytes: int
     created_at: datetime.datetime
+    # NULL = no override; effective_trash_retention_days resolves the actual value.
+    trash_retention_days: int | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def effective_trash_retention_days(self) -> int:
+        """Resolved retention window: this tenant's override, or the global
+        default — mirrors ``files/retention.py::effective_retention_days``
+        (that one takes the ORM object; this takes the already-validated
+        pydantic field, so the one-line fallback is duplicated rather than
+        shared across the module boundary for a single ``or``)."""
+        return (
+            self.trash_retention_days
+            if self.trash_retention_days is not None
+            else settings.trash_retention_days_default
+        )
 
 
 class MeOut(CamelModel):
@@ -35,11 +52,11 @@ class MeOut(CamelModel):
 
 
 class TenantPatchIn(CamelModel):
-    """Editable organisation profile fields. Only ``name`` is real today —
-    no timezone/locale columns exist yet, so we don't fake fields that don't
-    persist anywhere."""
+    """Editable organisation profile fields."""
 
     name: str = Field(max_length=200)
+    # None clears the override (falls back to the global default).
+    trash_retention_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class InviteUserIn(CamelModel):

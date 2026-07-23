@@ -63,9 +63,7 @@ async def upload_documents(
     # Pad with "other" so every file has a type hint
     if len(types) < len(files):
         types += ["other"] * (len(files) - len(types))
-    return service.create_documents(
-        db, user, files, types, field_values, new_fields, attach_fields
-    )
+    return service.create_documents(db, user, files, types, field_values, new_fields, attach_fields)
 
 
 @router.get(
@@ -97,9 +95,10 @@ def list_documents(
     custom_field_date_from: datetime.date | None = None,
     custom_field_date_to: datetime.date | None = None,
 ) -> DocumentListOut:
-    db, _ = ctx
+    db, user = ctx
     return service.list_documents(
         db,
+        tenant_id=uuid.UUID(user.tenant_id),
         status_filter=status_q,
         type_filter=type_q,
         tag_id=tag_id,
@@ -242,9 +241,7 @@ def bulk_set_type(ctx: _DbCtx, body: BulkSetTypeIn) -> dict[str, int]:
     response_model_by_alias=True,
     summary="Update editable metadata (title, document_type, document_date)",
 )
-def patch_document(
-    ctx: _DbCtx, doc_id: uuid.UUID, patch: DocumentPatchIn
-) -> DocumentOut:
+def patch_document(ctx: _DbCtx, doc_id: uuid.UUID, patch: DocumentPatchIn) -> DocumentOut:
     db, user = ctx
     return service.patch_document(db, user, doc_id, patch)
 

@@ -3,7 +3,7 @@
 - ``list_activity`` — the paginated audit-trail read endpoint (org-wide feed for
   Settings, or scoped to one document for the detail page's History tab).
 - ``_mime_family`` — the mime-type bucketing used by the Settings storage widget.
-- ``update_tenant_name`` — the real (non-mock) organisation-rename service call.
+- ``update_tenant_settings`` — the real (non-mock) organisation settings service call.
 
 All I/O is mocked — no DB or Supabase, matching the rest of this module's tests.
 """
@@ -20,10 +20,10 @@ from app.modules.auth import service as auth_service
 from app.modules.files import service as files_service
 from app.modules.idp import mimetype
 
-
 # ---------------------------------------------------------------------------
 # list_activity
 # ---------------------------------------------------------------------------
+
 
 def _make_event(document_id: uuid.UUID | None = None) -> ActivityEvent:
     evt = MagicMock(spec=ActivityEvent)
@@ -88,6 +88,7 @@ class TestListActivity:
 # _mime_family — the Settings storage-breakdown bucketing
 # ---------------------------------------------------------------------------
 
+
 class TestMimeFamily:
     def test_pdf(self) -> None:
         assert files_service._mime_family(mimetype.MIME_PDF) == "pdf"
@@ -112,10 +113,11 @@ class TestMimeFamily:
 
 
 # ---------------------------------------------------------------------------
-# update_tenant_name
+# update_tenant_settings
 # ---------------------------------------------------------------------------
 
-class TestUpdateTenantName:
+
+class TestUpdateTenantSettings:
     def test_renames_tenant(self) -> None:
         db = MagicMock()
         tenant = MagicMock(spec=Tenant)
@@ -123,7 +125,7 @@ class TestUpdateTenantName:
         db.get.return_value = tenant
         tenant_id = uuid.uuid4()
 
-        result = auth_service.update_tenant_name(db, tenant_id, "New Name")
+        result = auth_service.update_tenant_settings(db, tenant_id, "New Name", None)
 
         assert tenant.name == "New Name"
         assert result is tenant
@@ -134,7 +136,7 @@ class TestUpdateTenantName:
         tenant = MagicMock(spec=Tenant)
         db.get.return_value = tenant
 
-        auth_service.update_tenant_name(db, uuid.uuid4(), "  Padded Name  ")
+        auth_service.update_tenant_settings(db, uuid.uuid4(), "  Padded Name  ", None)
 
         assert tenant.name == "Padded Name"
 
@@ -142,7 +144,7 @@ class TestUpdateTenantName:
         db = MagicMock()
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_service.update_tenant_name(db, uuid.uuid4(), "   ")
+            auth_service.update_tenant_settings(db, uuid.uuid4(), "   ", None)
 
         assert exc_info.value.status_code == 400
         db.get.assert_not_called()
@@ -152,6 +154,25 @@ class TestUpdateTenantName:
         db.get.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_service.update_tenant_name(db, uuid.uuid4(), "New Name")
+            auth_service.update_tenant_settings(db, uuid.uuid4(), "New Name", None)
 
         assert exc_info.value.status_code == 404
+
+    def test_sets_trash_retention_override(self) -> None:
+        db = MagicMock()
+        tenant = MagicMock(spec=Tenant)
+        db.get.return_value = tenant
+
+        auth_service.update_tenant_settings(db, uuid.uuid4(), "Name", 7)
+
+        assert tenant.trash_retention_days == 7
+
+    def test_none_clears_trash_retention_override(self) -> None:
+        db = MagicMock()
+        tenant = MagicMock(spec=Tenant)
+        tenant.trash_retention_days = 7
+        db.get.return_value = tenant
+
+        auth_service.update_tenant_settings(db, uuid.uuid4(), "Name", None)
+
+        assert tenant.trash_retention_days is None

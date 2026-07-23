@@ -36,6 +36,7 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.correspondent import Correspondent
 from app.models.tag import DocumentTag, Tag
+from app.modules.files import retention
 from app.modules.files.schemas import (
     ActivityListOut,
     ActivityOut,
@@ -93,9 +94,7 @@ def _names_for_ids(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str
     return {row.id: row.name for row in rows}
 
 
-def _fetch_tags_for_docs(
-    db: Session, doc_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, list[TagOut]]:
+def _fetch_tags_for_docs(db: Session, doc_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[TagOut]]:
     """Batch-fetch tag assignments for a list of doc IDs (single query, no N+1)."""
     if not doc_ids:
         return {}
@@ -119,9 +118,7 @@ def _fetch_correspondents_for_ids(
     if not correspondent_ids:
         return {}
     rows = db.execute(
-        select(Correspondent.id, Correspondent.name).where(
-            Correspondent.id.in_(correspondent_ids)
-        )
+        select(Correspondent.id, Correspondent.name).where(Correspondent.id.in_(correspondent_ids))
     ).all()
     return {row.id: CorrespondentOut(id=row.id, name=row.name) for row in rows}
 
@@ -184,11 +181,11 @@ def _apply_upload_time_fields(
                     if exc.status_code != status.HTTP_409_CONFLICT:
                         raise
                 if "value" in spec:
-                    set_field_value(db, tenant_id, doc.id, field_id, FieldValueIn(value=spec["value"]))
+                    set_field_value(
+                        db, tenant_id, doc.id, field_id, FieldValueIn(value=spec["value"])
+                    )
             except (HTTPException, KeyError, TypeError, ValueError) as exc:
-                logger.warning(
-                    "doc=%s: could not attach existing field %r: %s", doc.id, spec, exc
-                )
+                logger.warning("doc=%s: could not attach existing field %r: %s", doc.id, spec, exc)
 
     if new_fields_json:
         try:
@@ -218,9 +215,7 @@ def _apply_upload_time_fields(
                         db, tenant_id, doc.id, created.id, FieldValueIn(value=spec["value"])
                     )
             except (HTTPException, KeyError, TypeError) as exc:
-                logger.warning(
-                    "doc=%s: could not create ad-hoc field %r: %s", doc.id, spec, exc
-                )
+                logger.warning("doc=%s: could not create ad-hoc field %r: %s", doc.id, spec, exc)
 
     if field_values_json:
         try:
@@ -233,9 +228,7 @@ def _apply_upload_time_fields(
                 field_id = uuid.UUID(field_id_str)
                 set_field_value(db, tenant_id, doc.id, field_id, FieldValueIn(value=value))
             except (HTTPException, ValueError) as exc:
-                logger.warning(
-                    "doc=%s: could not set field %s: %s", doc.id, field_id_str, exc
-                )
+                logger.warning("doc=%s: could not set field %s: %s", doc.id, field_id_str, exc)
 
 
 def _doc_to_out(
@@ -365,15 +358,20 @@ def create_documents(
         if len(data) > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=(
-                    f"File '{upload.filename}' exceeds the {settings.max_upload_mb} MB limit."
-                ),
+                detail=(f"File '{upload.filename}' exceeds the {settings.max_upload_mb} MB limit."),
             )
         checksum = hashlib.sha256(data).hexdigest()
         validated.append(
             (
-                upload, type_hint, data, sniffed, ext, checksum,
-                field_values_json, new_fields_json, attach_fields_json,
+                upload,
+                type_hint,
+                data,
+                sniffed,
+                ext,
+                checksum,
+                field_values_json,
+                new_fields_json,
+                attach_fields_json,
             )
         )
 
@@ -395,8 +393,15 @@ def create_documents(
     deduped: list[tuple[UploadFile, str, bytes, str, str, str, str, str, str]] = []
     seen_in_batch: set[str] = set()
     for (
-        upload, type_hint, data, sniffed, ext, checksum,
-        field_values_json, new_fields_json, attach_fields_json,
+        upload,
+        type_hint,
+        data,
+        sniffed,
+        ext,
+        checksum,
+        field_values_json,
+        new_fields_json,
+        attach_fields_json,
     ) in validated:
         if checksum in existing_checksums or checksum in seen_in_batch:
             duplicates.append(upload.filename or "unnamed")
@@ -404,8 +409,15 @@ def create_documents(
         seen_in_batch.add(checksum)
         deduped.append(
             (
-                upload, type_hint, data, sniffed, ext, checksum,
-                field_values_json, new_fields_json, attach_fields_json,
+                upload,
+                type_hint,
+                data,
+                sniffed,
+                ext,
+                checksum,
+                field_values_json,
+                new_fields_json,
+                attach_fields_json,
             )
         )
 
@@ -416,8 +428,15 @@ def create_documents(
     total_size = 0
 
     for (
-        upload, type_hint, data, sniffed, ext, checksum,
-        field_values_json, new_fields_json, attach_fields_json,
+        upload,
+        type_hint,
+        data,
+        sniffed,
+        ext,
+        checksum,
+        field_values_json,
+        new_fields_json,
+        attach_fields_json,
     ) in deduped:
         doc_id = uuid.uuid4()
         safe_name = upload.filename or f"document_{doc_id}.{ext}"
@@ -446,19 +465,23 @@ def create_documents(
             db, tenant_id, doc, field_values_json, new_fields_json, attach_fields_json
         )
 
-        db.add(ProcessingJob(
-            tenant_id=tenant_id,
-            document_id=doc.id,
-            status=JOB_QUEUED,
-        ))
-        db.add(ActivityEvent(
-            tenant_id=tenant_id,
-            type=ACT_UPLOAD,
-            document_id=doc.id,
-            document_name=safe_name,
-            user_id=uploader_id,
-            user_name=uploader_name,
-        ))
+        db.add(
+            ProcessingJob(
+                tenant_id=tenant_id,
+                document_id=doc.id,
+                status=JOB_QUEUED,
+            )
+        )
+        db.add(
+            ActivityEvent(
+                tenant_id=tenant_id,
+                type=ACT_UPLOAD,
+                document_id=doc.id,
+                document_name=safe_name,
+                user_id=uploader_id,
+                user_name=uploader_name,
+            )
+        )
         created.append(doc)
 
     if total_size > 0:
@@ -561,9 +584,11 @@ def build_document_query(
         stmt = stmt.where(Document.vendor.ilike(f"%{vendor}%"))
     if inbox:
         # Subquery avoids join conflict with tag_id filter
-        inbox_subq = select(DocumentTag.document_id).join(
-            Tag, Tag.id == DocumentTag.tag_id
-        ).where(Tag.is_inbox_tag.is_(True))
+        inbox_subq = (
+            select(DocumentTag.document_id)
+            .join(Tag, Tag.id == DocumentTag.tag_id)
+            .where(Tag.is_inbox_tag.is_(True))
+        )
         stmt = stmt.where(Document.id.in_(inbox_subq))
     if custom_field_id is not None:
         # JSONB values need the Postgres "as text" extraction (#>>'{}') before
@@ -618,6 +643,7 @@ def build_document_query(
 def list_documents(
     db: Session,
     *,
+    tenant_id: uuid.UUID | None = None,
     status_filter: str | None = None,
     type_filter: str | None = None,
     tag_id: uuid.UUID | None = None,
@@ -644,7 +670,14 @@ def list_documents(
     RLS automatically scopes the query to the tenant set by the GUC.
     By default only live (non-trashed) documents are returned; pass
     ``trashed=True`` to list the trash instead.
+
+    Viewing the trash is also the opportunistic trigger point for auto-
+    retention (see ``files/retention.py`` — rate-limited to ~once/day, so this
+    is a no-op on almost every call).
     """
+    if trashed and tenant_id is not None:
+        retention.maybe_purge_expired_trash(db, tenant_id)
+
     stmt, rank_order = build_document_query(
         status_filter=status_filter,
         type_filter=type_filter,
@@ -736,14 +769,16 @@ def get_download_url(db: Session, user: TokenData, doc_id: uuid.UUID) -> str:
     url = object_storage.create_signed_url(doc.storage_key)
 
     downloader_id = uuid.UUID(user.user_id)
-    db.add(ActivityEvent(
-        tenant_id=doc.tenant_id,
-        type=ACT_DOWNLOAD,
-        document_id=doc.id,
-        document_name=doc.original_filename,
-        user_id=downloader_id,
-        user_name=_user_name(db, downloader_id),
-    ))
+    db.add(
+        ActivityEvent(
+            tenant_id=doc.tenant_id,
+            type=ACT_DOWNLOAD,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=downloader_id,
+            user_name=_user_name(db, downloader_id),
+        )
+    )
     db.flush()
     return url
 
@@ -798,14 +833,16 @@ def patch_document(
         doc.extracted_data = merged
 
     editor_id = uuid.UUID(user.user_id)
-    db.add(ActivityEvent(
-        tenant_id=doc.tenant_id,
-        type=ACT_EDIT,
-        document_id=doc.id,
-        document_name=doc.original_filename,
-        user_id=editor_id,
-        user_name=_user_name(db, editor_id),
-    ))
+    db.add(
+        ActivityEvent(
+            tenant_id=doc.tenant_id,
+            type=ACT_EDIT,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=editor_id,
+            user_name=_user_name(db, editor_id),
+        )
+    )
     db.flush()
     tags_map = _fetch_tags_for_docs(db, [doc.id])
     corresp: CorrespondentOut | None = None
@@ -836,14 +873,16 @@ def trash_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> DocumentO
     doc.deleted_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
     actor_id = uuid.UUID(user.user_id)
-    db.add(ActivityEvent(
-        tenant_id=doc.tenant_id,
-        type=ACT_TRASH,
-        document_id=doc.id,
-        document_name=doc.original_filename,
-        user_id=actor_id,
-        user_name=_user_name(db, actor_id),
-    ))
+    db.add(
+        ActivityEvent(
+            tenant_id=doc.tenant_id,
+            type=ACT_TRASH,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=actor_id,
+            user_name=_user_name(db, actor_id),
+        )
+    )
     db.flush()
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))  # no tag refresh needed for trash
 
@@ -862,14 +901,16 @@ def restore_document(db: Session, user: TokenData, doc_id: uuid.UUID) -> Documen
     doc.deleted_at = None
 
     actor_id = uuid.UUID(user.user_id)
-    db.add(ActivityEvent(
-        tenant_id=doc.tenant_id,
-        type=ACT_RESTORE,
-        document_id=doc.id,
-        document_name=doc.original_filename,
-        user_id=actor_id,
-        user_name=_user_name(db, actor_id),
-    ))
+    db.add(
+        ActivityEvent(
+            tenant_id=doc.tenant_id,
+            type=ACT_RESTORE,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=actor_id,
+            user_name=_user_name(db, actor_id),
+        )
+    )
     db.flush()
     return _doc_to_out(doc, _user_name(db, doc.uploaded_by))
 
@@ -885,7 +926,9 @@ def permanent_delete_document(db: Session, user: TokenData, doc_id: uuid.UUID) -
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     if doc.deleted_at is None:
-        raise HTTPException(status_code=409, detail="Document must be trashed before it can be permanently deleted.")
+        raise HTTPException(
+            status_code=409, detail="Document must be trashed before it can be permanently deleted."
+        )
 
     for key in filter(None, [doc.storage_key, doc.thumbnail_key]):
         try:
@@ -896,14 +939,16 @@ def permanent_delete_document(db: Session, user: TokenData, doc_id: uuid.UUID) -
     tenant_id = doc.tenant_id
     size_bytes = doc.size_bytes
     actor_id = uuid.UUID(user.user_id)
-    db.add(ActivityEvent(
-        tenant_id=tenant_id,
-        type=ACT_PERMANENT_DELETE,
-        document_id=doc.id,
-        document_name=doc.original_filename,
-        user_id=actor_id,
-        user_name=_user_name(db, actor_id),
-    ))
+    db.add(
+        ActivityEvent(
+            tenant_id=tenant_id,
+            type=ACT_PERMANENT_DELETE,
+            document_id=doc.id,
+            document_name=doc.original_filename,
+            user_id=actor_id,
+            user_name=_user_name(db, actor_id),
+        )
+    )
     db.delete(doc)
 
     if size_bytes > 0:
@@ -922,9 +967,7 @@ def empty_trash(db: Session, user: TokenData) -> int:
     swallowed so a single orphaned object can't block the whole operation.
     Returns the number of documents permanently deleted.
     """
-    rows = db.scalars(
-        select(Document).where(Document.deleted_at.is_not(None))
-    ).all()
+    rows = db.scalars(select(Document).where(Document.deleted_at.is_not(None))).all()
 
     tenant_id = None
     freed_bytes = 0
@@ -1011,9 +1054,7 @@ def extract_missing(db: Session) -> int:
 # ---------------------------------------------------------------------------
 
 
-def bulk_trash(
-    db: Session, user: TokenData, document_ids: list[uuid.UUID]
-) -> int:
+def bulk_trash(db: Session, user: TokenData, document_ids: list[uuid.UUID]) -> int:
     """Soft-delete multiple live documents in one call. Returns count trashed."""
     if not document_ids:
         return 0
@@ -1028,14 +1069,16 @@ def bulk_trash(
     actor_name = _user_name(db, actor_id)
     for doc in rows:
         doc.deleted_at = now
-        db.add(ActivityEvent(
-            tenant_id=doc.tenant_id,
-            type=ACT_TRASH,
-            document_id=doc.id,
-            document_name=doc.original_filename,
-            user_id=actor_id,
-            user_name=actor_name,
-        ))
+        db.add(
+            ActivityEvent(
+                tenant_id=doc.tenant_id,
+                type=ACT_TRASH,
+                document_id=doc.id,
+                document_name=doc.original_filename,
+                user_id=actor_id,
+                user_name=actor_name,
+            )
+        )
     db.flush()
     return len(rows)
 
@@ -1053,12 +1096,16 @@ def bulk_tag_assign(
     if tag is None:
         raise HTTPException(status_code=404, detail="Tag not found.")
     for doc_id in document_ids:
-        stmt = pg_insert(DocumentTag).values(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            document_id=doc_id,
-            tag_id=tag_id,
-        ).on_conflict_do_nothing(index_elements=["document_id", "tag_id"])
+        stmt = (
+            pg_insert(DocumentTag)
+            .values(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                document_id=doc_id,
+                tag_id=tag_id,
+            )
+            .on_conflict_do_nothing(index_elements=["document_id", "tag_id"])
+        )
         db.execute(stmt)
     db.flush()
     return len(document_ids)
@@ -1091,9 +1138,7 @@ def bulk_set_type(
     if not document_ids:
         return 0
     result = db.execute(
-        update(Document)
-        .where(Document.id.in_(document_ids))
-        .values(document_type=document_type)
+        update(Document).where(Document.id.in_(document_ids)).values(document_type=document_type)
     )
     db.flush()
     return result.rowcount
@@ -1173,13 +1218,10 @@ def get_dashboard(db: Session) -> DashboardOut:
     storage_limit = int(tenant_row[1]) if tenant_row else Tenant.storage_limit_bytes.default.arg  # type: ignore[union-attr]
 
     # Recent 5 documents
-    recent_docs = db.scalars(
-        select(Document).order_by(Document.uploaded_at.desc()).limit(5)
-    ).all()
+    recent_docs = db.scalars(select(Document).order_by(Document.uploaded_at.desc()).limit(5)).all()
     names = _names_for_ids(db, {doc.uploaded_by for doc in recent_docs})
     recent_out = [
-        _doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by)))
-        for doc in recent_docs
+        _doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by))) for doc in recent_docs
     ]
 
     # Latest 6 activity events

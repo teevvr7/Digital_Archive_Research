@@ -30,6 +30,10 @@ export interface AuthTenant {
   storageUsedBytes: number;
   storageLimitBytes: number;
   createdAt: string;
+  /** This tenant's trash-retention override in days, or null to use the default. */
+  trashRetentionDays: number | null;
+  /** Resolved retention window (the override, or the global default) — use this for countdowns. */
+  effectiveTrashRetentionDays: number;
 }
 
 export interface DashboardStats {
@@ -260,9 +264,13 @@ export const apiSearch = (query: SearchQuery) => {
 
 // ---- Settings --------------------------------------------------------------
 
-/** Rename the organisation. Admin-only (backend enforces via require_admin). */
-export const apiUpdateTenant = (name: string) =>
-  patch_<AuthTenant>("/auth/tenant", { name });
+/**
+ * Update organisation settings (name, trash-retention override). Admin-only
+ * (backend enforces via require_admin). Pass `trashRetentionDays: null` to
+ * clear the override and fall back to the global default.
+ */
+export const apiUpdateTenant = (name: string, trashRetentionDays: number | null) =>
+  patch_<AuthTenant>("/auth/tenant", { name, trashRetentionDays });
 
 // ---- Team / users (Level 4) ------------------------------------------------
 

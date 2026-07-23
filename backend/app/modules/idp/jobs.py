@@ -102,9 +102,7 @@ def _attach_thumbnail(db, doc: Document, file_bytes: bytes) -> None:
         logger.warning("Thumbnail generation crashed (doc=%s): %s", doc.id, exc)
 
 
-def _apply_auto_title_and_duplicate_check(
-    db, doc: Document, tenant_uuid: uuid.UUID
-) -> None:
+def _apply_auto_title_and_duplicate_check(db, doc: Document, tenant_uuid: uuid.UUID) -> None:
     """Sets an auto-generated title (``"{vendor} — {invoiceNo}"``) and flags a
     possible duplicate invoice. Both advisory, never blocking — CLAUDE.md:
     ingestion must never block, a resubmitted/corrected invoice must still
@@ -131,18 +129,23 @@ def _apply_auto_title_and_duplicate_check(
     ).first()
     if existing_id is not None:
         doc.duplicate_of_document_id = existing_id
-        db.add(ActivityEvent(
-            tenant_id=tenant_uuid,
-            type=ACT_DUPLICATE_DETECTED,
-            document_id=doc.id,
-            document_name=doc.original_filename,
-            user_id=None,
-            user_name="system",
-            meta=f"Same vendor ({doc.vendor}) and invoice number ({doc.invoice_no}) as an existing document",
-        ))
+        db.add(
+            ActivityEvent(
+                tenant_id=tenant_uuid,
+                type=ACT_DUPLICATE_DETECTED,
+                document_id=doc.id,
+                document_name=doc.original_filename,
+                user_id=None,
+                user_name="system",
+                meta=f"Same vendor ({doc.vendor}) and invoice number ({doc.invoice_no}) as an existing document",
+            )
+        )
         logger.info(
             "Possible duplicate invoice: doc=%s matches existing doc=%s (vendor=%r invoice_no=%r)",
-            doc.id, existing_id, doc.vendor, doc.invoice_no,
+            doc.id,
+            existing_id,
+            doc.vendor,
+            doc.invoice_no,
         )
 
 
@@ -168,11 +171,20 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             # Row not visible yet (upload→commit race) — raise so RQ retries.
             raise LookupError(f"Document {doc_id} not found under tenant {tenant_id}")
 
-        job = db.scalars(
-            select(ProcessingJob).where(ProcessingJob.document_id == doc_uuid)
-        ).first()
+        job = db.scalars(select(ProcessingJob).where(ProcessingJob.document_id == doc_uuid)).first()
         if job is None:
             raise LookupError(f"ProcessingJob for document {doc_id} not found")
+
+        # Opportunistic trash auto-retention (see files/retention.py) — this
+        # tenant's own document-processing jobs are one of the two places that
+        # already run inside its RLS-scoped session, so it costs nothing extra
+        # to check here. Rate-limited to ~once/day; a no-op almost every call.
+        try:
+            from app.modules.files import retention
+
+            retention.maybe_purge_expired_trash(db, tenant_uuid)
+        except Exception as _exc:
+            logger.warning("Trash auto-retention check crashed (tenant=%s): %s", tenant_id, _exc)
 
         # --- Mark running ---
         job.status = JOB_RUNNING
@@ -216,15 +228,21 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                 if candidate is not None:
                     extraction_attempted = True
                     gate_result = gate.score_extraction(candidate, result.ocr_confidence)
-                    db.add(Extraction(
-                        tenant_id=tenant_uuid,
-                        document_id=doc_uuid,
-                        method=METHOD_DETERMINISTIC,
-                        model_name=None,
-                        output=candidate.to_fields(),
-                        confidence=gate_result.score,
-                        status=EXTRACTION_ACCEPTED if gate_result.passed else EXTRACTION_LOW_CONFIDENCE,
-                    ))
+                    db.add(
+                        Extraction(
+                            tenant_id=tenant_uuid,
+                            document_id=doc_uuid,
+                            method=METHOD_DETERMINISTIC,
+                            model_name=None,
+                            output=candidate.to_fields(),
+                            confidence=gate_result.score,
+                            status=(
+                                EXTRACTION_ACCEPTED
+                                if gate_result.passed
+                                else EXTRACTION_LOW_CONFIDENCE
+                            ),
+                        )
+                    )
                     if gate_result.passed:
                         doc.extracted_data = candidate.to_fields()
                         doc.confidence = gate_result.score
@@ -237,12 +255,17 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                         deterministic_accepted = True
                         logger.info(
                             "Deterministic extraction accepted: doc=%s type=%s score=%.2f",
-                            doc_id, candidate.document_type, gate_result.score,
+                            doc_id,
+                            candidate.document_type,
+                            gate_result.score,
                         )
                     else:
                         logger.info(
                             "Deterministic extraction gate-failed: doc=%s type=%s score=%.2f breakdown=%s",
-                            doc_id, candidate.document_type, gate_result.score, gate_result.breakdown,
+                            doc_id,
+                            candidate.document_type,
+                            gate_result.score,
+                            gate_result.breakdown,
                         )
 
                 # VLM fallback is vision-based (page images) — never applies to
@@ -261,20 +284,29 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                         if not ai_budget.llm_allowed(db, tenant_uuid):
                             logger.warning(
                                 "LLM monthly token budget exceeded for tenant=%s — skipping VLM extraction (doc=%s)",
-                                tenant_id, doc_id,
+                                tenant_id,
+                                doc_id,
                             )
-                            db.add(Extraction(
-                                tenant_id=tenant_uuid,
-                                document_id=doc_uuid,
-                                method=METHOD_VLM,
-                                model_name=settings.vlm_model or None,
-                                output={"_error": "monthly LLM token budget exceeded", "_mode": "budget_blocked"},
-                                confidence=None,
-                                status=EXTRACTION_SKIPPED_BUDGET,
-                            ))
+                            db.add(
+                                Extraction(
+                                    tenant_id=tenant_uuid,
+                                    document_id=doc_uuid,
+                                    method=METHOD_VLM,
+                                    model_name=settings.vlm_model or None,
+                                    output={
+                                        "_error": "monthly LLM token budget exceeded",
+                                        "_mode": "budget_blocked",
+                                    },
+                                    confidence=None,
+                                    status=EXTRACTION_SKIPPED_BUDGET,
+                                )
+                            )
                         else:
                             outcome = run_ai_extraction(
-                                file_bytes, doc.mime_type, result.text or None, result.has_text_layer
+                                file_bytes,
+                                doc.mime_type,
+                                result.text or None,
+                                result.has_text_layer,
                             )
                             if outcome.total_tokens:
                                 ai_budget.record_ai_usage(
@@ -302,52 +334,69 @@ def process_document(doc_id: str, tenant_id: str) -> None:
                                     else EXTRACTION_LOW_CONFIDENCE
                                 )
                                 vlm_accepted = ext_status == EXTRACTION_ACCEPTED
-                                db.add(Extraction(
-                                    tenant_id=tenant_uuid,
-                                    document_id=doc_uuid,
-                                    method=METHOD_VLM,
-                                    model_name=ai.model_name,
-                                    output=ai.fields,
-                                    confidence=ai.confidence,
-                                    status=ext_status,
-                                ))
+                                db.add(
+                                    Extraction(
+                                        tenant_id=tenant_uuid,
+                                        document_id=doc_uuid,
+                                        method=METHOD_VLM,
+                                        model_name=ai.model_name,
+                                        output=ai.fields,
+                                        confidence=ai.confidence,
+                                        status=ext_status,
+                                    )
+                                )
                                 logger.info(
                                     "AI extraction persisted: doc=%s mode=%s type=%s confidence=%.2f status=%s",
-                                    doc_id, outcome.mode, ai.document_type, ai.confidence, ext_status,
+                                    doc_id,
+                                    outcome.mode,
+                                    ai.document_type,
+                                    ai.confidence,
+                                    ext_status,
                                 )
                             elif outcome.error:
                                 # Failure (not a clean skip) — record the reason for the audit trail.
                                 logger.warning(
                                     "AI extraction produced no data (doc=%s mode=%s): %s",
-                                    doc_id, outcome.mode, outcome.error,
+                                    doc_id,
+                                    outcome.mode,
+                                    outcome.error,
                                 )
-                                db.add(Extraction(
-                                    tenant_id=tenant_uuid,
-                                    document_id=doc_uuid,
-                                    method=METHOD_VLM,
-                                    model_name=settings.vlm_model or None,
-                                    output={"_error": outcome.error, "_mode": outcome.mode},
-                                    confidence=None,
-                                    status=EXTRACTION_LOW_CONFIDENCE,
-                                ))
+                                db.add(
+                                    Extraction(
+                                        tenant_id=tenant_uuid,
+                                        document_id=doc_uuid,
+                                        method=METHOD_VLM,
+                                        model_name=settings.vlm_model or None,
+                                        output={"_error": outcome.error, "_mode": outcome.mode},
+                                        confidence=None,
+                                        status=EXTRACTION_LOW_CONFIDENCE,
+                                    )
+                                )
                     except Exception as exc:
                         logger.warning(
                             "AI extraction crashed (doc=%s) — document will complete without structured data: %s",
-                            doc_id, exc,
+                            doc_id,
+                            exc,
                         )
-                        db.add(Extraction(
-                            tenant_id=tenant_uuid,
-                            document_id=doc_uuid,
-                            method=METHOD_VLM,
-                            model_name=settings.vlm_model or None,
-                            output={"_error": f"{type(exc).__name__}: {exc}"[:500], "_mode": "crash"},
-                            confidence=None,
-                            status=EXTRACTION_LOW_CONFIDENCE,
-                        ))
+                        db.add(
+                            Extraction(
+                                tenant_id=tenant_uuid,
+                                document_id=doc_uuid,
+                                method=METHOD_VLM,
+                                model_name=settings.vlm_model or None,
+                                output={
+                                    "_error": f"{type(exc).__name__}: {exc}"[:500],
+                                    "_mode": "crash",
+                                },
+                                confidence=None,
+                                status=EXTRACTION_LOW_CONFIDENCE,
+                            )
+                        )
                 elif not extraction_attempted:
                     logger.debug(
                         "Structured extraction skipped (doc=%s mime=%s) — content doesn't look like an invoice/receipt",
-                        doc_id, doc.mime_type,
+                        doc_id,
+                        doc.mime_type,
                     )
                 elif not deterministic_accepted:
                     logger.info(
@@ -357,7 +406,8 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             else:
                 logger.debug(
                     "Structured extraction skipped (doc=%s mime=%s) — not a structured-extraction candidate type",
-                    doc_id, doc.mime_type,
+                    doc_id,
+                    doc.mime_type,
                 )
 
             needs_review = extraction_attempted and not deterministic_accepted and not vlm_accepted
@@ -389,6 +439,7 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             # Auto-tag + auto-link correspondent (deterministic, never raises).
             try:
                 from app.modules.tags.matching import run_document_matching
+
                 run_document_matching(db, doc, result.text or "")
             except Exception as _exc:
                 logger.warning("Auto-matching crashed (doc=%s): %s", doc_id, _exc)
@@ -399,14 +450,16 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             job.finished_at = now
             job.duration_ms = duration_ms
 
-            db.add(ActivityEvent(
-                tenant_id=tenant_uuid,
-                type=ACT_PROCESSING_COMPLETE,
-                document_id=doc_uuid,
-                document_name=doc.original_filename,
-                user_id=None,
-                user_name="system",
-            ))
+            db.add(
+                ActivityEvent(
+                    tenant_id=tenant_uuid,
+                    type=ACT_PROCESSING_COMPLETE,
+                    document_id=doc_uuid,
+                    document_name=doc.original_filename,
+                    user_id=None,
+                    user_name="system",
+                )
+            )
 
             logger.info(
                 "IDP complete: doc=%s duration=%dms ocr=%s pages=%d chars=%d",
@@ -430,15 +483,17 @@ def process_document(doc_id: str, tenant_id: str) -> None:
             job.duration_ms = duration_ms
             job.error = error_msg[:2000]
 
-            db.add(ActivityEvent(
-                tenant_id=tenant_uuid,
-                type=ACT_PROCESSING_FAILED,
-                document_id=doc_uuid,
-                document_name=doc.original_filename,
-                user_id=None,
-                user_name="system",
-                meta=error_msg[:500],
-            ))
+            db.add(
+                ActivityEvent(
+                    tenant_id=tenant_uuid,
+                    type=ACT_PROCESSING_FAILED,
+                    document_id=doc_uuid,
+                    document_name=doc.original_filename,
+                    user_id=None,
+                    user_name="system",
+                    meta=error_msg[:500],
+                )
+            )
 
             logger.error("IDP failed: doc=%s error=%s", doc_id, error_msg)
             raise  # let RQ record the failure and schedule a retry
@@ -470,7 +525,8 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
         if doc.mime_type not in _VLM_ELIGIBLE_MIMES:
             logger.info(
                 "AI re-extract skipped (doc=%s mime=%s) — not a structured-extraction candidate",
-                doc_id, doc.mime_type,
+                doc_id,
+                doc.mime_type,
             )
             return
 
@@ -478,17 +534,23 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
             if not ai_budget.llm_allowed(db, doc.tenant_id):
                 logger.warning(
                     "LLM monthly token budget exceeded for tenant=%s — skipping AI re-extract (doc=%s)",
-                    doc.tenant_id, doc_id,
+                    doc.tenant_id,
+                    doc_id,
                 )
-                db.add(Extraction(
-                    tenant_id=doc.tenant_id,
-                    document_id=doc_uuid,
-                    method=METHOD_VLM,
-                    model_name=settings.vlm_model or None,
-                    output={"_error": "monthly LLM token budget exceeded", "_mode": "budget_blocked"},
-                    confidence=None,
-                    status=EXTRACTION_SKIPPED_BUDGET,
-                ))
+                db.add(
+                    Extraction(
+                        tenant_id=doc.tenant_id,
+                        document_id=doc_uuid,
+                        method=METHOD_VLM,
+                        model_name=settings.vlm_model or None,
+                        output={
+                            "_error": "monthly LLM token budget exceeded",
+                            "_mode": "budget_blocked",
+                        },
+                        confidence=None,
+                        status=EXTRACTION_SKIPPED_BUDGET,
+                    )
+                )
                 return
 
             file_bytes = object_storage.download_file(doc.storage_key)
@@ -523,15 +585,17 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
                 # A manual re-extraction that succeeds resolves a needs_review flag.
                 if ext_status == EXTRACTION_ACCEPTED and doc.status == STATUS_NEEDS_REVIEW:
                     doc.status = STATUS_COMPLETED
-                db.add(Extraction(
-                    tenant_id=doc.tenant_id,
-                    document_id=doc_uuid,
-                    method=METHOD_VLM,
-                    model_name=ai.model_name,
-                    output=ai.fields,
-                    confidence=ai.confidence,
-                    status=ext_status,
-                ))
+                db.add(
+                    Extraction(
+                        tenant_id=doc.tenant_id,
+                        document_id=doc_uuid,
+                        method=METHOD_VLM,
+                        model_name=ai.model_name,
+                        output=ai.fields,
+                        confidence=ai.confidence,
+                        status=ext_status,
+                    )
+                )
                 logger.info(
                     "AI re-extract complete: doc=%s mode=%s type=%s confidence=%.2f duration=%dms",
                     doc_id,
@@ -541,26 +605,35 @@ def ai_extract_document(doc_id: str, tenant_id: str) -> None:
                     int((time.perf_counter() - t_start) * 1000),
                 )
             elif outcome.error:
-                logger.warning("AI re-extract no data: doc=%s mode=%s error=%s", doc_id, outcome.mode, outcome.error)
-                db.add(Extraction(
-                    tenant_id=doc.tenant_id,
-                    document_id=doc_uuid,
-                    method=METHOD_VLM,
-                    model_name=settings.vlm_model or None,
-                    output={"_error": outcome.error, "_mode": outcome.mode},
-                    confidence=None,
-                    status=EXTRACTION_LOW_CONFIDENCE,
-                ))
+                logger.warning(
+                    "AI re-extract no data: doc=%s mode=%s error=%s",
+                    doc_id,
+                    outcome.mode,
+                    outcome.error,
+                )
+                db.add(
+                    Extraction(
+                        tenant_id=doc.tenant_id,
+                        document_id=doc_uuid,
+                        method=METHOD_VLM,
+                        model_name=settings.vlm_model or None,
+                        output={"_error": outcome.error, "_mode": outcome.mode},
+                        confidence=None,
+                        status=EXTRACTION_LOW_CONFIDENCE,
+                    )
+                )
             else:
                 logger.info("AI re-extract skipped (no endpoint): doc=%s", doc_id)
         except Exception as exc:
             logger.warning("AI re-extract crashed: doc=%s error=%s", doc_id, exc)
-            db.add(Extraction(
-                tenant_id=doc.tenant_id,
-                document_id=doc_uuid,
-                method=METHOD_VLM,
-                model_name=settings.vlm_model or None,
-                output={"_error": f"{type(exc).__name__}: {exc}"[:500], "_mode": "crash"},
-                confidence=None,
-                status=EXTRACTION_LOW_CONFIDENCE,
-            ))
+            db.add(
+                Extraction(
+                    tenant_id=doc.tenant_id,
+                    document_id=doc_uuid,
+                    method=METHOD_VLM,
+                    model_name=settings.vlm_model or None,
+                    output={"_error": f"{type(exc).__name__}: {exc}"[:500], "_mode": "crash"},
+                    confidence=None,
+                    status=EXTRACTION_LOW_CONFIDENCE,
+                )
+            )

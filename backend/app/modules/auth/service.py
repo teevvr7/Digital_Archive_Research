@@ -108,9 +108,7 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             # populated at flush — too late for the WITH CHECK.)
             new_tenant_id = uuid.uuid4()
             set_tenant(db, str(new_tenant_id))
-            tenant = Tenant(
-                id=new_tenant_id, name=_derive_tenant_name(token.email), plan="starter"
-            )
+            tenant = Tenant(id=new_tenant_id, name=_derive_tenant_name(token.email), plan="starter")
             db.add(tenant)
             db.flush()
             _seed_starter_tags(db, tenant.id)
@@ -173,9 +171,13 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
         db.close()
 
 
-def update_tenant_name(db: Session, tenant_id: uuid.UUID, name: str) -> Tenant:
-    """Rename the current tenant. Runs under the normal RLS-scoped session
-    (unlike ``bootstrap``, the tenant row is guaranteed to already exist)."""
+def update_tenant_settings(
+    db: Session, tenant_id: uuid.UUID, name: str, trash_retention_days: int | None
+) -> Tenant:
+    """Update editable organisation settings. Runs under the normal RLS-scoped
+    session (unlike ``bootstrap``, the tenant row is guaranteed to already
+    exist). ``trash_retention_days=None`` clears the override (falls back to
+    ``settings.trash_retention_days_default`` — see files/retention.py)."""
     name = name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Organisation name cannot be empty.")
@@ -183,6 +185,7 @@ def update_tenant_name(db: Session, tenant_id: uuid.UUID, name: str) -> Tenant:
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant not found.")
     tenant.name = name
+    tenant.trash_retention_days = trash_retention_days
     db.flush()
     db.refresh(tenant)
     return tenant
@@ -202,9 +205,7 @@ def _actor_name(db: Session, actor: TokenData) -> str:
 def list_users(db: Session, tenant_id: uuid.UUID) -> list[User]:
     """All members of the current tenant, oldest first."""
     return list(
-        db.scalars(
-            select(User).where(User.tenant_id == tenant_id).order_by(User.created_at.asc())
-        )
+        db.scalars(select(User).where(User.tenant_id == tenant_id).order_by(User.created_at.asc()))
     )
 
 
@@ -285,11 +286,7 @@ def invite_user(
 
 def _admin_count(db: Session, tenant_id: uuid.UUID) -> int:
     return len(
-        list(
-            db.scalars(
-                select(User.id).where(User.tenant_id == tenant_id, User.role == "admin")
-            )
-        )
+        list(db.scalars(select(User.id).where(User.tenant_id == tenant_id, User.role == "admin")))
     )
 
 

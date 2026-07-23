@@ -97,9 +97,13 @@ def update_tenant(
     patch: schemas.TenantPatchIn,
     ctx: tuple[Session, TokenData] = Depends(require_admin),
 ):
-    """Rename the organisation. Admin-only (Settings > Organisation)."""
+    """Update organisation settings (name, trash retention).
+
+    Admin-only (Settings > Organisation)."""
     db, user = ctx
-    tenant = service.update_tenant_name(db, uuid.UUID(user.tenant_id), patch.name)
+    tenant = service.update_tenant_settings(
+        db, uuid.UUID(user.tenant_id), patch.name, patch.trash_retention_days
+    )
     return schemas.TenantOut.model_validate(tenant)
 
 
