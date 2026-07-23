@@ -89,6 +89,21 @@ uploading or visiting their trash isn't generating new storage cost either.
 
 ## Next
 
-12 commits from 07-20/07-21/07-22 plus this feature now sit locally on `mvp3-prod`. Still not
-pushed. Two Level 5 items remain unstarted (email-in ingestion, Malay FTS config); the
-detail-page race condition and a real worker-processing pass are still outstanding from 07-21.
+13 commits from 07-20 through this feature now sit locally on `mvp3-prod` (`1e2ec7f`), still not
+pushed to `origin`. Remaining work, by thread:
+
+- **Security roadmap** (Phase 1 + the search-XSS fix done 07-22/07-23): Phase 2 remainder (safe
+  inline-download `Content-Disposition` for SVG/HTML), the deferred frontend CSP, Phase 3
+  (Supabase dashboard password/MFA settings), Phase 4 (audit-trail + regression tests,
+  `SECURITY.md`), Phase 5 (cookie-based auth, PDPA tooling — only if/when needed).
+- **Carried over from the UX pass (07-20/21)**: the detail-page race condition on
+  `documents/[id]/page.tsx` (same pattern already fixed on the list page, not yet fixed here); a
+  real worker-processing pass (the IDP worker hasn't run this session); test-coverage gaps
+  (`/search`, Dashboard, Saved Views, Correspondents, Settings' stub tabs, detail-page tabs,
+  team-invite email flow, MyInvois ingestion — only 4 E2E specs exist).
+- **Trash auto-retention follow-ups** (this feature): no live browser click-through was done yet
+  — worth a manual end-to-end pass before relying on it in front of a real user; the grid view's
+  `DocCard` doesn't show the retention countdown (table view only).
+- **Level 5**: 2 of 7 SME features remain unstarted — email-in ingestion, Malay FTS config.
+- **Level 2** (paddle_qwen IDP port): still blocked on the user's Lightning AI endpoint + license
+  check.
