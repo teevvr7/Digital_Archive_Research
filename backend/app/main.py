@@ -1,7 +1,9 @@
 """FastAPI application entrypoint."""
 
-from fastapi import FastAPI
+import sentry_sdk
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -9,6 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.core.config import settings
 from app.core.monitoring import init_sentry
 from app.core.rate_limit import limiter
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.correspondents.router import router as correspondents_router
 from app.modules.export.router import router as export_router
@@ -24,12 +27,16 @@ from app.modules.views.router import router as views_router
 # Must run before the app is constructed so startup errors are also captured.
 init_sentry("api")
 
+_is_prod = settings.env == "production"
+
 app = FastAPI(
     title="DataWiz Digital Archive API",
     version="0.1.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    # The full API surface (incl. schemas) shouldn't be publicly enumerable in
+    # production; Swagger/ReDoc/the raw OpenAPI doc stay dev-only.
+    docs_url=None if _is_prod else "/api/docs",
+    redoc_url=None if _is_prod else "/api/redoc",
+    openapi_url=None if _is_prod else "/api/openapi.json",
 )
 
 # ---- Rate limiting (targeted — see core/rate_limit.py) ----
@@ -49,6 +56,23 @@ app.add_middleware(
     # and detect the row-cap — browsers hide custom headers by default.
     expose_headers=["Content-Disposition", "X-Export-Truncated"],
 )
+
+# ---- Security headers (see core/security_headers.py) ----
+app.add_middleware(SecurityHeadersMiddleware)
+
+if _is_prod:
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Catch-all so a bug never leaks an internal error message or traceback
+        to the client. Sentry still gets the real exception either way — this
+        only changes what crosses the network boundary. Dev keeps FastAPI's
+        default (verbose) handling untouched, so this handler is only
+        registered in production.
+        """
+        sentry_sdk.capture_exception(exc)
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 # ---- Routers ----
 app.include_router(auth_router, prefix="/api")

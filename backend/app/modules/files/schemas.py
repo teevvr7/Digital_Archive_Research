@@ -9,6 +9,8 @@ import datetime
 import uuid
 from typing import Any
 
+from pydantic import Field
+
 from app.core.camel import CamelModel
 from app.modules.metadata.schemas import FieldValueOut  # noqa: F401 — re-exported for callers
 
@@ -39,7 +41,7 @@ class DocumentPatchIn(CamelModel):
     all other keys in the existing JSON are preserved.
     """
 
-    title: str | None = None
+    title: str | None = Field(default=None, max_length=500)
     document_type: str | None = None
     document_date: datetime.date | None = None
     correspondent_id: uuid.UUID | None = None

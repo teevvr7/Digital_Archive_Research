@@ -52,6 +52,7 @@ dev = [
     "pytest-mock>=3.14",
     "ruff>=0.5",
     "black>=24.4",
+    "pip-audit>=2.7",               # dependency vulnerability scan — run before each release
 ]
 
 [tool.setuptools]

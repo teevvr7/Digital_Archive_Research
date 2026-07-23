@@ -3,22 +3,24 @@
 import datetime
 import uuid
 
+from pydantic import Field
+
 from app.core.camel import CamelModel
 
 
 class TagIn(CamelModel):
-    name: str
+    name: str = Field(max_length=100)
     color: str = "#6B7280"
-    match: str = ""
+    match: str = Field(default="", max_length=1000)
     matching_algorithm: str = "any"
     is_insensitive: bool = True
     is_inbox_tag: bool = False
 
 
 class TagPatchIn(CamelModel):
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=100)
     color: str | None = None
-    match: str | None = None
+    match: str | None = Field(default=None, max_length=1000)
     matching_algorithm: str | None = None
     is_insensitive: bool | None = None
     is_inbox_tag: bool | None = None

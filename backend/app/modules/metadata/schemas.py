@@ -4,13 +4,20 @@ import datetime
 import uuid
 from typing import Any
 
+from pydantic import Field, field_validator
+
 from app.core.camel import CamelModel
+
+# Custom-field text VALUES aren't name-like labels — they can be a genuine
+# user-entered note — so they get a much more generous cap than the 100-char
+# field NAME, just enough to bound a pathological payload.
+_MAX_FIELD_VALUE_LENGTH = 5000
 
 
 class CustomFieldIn(CamelModel):
     """Input for creating a custom field definition."""
 
-    name: str
+    name: str = Field(max_length=100)
     field_type: str  # text | number | date | boolean | select
     options: list[str] = []  # populated only for field_type='select'
     position: int = 0
@@ -19,7 +26,7 @@ class CustomFieldIn(CamelModel):
 class CustomFieldPatchIn(CamelModel):
     """Partial update for a custom field. Absent fields are left unchanged."""
 
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=100)
     options: list[str] | None = None
     position: int | None = None
 
@@ -39,6 +46,17 @@ class FieldValueIn(CamelModel):
     """Input for setting (upserting) a custom field value on a document."""
 
     value: Any
+
+    @field_validator("value")
+    @classmethod
+    def _cap_string_length(cls, v: Any) -> Any:
+        # `Any` bypasses pydantic's normal str constraints, so a text-type
+        # value needs its own explicit length cap.
+        if isinstance(v, str) and len(v) > _MAX_FIELD_VALUE_LENGTH:
+            raise ValueError(
+                f"Value exceeds maximum length of {_MAX_FIELD_VALUE_LENGTH} characters"
+            )
+        return v
 
 
 class FieldValueOut(CamelModel):

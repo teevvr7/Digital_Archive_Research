@@ -7,23 +7,24 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
 import httpx
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_tenant_db, require_admin
 from app.core.rate_limit import limiter
 from app.core.security import TokenData
+from app.core.validation import EmailField
 from app.modules.auth import schemas, service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class SignupRequest(BaseModel):
-    email: str
-    password: str
+    email: EmailField
+    password: str = Field(min_length=1, max_length=128)
 
 
 @router.post("/signup")
@@ -61,7 +62,9 @@ async def signup(request: Request, req: SignupRequest):
         detail = response.text
         try:
             body = response.json()
-            detail = body.get("msg") or body.get("error_description") or body.get("message") or detail
+            detail = (
+                body.get("msg") or body.get("error_description") or body.get("message") or detail
+            )
         except Exception:
             pass
         raise HTTPException(status_code=response.status_code, detail=detail)

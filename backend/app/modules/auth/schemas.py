@@ -3,7 +3,10 @@
 import datetime
 import uuid
 
+from pydantic import Field
+
 from app.core.camel import CamelModel
+from app.core.validation import EmailField
 
 
 class UserOut(CamelModel):
@@ -36,12 +39,12 @@ class TenantPatchIn(CamelModel):
     no timezone/locale columns exist yet, so we don't fake fields that don't
     persist anywhere."""
 
-    name: str
+    name: str = Field(max_length=200)
 
 
 class InviteUserIn(CamelModel):
-    email: str
-    name: str
+    email: EmailField
+    name: str = Field(max_length=200)
     role: str = "user"
 
 
