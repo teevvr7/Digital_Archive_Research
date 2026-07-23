@@ -6,6 +6,8 @@
 
 ## Table of Contents
 
+**[How to Run the System](#how-to-run-the-system)** — start here if you just want it running.
+
 **Part 1 — Technical Reference**
 1. [Project Overview](#1-project-overview)
 2. [Architecture](#2-architecture)
@@ -26,6 +28,117 @@
 15. [How It Works — Step by Step](#15-how-it-works--step-by-step)
 16. [What's Already Built](#16-whats-already-built)
 17. [What's Coming Next](#17-whats-coming-next)
+
+---
+
+## How to Run the System
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+ and npm
+- Redis (local install, or `docker run -p 6379:6379 redis`)
+- A Supabase project (free tier is enough) — gives you Postgres, Auth, and Storage in one place
+
+### 1. Environment files
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.local.example frontend/.env.local
+```
+
+Fill in `backend/.env` from your Supabase project (Project Settings → API / Database):
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`,
+`DATABASE_URL` (transaction pooler, port 6543), `ALEMBIC_DATABASE_URL` (direct connection, port
+5432). Everything else in `.env.example` has a working default. `VLM_BASE_URL` can stay empty —
+AI extraction is simply skipped (documents that need it fall through to `needs_review`) until a
+Lightning AI Studio endpoint is deployed. Fill `frontend/.env.local` with the matching
+`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`NEXT_PUBLIC_API_BASE_URL` defaults
+to `http://localhost:8000/api`, correct for local dev). Never commit either `.env` file.
+
+### 2. Install dependencies
+
+```bash
+# Backend (installs the API + worker + dev/test tooling in one venv for local dev)
+cd backend
+python -m venv venv
+./venv/Scripts/Activate.ps1        # Windows PowerShell — use `source venv/bin/activate` on macOS/Linux
+pip install -e ".[worker,dev]"
+cd ..
+
+# Frontend
+cd frontend
+npm install
+cd ..
+```
+
+### 3. Apply database migrations
+
+```bash
+cd backend
+alembic upgrade head        # current head: 0016 — see §4.3 for the full list
+```
+
+This connects as `ALEMBIC_DATABASE_URL` (the `postgres` superuser, direct port 5432 — needs DDL
+privileges the live app's `app_user` role deliberately doesn't have). Re-run this any time you
+pull new migrations.
+
+### 4. Start all three processes
+
+Either use the convenience script from the repo root (Windows):
+
+```powershell
+./start-system.ps1
+```
+
+It installs missing dependencies automatically, then opens three PowerShell windows: backend API
+(port 8000, with `--reload`), worker, and frontend (port 3000).
+
+...or start each manually, in three terminals:
+
+```bash
+# Terminal 1 — API
+cd backend && ./venv/Scripts/python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — worker (polls the Redis "idp" queue; needs the [worker] extra installed)
+cd backend && ./venv/Scripts/python.exe -m app.worker
+
+# Terminal 3 — frontend
+cd frontend && npm run dev
+```
+
+Then open `http://localhost:3000`, sign up, and the first login auto-bootstraps your tenant —
+no manual setup needed.
+
+### 5. Run the tests
+
+```bash
+cd backend
+./venv/Scripts/python.exe -m pytest app/tests -v      # 394 tests — use the venv's own interpreter,
+                                                        # not a bare `python`, or app.main-importing
+                                                        # tests silently fail (see §12)
+python eval/run.py                                     # deterministic pass rate + LLM share
+```
+
+```bash
+cd frontend
+npm run lint
+npx tsc --noEmit
+```
+
+### Troubleshooting
+
+- **Uvicorn `--reload` can silently serve stale code** after certain file changes (observed in
+  dev — a route addition looked like a 404 when it was actually just not reloaded). If a route
+  you just added looks missing, restart uvicorn **without** `--reload` once to confirm; if that
+  fixes it, it was a stale-reload issue, not a real bug. A quick way to tell "route doesn't exist"
+  (404) apart from "route exists but auth/tenant failed" (401) is to hit it with no `Authorization`
+  header — a 401 confirms the route is actually registered.
+- **Redis not running** → the worker will fail to connect and the API's rate limiter fails open
+  (logs a warning, lets requests through) rather than 500ing — uploads will queue but never
+  process until Redis is back.
+- **`VLM_BASE_URL` empty** → this is expected until a GPU endpoint is deployed (see §17); the
+  pipeline degrades gracefully, marking hard documents `needs_review` instead of blocking.
 
 ---
 
@@ -199,7 +312,7 @@ Deterministic code (parsing, OCR, regex/rule-based field extraction, full-text s
 
 ### 4.1 Tables Overview
 
-**17 tables total.** Every tenant-owned table has a non-nullable `tenant_id UUID` column and an RLS policy that enforces `tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid`. The `tenants` table is special — its RLS policy uses `id = ...` instead. The live API connects as a dedicated `app_user` Postgres role (`NOBYPASSRLS`) — RLS is genuinely the enforcement layer in production, not just a convenience filter (Alembic still connects as `postgres`, which needs DDL privileges `app_user` doesn't have).
+**18 tables total.** Every tenant-owned table has a non-nullable `tenant_id UUID` column and an RLS policy that enforces `tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid`. The `tenants` table is special — its RLS policy uses `id = ...` instead. The live API connects as a dedicated `app_user` Postgres role (`NOBYPASSRLS`) — RLS is genuinely the enforcement layer in production, not just a convenience filter (Alembic still connects as `postgres`, which needs DDL privileges `app_user` doesn't have).
 
 ### `tenants`
 | Column | Type | Notes |
@@ -210,6 +323,8 @@ Deterministic code (parsing, OCR, regex/rule-based field extraction, full-text s
 | `storage_used_bytes` | BIGINT NOT NULL | Incremented on upload; default 0 |
 | `storage_limit_bytes` | BIGINT NOT NULL | Default 10 GB (`10 * 1024³`) |
 | `llm_monthly_token_cap` | INTEGER nullable | Per-tenant override; NULL = use `settings.llm_monthly_token_cap_default` |
+| `trash_retention_days` | INTEGER nullable | Per-tenant override; NULL = use `settings.trash_retention_days_default` (30 days) — trashed documents past this window are auto-purged |
+| `trash_last_purged_at` | TIMESTAMPTZ nullable | Rate-limits the auto-purge check (opportunistic, triggered from within a tenant's own request/job — see §6 note under Documents & files) so it runs at most roughly once per check interval, not on every request |
 | `created_at` | TIMESTAMPTZ | `server_default=now()` |
 
 ### `users`
@@ -393,6 +508,18 @@ Real entity tables — **not** the dead `documents.tags` array column above.
 
 `document_field_values`: `id`, `tenant_id` FK, `document_id` FK, `field_id` FK→custom_fields, `value` (JSONB, nullable).
 
+### `document_type_fields` (added 2026-07-16 — predefined fields per document type)
+Links a `custom_fields` catalog entry to one of the 7 fixed document-type strings
+(invoice/receipt/contract/report/letter/form/other) as "predefined" for that type — drives the
+upload-time field popup and the type-gated custom-field filter on `/documents`. Keyed off the
+type **string**, not a `document_types.id` FK — that table's per-tenant/dynamic-type capability
+stays dormant until tenant-defined types are built as separate work.
+
+`id`, `tenant_id` FK, `document_type` (one of the 7 fixed strings), `field_id` FK→custom_fields
+CASCADE, `required` (BOOLEAN, default `false` — soft-required in the upload popup only, never
+enforced by the API), `position`, `created_at`. Unique on `(tenant_id, document_type, field_id)`
+— a field can only be predefined once per type.
+
 ### `saved_views` (Phase 6 — Retrieval & UX)
 `id`, `tenant_id` FK, `name`, `filter_state` (JSONB — the full filter/sort/display config), `is_default`, `created_at`.
 
@@ -421,7 +548,7 @@ Real entity tables — **not** the dead `documents.tags` array column above.
 
 ### 4.3 Migrations
 
-Current head: **`0014`**. Full list:
+Current head: **`0016`**. Full list:
 
 | Revision | What it does |
 |---|---|
@@ -439,6 +566,8 @@ Current head: **`0014`**. Full list:
 | `0012` | Promotes `vendor`/`invoice_no`/`total_amount`/`currency` out of `extracted_data` JSONB into typed columns; adds `duplicate_of_document_id`; backfills historic rows from both live extraction schemas (Level 3) |
 | `0013` | Creates `document_shares` — RLS on authenticated CRUD only, the public resolve path bypasses RLS entirely by design (Level 3) |
 | `0014` | Adds `correspondents.email` + per-tenant unique constraint (Level 5) |
+| `0015` | Creates `document_type_fields`; seeds starter predefined fields for every existing tenant (Invoice: PO Number/Payment Terms; Receipt: Expense Category; Contract: Contract End Date/Renewal Reminder; Report: Department) |
+| `0016` | Adds `tenants.trash_retention_days` + `tenants.trash_last_purged_at` (trash auto-retention) |
 
 **How to run migrations:**
 ```bash
@@ -533,6 +662,16 @@ WITH CHECK (
 - **LLM budget gate** (`app/core/ai_budget.py`, backed by the `ai_usage` table + `tenants.llm_monthly_token_cap`): `llm_allowed(db, tenant_id)` enforces a per-tenant monthly token cap and a `docs_llm/docs_total ≤ 20%` circuit breaker. If the budget is exhausted, the document is marked `needs_review` instead — the pipeline never blocks on the LLM being unavailable.
 - **Non-bypassrls DB role**: the live API connects as `app_user` (`NOBYPASSRLS`), not the Supabase `postgres` superuser — RLS is the real enforcement layer for every live request, not just a defense-in-depth convenience.
 
+### 5.7 Security Hardening (added 2026-07-22)
+
+- **Security headers on every API response** (`core/security_headers.py`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Cross-Origin-Opener-Policy`, `Permissions-Policy`, and a locked-down `Content-Security-Policy: default-src 'none'` (the API only ever returns JSON, so nothing needs to be allowed). Swagger/ReDoc routes are exempted from the CSP so their CDN assets keep working in dev. `Strict-Transport-Security` only fires when `ENV=production`. The frontend (`next.config.ts`) sets the equivalent headers on every page.
+- **API docs gated off in production** — `/api/docs`, `/api/redoc`, `/api/openapi.json` are disabled when `ENV=production` so the schema isn't publicly enumerable; unchanged in dev.
+- **Production error hygiene** — a catch-all exception handler, active only when `ENV=production`, returns a generic JSON 500 instead of a stack trace, while still calling `sentry_sdk.capture_exception` so the real error is tracked. Dev keeps FastAPI's normal verbose behavior untouched.
+- **Global rate-limit fallback** — `default_limits=["200/minute"]` per IP on top of the existing stricter per-endpoint limits (signup 10/hr, upload 300/min, share-resolve 30/min). Uses `swallow_errors=True` so a Redis outage fails **open** (the check is skipped, not a 500) — consistent with the project's degrade-gracefully rule, since this ceiling now touches every route, not just the ones that already depended on Redis.
+- **Input validation tightening** (`core/validation.py`) — a lightweight regex email validator (not pydantic's `EmailStr`, to avoid a new dependency) on signup/invite/correspondent-email fields; explicit `max_length` bounds on free-text inputs (org name, tag/correspondent name + match pattern, custom-field name, document title) and on custom-field values.
+- **Stored-XSS fix in search** (`search/query.py`/`search/service.py`) — the FTS snippet used to insert `<mark>` tags directly around matched terms inside `ts_headline()` output, then rendered via `dangerouslySetInnerHTML` on the frontend, without ever escaping the surrounding document text. A document containing something like `<img src=x onerror=...>` in its extracted text would have executed that script in a viewer's browser the moment it appeared in their own search results. Fixed by having Postgres wrap matches in sentinel control characters (`\x01`/`\x02`, illegal in real text) instead of literal tags; `snippet_html_safe()` then HTML-escapes the entire string and only afterward swaps the escape-proof sentinels for real `<mark>` tags — so nothing from the source document can inject markup, but highlighting still works.
+- **Dependency scanning** — `pip-audit` added as a backend dev dependency; run before releases.
+
 ---
 
 ## 6. Backend API — All Endpoints
@@ -574,6 +713,19 @@ All response bodies use **camelCase** field names (via `CamelModel` alias genera
 | `POST` | `/documents/bulk-set-type` | Set document type on multiple documents |
 | `GET` | `/activity` | Paginated audit-trail feed (org-wide, or `?document_id=` scoped) |
 
+**Trash auto-retention** (added 2026-07-23): trashed documents past `tenants.trash_retention_days`
+(or the global `TRASH_RETENTION_DAYS_DEFAULT` when unset) are purged automatically —
+`app/modules/files/retention.py::maybe_purge_expired_trash`. There's deliberately no global RQ
+cron job for this: the `tenants` table's own RLS policy means there is no way to enumerate every
+tenant from a normal (non-bypassrls) session, so a global sweep would need to bypass RLS — banned
+by this project's hard tenancy rule. Instead the check is **opportunistic**: it runs inside an
+already-open, tenant-scoped session at two points that happen naturally in the course of normal
+use — listing the trash view (`GET /documents?trashed=true`) and the start of every document's
+worker processing job — rate-limited via `trash_last_purged_at` so it does real work at most
+about once per check interval, not on every call. When it purges documents, it records one
+summary `ActivityEvent` (`user_name="system"`) rather than one per document, so there's an audit
+trail for something that happens with nobody watching.
+
 **Dashboard & search**
 | Method | Path | Purpose |
 |---|---|---|
@@ -590,14 +742,22 @@ All response bodies use **camelCase** field names (via `CamelModel` alias genera
 | `GET`/`POST` | `/correspondents` | List / create correspondents |
 | `PATCH`/`DELETE` | `/correspondents/{id}` | Update / delete a correspondent |
 
-**Metadata & saved views** (`/api/custom-fields/*`, `/api/saved-views/*`)
+**Metadata & saved views** (`/api/custom-fields/*`, `/api/saved-views/*`, `/api/document-type-fields`)
 | Method | Path | Purpose |
 |---|---|---|
 | `GET`/`POST` | `/custom-fields` | List / create custom field definitions |
 | `PATCH`/`DELETE` | `/custom-fields/{id}` | Update / delete a definition (+ its values) |
 | `POST`/`DELETE` | `/documents/{id}/fields/{field_id}` | Set / clear a custom field value on a document |
+| `GET` | `/document-type-fields` | List all predefined-field links, grouped by document type |
+| `POST`/`PATCH`/`DELETE` | `/document-types/{type}/fields` | Attach / update / detach a predefined field for one document type |
 | `GET`/`POST` | `/saved-views` | List / create saved views |
 | `PATCH`/`DELETE` | `/saved-views/{id}` | Update / delete a saved view |
+
+`GET /documents` and `GET /documents/export` additionally accept `custom_field_id` +
+`custom_field_value` (exact match for select/boolean fields, partial `ILIKE` for text) or
+`custom_field_min`/`custom_field_max`/`custom_field_date_from`/`custom_field_date_to` (number/date
+fields) — the field's type is always resolved server-side, never trusted from the client, so a
+select field can't be over-matched with a substring search.
 
 **Export & sharing** (`/api/documents/export`, `/api/*share*`)
 | Method | Path | Auth | Purpose |
@@ -621,6 +781,15 @@ All response bodies use **camelCase** field names (via `CamelModel` alias genera
 **Request:** `multipart/form-data`
 - `files`: one or more files (`UploadFile[]`)
 - `document_type`: optional repeated string field; index-matched to files; defaults to `"other"`
+- `field_values`: optional repeated JSON string `{field_id: value}` — values for that type's
+  predefined custom fields, captured at upload time
+- `new_fields`: optional repeated JSON string `[{name, fieldType, options, value}]` — define a
+  brand-new custom field inline and auto-attach it as predefined for that file's type
+- `attach_fields`: optional repeated JSON string `[{fieldId, value}]` — reuse an already-existing
+  catalog field (from another document type) as predefined for this one
+
+All three are best-effort: any parse/validation failure on a field value is logged and skipped,
+never raised — a bad custom-field value can never block the document itself from archiving.
 
 **Response:** `DocumentListOut`
 ```json
@@ -1083,6 +1252,7 @@ All values read from `backend/.env`. Never commit this file.
 | `PROMOTE_AFTER_N` | int | `3` | Reserved: accepted extractions needed before template promotion |
 | `MAX_UPLOAD_MB` | int | `50` | Maximum file size in MB (enforced at upload) |
 | `LLM_MONTHLY_TOKEN_CAP_DEFAULT` | int | `2,000,000` | Default per-tenant monthly VLM token cap when `tenants.llm_monthly_token_cap` is unset (LLM budget gate, backed by the `ai_usage` table) |
+| `TRASH_RETENTION_DAYS_DEFAULT` | int | `30` | Default trash auto-purge window (days) when `tenants.trash_retention_days` is unset |
 | `CORS_ALLOW_ORIGINS` | string | `"http://localhost:3000,http://127.0.0.1:3000,http://[::1]:3000"` | Comma-separated list of allowed CORS origins |
 | `SENTRY_DSN` | string | `""` | Sentry DSN — **now actually wired** in both `main.py` and `worker.py`, no-op until set |
 | `ENV` | string | `"development"` | Environment label; returned in `/api/health` |
@@ -1100,7 +1270,7 @@ All values read from `backend/.env`. Never commit this file.
 
 ## 12. Testing
 
-**348 tests, 25 files** (`conftest.py` + 24 test modules), 0 failing as of the last full run.
+**394 tests, 29 files** (`conftest.py` + 28 test modules), 0 failing as of the last full run.
 
 Run all tests:
 ```bash
@@ -1131,9 +1301,13 @@ Unit tests run offline (no DB, no Redis, no VLM). Integration tests require `ALE
 | `test_shares.py` | Share creation/list/revoke + public token-resolve |
 | `test_auth.py` | Invite/list/role-change/remove-user, last-admin guards, starter-tag seeding |
 | `test_auto_title_and_duplicates.py` | Auto-title + duplicate-invoice detection |
-| `test_settings_and_activity.py` | Activity feed pagination, org rename, storage-by-mime-family |
+| `test_settings_and_activity.py` | Activity feed pagination, org rename, storage-by-mime-family, tenant settings incl. trash-retention override |
+| `test_document_type_fields.py` | Predefined-field CRUD per document type, upload-time `field_values`/`new_fields`/`attach_fields` |
+| `test_custom_field_documents_filter.py` | Integration — custom-field filter/range params on `/documents` + export, type-resolution-server-side guard |
+| `test_security_headers.py` | Security headers present on responses; CSP exemption for docs routes; prod-only behaviors |
+| `test_trash_retention.py` | Integration — expired vs. recent purge, storage decrement, one summary `ActivityEvent`, rate-limiting, override/default resolution, dedicated cross-tenant isolation proof |
 | `test_monitoring.py` | Sentry no-op / init-once |
-| `test_search_service.py` | Integration — FTS + trigram ranking, type filter |
+| `test_search_service.py` | Integration — FTS + trigram ranking, type filter, stored-XSS snippet-neutralization regression |
 | `test_search_tenant_isolation.py` | Integration — cross-tenant search isolation |
 | `test_tenant_isolation.py` | Integration — cross-tenant RLS isolation across core tables |
 | `test_idp_tenant_isolation.py` | Integration + unit — worker-path RLS isolation, `process_document` not-found handling |
@@ -1164,30 +1338,33 @@ digital_ui/
 │   │   ├── run.py                     # Eval harness: pass rate + LLM share against eval/corpus
 │   │   └── corpus/                    # 9 fixture docs + expected.json pairs
 │   ├── app/
-│   │   ├── main.py                    # FastAPI app: CORS, rate limiting, Sentry, 12 router mounts, /health
+│   │   ├── main.py                    # FastAPI app: CORS, rate limiting, security headers, Sentry, 12 router mounts, /health
 │   │   ├── worker.py                  # RQ worker entry: SimpleWorker/Worker + queue
 │   │   │
 │   │   ├── core/
 │   │   │   ├── config.py              # Settings (pydantic-settings)
 │   │   │   ├── security.py            # verify_token(), TokenData, JWKS client
+│   │   │   ├── security_headers.py    # nosniff/CSP/frame-options middleware (added 07-22)
+│   │   │   ├── validation.py          # EmailField + length-capping validators (added 07-22)
 │   │   │   ├── deps.py                # get_current_user(), get_tenant_db(), require_admin()
 │   │   │   ├── db.py                  # SQLAlchemy engine + SessionLocal
 │   │   │   ├── tenant_context.py      # set_tenant() GUC, tenant_session() context manager
 │   │   │   ├── storage.py             # Supabase Storage adapter (content-addressed keys)
-│   │   │   ├── rate_limit.py          # slowapi limiter
+│   │   │   ├── rate_limit.py          # slowapi limiter (per-endpoint limits + global 200/min fallback, fail-open)
 │   │   │   ├── monitoring.py          # init_sentry()
 │   │   │   ├── ai_budget.py           # llm_allowed(), record_ai_usage() — LLM budget gate
 │   │   │   └── camel.py               # CamelModel base class
 │   │   │
-│   │   ├── models/                    # 17 models — see §4 for full schema
+│   │   ├── models/                    # 18 models — see §4 for full schema
 │   │   │
 │   │   ├── modules/                    # 12 feature modules; each follows router/service/schemas
 │   │   │   ├── auth/                   # bootstrap, invite/roles/remove, tenant profile
-│   │   │   ├── files/                  # upload, list, trash, bulk ops, dashboard, activity
+│   │   │   ├── files/                  # upload, list, trash, bulk ops, dashboard, activity, retention
+│   │   │   │   └── retention.py         # trash auto-purge — opportunistic, rate-limited (see §6 note)
 │   │   │   ├── search/                 # freetext search
 │   │   │   ├── tags/                   # tag CRUD + assign + match-rule engine + retroactive backfill
 │   │   │   ├── correspondents/         # correspondent CRUD + sender-email linking
-│   │   │   ├── metadata/               # custom field catalog + typed values
+│   │   │   ├── metadata/               # custom field catalog + typed values + predefined-per-type fields
 │   │   │   ├── views/                  # saved views
 │   │   │   ├── export/                 # CSV/XLSX export, zip bulk-download
 │   │   │   ├── shares/                 # shareable public links (+ the one public router)
@@ -1207,9 +1384,9 @@ digital_ui/
 │   │   │       ├── jobs.py             # process_document(), ai_extract_document()
 │   │   │       └── queue.py            # enqueue_document(), enqueue_ai_extraction()
 │   │   │
-│   │   ├── migrations/versions/       # 0001-0014 — see §4.3 for the full list
+│   │   ├── migrations/versions/       # 0001-0016 — see §4.3 for the full list
 │   │   │
-│   │   └── tests/                     # 25 files, 348 tests — see §12
+│   │   └── tests/                     # 29 files, 394 tests — see §12
 │   │
 └── frontend/
     ├── package.json / tsconfig.json / tailwind.config.ts
@@ -1313,6 +1490,7 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 
 ### Organisation & Data Value ✅
 - Tags (with auto-match rules), senders/correspondents (auto-linked from email senders or match rules), custom fields, saved filter presets
+- **Custom fields can be predefined per document type** (e.g. Invoices always ask for PO Number, Contracts always ask for Contract End Date) — the upload screen prompts for exactly the right fields instead of showing one giant undifferentiated list, and those fields are filterable/searchable on the Documents page once a type is picked
 - Filter by amount range and vendor, not just status and type
 - Export filtered results to CSV/Excel, or download a batch as a zip
 - Retroactively apply your tagging rules to documents you uploaded before you set the rules up
@@ -1323,6 +1501,7 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 - Filterable, sortable document list with grid/table toggle and bulk actions
 - Inline preview, editable metadata, custom field values, and a per-document activity history
 - Soft-delete (trash) with restore and permanent-delete, and a storage meter that actually reflects what's been freed
+- **Trash auto-retention**: trashed documents are automatically purged for good after a set number of days (30 by default, adjustable per workspace in Settings), so abandoned trash doesn't quietly accumulate storage cost forever — the Trash view shows a "purges in N days" countdown on every row so nothing disappears as a surprise
 
 ### Search ✅
 - Full-text search by word or phrase, partial-word ("inv" finds "invoice"), and typo-tolerant filename matching
@@ -1334,7 +1513,9 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 - Org-wide and per-document audit trail (every upload, edit, tag, trash, invite, role change)
 - Error monitoring (Sentry) wired in, configured to never capture document text or personal data
 - Every company's data is isolated at the database level (Row-Level Security), enforced by a database role that cannot bypass it — not just an app-level convenience check
-- 348 automated tests, including dedicated tenant-isolation coverage for both the API and the background worker
+- Security headers on every response, production error pages that never leak stack traces, a global request-rate ceiling that still works even if Redis goes down, and tightened input validation on every free-text field
+- A found-and-fixed stored-XSS bug in search result highlighting (a malicious document could otherwise have run script in another user's browser) — now covered by a permanent regression test
+- 394 automated tests, including dedicated tenant-isolation coverage for both the API and the background worker
 
 ---
 
@@ -1352,7 +1533,6 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 |---|---|
 | **Forward emails straight into the archive** | A dedicated inbox address per workspace — no manual upload step at all. Needs a mail-routing domain set up first |
 | **Better Malay-language search** | Search currently favours English word stemming; a small config change improves recall for Malay documents |
-| **Automatic trash cleanup** | Permanently remove trashed documents after a set number of days, instead of requiring a manual "empty trash" |
 
 ### Deliberately out of scope (do not build without explicit approval)
 
@@ -1368,5 +1548,5 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 
 ---
 
-*Last updated: 2026-07-14*
-*Complete: Milestones A-E, Phases 0-6 (production hardening → universal ingestion → deterministic extraction → file management → organization → metadata → retrieval/UX), and Production Level-Up Levels 1, 3, 4, and 5 (4 of 7 items). Level 2 (IDP pipeline upgrade) is blocked on external GPU setup; see `CLAUDE.md` for the live status table.*
+*Last updated: 2026-07-27*
+*Complete: Milestones A-E, Phases 0-6 (production hardening → universal ingestion → deterministic extraction → file management → organization → metadata → retrieval/UX), and Production Level-Up Levels 1, 3, 4, and 5 (5 of 7 items — trash auto-retention shipped 2026-07-23). Level 2 (IDP pipeline upgrade) is blocked on external GPU setup. A dedicated security-hardening pass (headers, prod error hygiene, global rate-limit fallback, input validation, a stored-XSS fix in search) shipped 2026-07-22, plus predefined-per-document-type custom fields shipped 2026-07-16. See `CLAUDE.md` for the live status table.*
