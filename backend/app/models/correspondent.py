@@ -9,11 +9,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, uuid_pk
 
 # Matching algorithm constants (same set as Tag — shared by the matching engine).
-ALGO_NONE = "none"
-ALGO_ANY = "any"
-ALGO_ALL = "all"
-ALGO_LITERAL = "literal"
-ALGO_REGEX = "regex"
+ALGO_NONE = "none"  # never auto-match — manual assignment only
+ALGO_ANY = "any"  # match if ANY of the comma-separated keywords appear
+ALGO_ALL = "all"  # match only if ALL keywords appear
+ALGO_LITERAL = "literal"  # match the exact literal string
+ALGO_REGEX = "regex"  # match is treated as a regular expression
 
 
 class Correspondent(Base):
@@ -33,15 +33,18 @@ class Correspondent(Base):
     email: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Matching rules — empty match or algorithm=none means manual-only.
-    match: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    match: Mapped[str] = mapped_column(Text, nullable=False, default="")  # the keyword/pattern text
     matching_algorithm: Mapped[str] = mapped_column(Text, nullable=False, default=ALGO_ANY)
-    is_insensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_insensitive: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )  # case-insensitive?
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     __table_args__ = (
+        # A tenant can't have two correspondents with the same name.
         UniqueConstraint("tenant_id", "name", name="uq_correspondents_tenant_name"),
         # NULL emails don't collide (standard Postgres unique-constraint behavior) —
         # only non-null emails must be unique per tenant.

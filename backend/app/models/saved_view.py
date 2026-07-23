@@ -19,10 +19,12 @@ class SavedView(Base):
         ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    filter_state: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
-    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The ENTIRE saved filter/sort/display configuration as one JSON blob —
+    # avoids needing a separate column for every possible filter option.
+    filter_state: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )  # auto-loads if true
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -16,9 +16,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
 
-TEMPLATE_CANDIDATE = "candidate"
-TEMPLATE_PROMOTED = "promoted"
-TEMPLATE_DISABLED = "disabled"
+# The lifecycle a template moves through as it proves itself reliable.
+TEMPLATE_CANDIDATE = "candidate"  # newly learned, not yet trusted
+TEMPLATE_PROMOTED = "promoted"  # proven reliable after enough accepted examples
+TEMPLATE_DISABLED = "disabled"  # turned off (e.g. it started producing bad extractions)
 
 
 class DocumentTemplate(Base):
@@ -34,18 +35,24 @@ class DocumentTemplate(Base):
         ForeignKey("document_types.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    fingerprint: Mapped[str] = mapped_column(String, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String, nullable=False)  # identifies "this layout"
+    # The actual extraction rules learned for this layout, as JSON.
     field_mappings: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String, nullable=False, default=TEMPLATE_CANDIDATE)
-    examples_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    examples_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )  # accepted-extraction tally
     confidence: Mapped[float | None] = mapped_column(REAL, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # One example document that produced this template — a reference for humans reviewing it.
     sample_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # onupdate=func.now() means Postgres automatically bumps this every time
+    # the row is UPDATEd, without the application having to remember to set it.
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

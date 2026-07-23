@@ -18,8 +18,12 @@ class ApiKey(Base, TimestampMixin):
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)  # user-given label for the key
+    # A short, non-secret prefix (e.g. "dw_abc123") safe to display in the UI
+    # so the user can tell keys apart without ever seeing the full secret again.
     prefix: Mapped[str] = mapped_column(String, nullable=False)
+    # Only a HASH of the actual key is stored — if this table were ever
+    # leaked, no usable API key could be recovered from it.
     hashed_key: Mapped[str] = mapped_column(String, nullable=False)
     last_used_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

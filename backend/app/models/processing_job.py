@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
 
+# The lifecycle a job moves through as the worker picks it up and runs it.
 JOB_QUEUED = "queued"
 JOB_RUNNING = "running"
 JOB_COMPLETED = "completed"
@@ -28,6 +29,8 @@ class ProcessingJob(Base):
     )
     status: Mapped[str] = mapped_column(String, nullable=False, default=JOB_QUEUED)
     stage: Mapped[str | None] = mapped_column(String, nullable=True)  # current cascade stage
+    # Bumped every time the worker (re)tries this job — including retries
+    # after a transient failure, so this doubles as a retry counter.
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     enqueued_at: Mapped[datetime.datetime] = mapped_column(
@@ -39,4 +42,6 @@ class ProcessingJob(Base):
     finished_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # wall-clock processing time

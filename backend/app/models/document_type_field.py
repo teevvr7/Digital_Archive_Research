@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
 
+# The 7 fixed document-type strings the whole app uses (documents.document_type
+# and this table's document_type column both use these exact values).
 DOCUMENT_TYPE_INVOICE = "invoice"
 DOCUMENT_TYPE_RECEIPT = "receipt"
 DOCUMENT_TYPE_CONTRACT = "contract"
@@ -15,6 +17,7 @@ DOCUMENT_TYPE_REPORT = "report"
 DOCUMENT_TYPE_LETTER = "letter"
 DOCUMENT_TYPE_FORM = "form"
 DOCUMENT_TYPE_OTHER = "other"
+# Fast membership-check set for "is this a valid document type string?".
 VALID_DOCUMENT_TYPES: frozenset[str] = frozenset(
     {
         DOCUMENT_TYPE_INVOICE,
@@ -40,8 +43,13 @@ class DocumentTypeField(Base):
 
     __tablename__ = "document_type_fields"
     __table_args__ = (
+        # A given (tenant, document type, field) combination can only be
+        # "predefined" once — attaching the same field to the same type twice
+        # is rejected at the database level, not just in application code.
         UniqueConstraint(
-            "tenant_id", "document_type", "field_id",
+            "tenant_id",
+            "document_type",
+            "field_id",
             name="uq_document_type_fields_tenant_type_field",
         ),
     )
@@ -50,12 +58,14 @@ class DocumentTypeField(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    document_type: Mapped[str] = mapped_column(Text, nullable=False)
+    document_type: Mapped[str] = mapped_column(Text, nullable=False)  # one of VALID_DOCUMENT_TYPES
     field_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("custom_fields.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )  # soft-required in the UI only
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # display order
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

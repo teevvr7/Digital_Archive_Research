@@ -28,7 +28,11 @@ class DocumentShare(Base, TimestampMixin):
     # Globally unique (not per-tenant) — the public lookup has no tenant
     # context to scope by, it can only filter on the token itself.
     token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    # SET NULL — the share link keeps working even if the admin who created
+    # it is later removed from the team.
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Required (not nullable) — every share MUST have an expiry, capped to
+    # 1-30 days at creation time by the service layer.
     expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)

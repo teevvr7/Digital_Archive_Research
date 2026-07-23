@@ -20,14 +20,20 @@ slowapi logs it and skips the check rather than raising — the app fails open
 on this defense-in-depth ceiling instead of 500ing every request.
 """
 
+# Limiter is slowapi's main class — one instance is shared across the whole app.
 from slowapi import Limiter
+
+# get_remote_address extracts the caller's IP address from the request, which
+# is what we key rate limits on (as opposed to per-user or per-API-key).
 from slowapi.util import get_remote_address
 
 from app.core.config import settings
 
+# One shared Limiter instance, imported by main.py (to wire the middleware)
+# and by every router that needs a stricter per-route limit via @limiter.limit(...).
 limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=settings.redis_url,
-    default_limits=["200/minute"],
-    swallow_errors=True,
+    key_func=get_remote_address,  # rate-limit per client IP
+    storage_uri=settings.redis_url,  # store counters in Redis, not just in-process memory
+    default_limits=["200/minute"],  # fallback ceiling applied to every route by default
+    swallow_errors=True,  # if Redis is down, skip the check instead of erroring the request
 )

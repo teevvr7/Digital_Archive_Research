@@ -21,10 +21,17 @@ class DocumentType(Base, TimestampMixin):
     __tablename__ = "document_types"
 
     id: Mapped[uuid.UUID] = uuid_pk()
+    # nullable=True is the important detail here: NULL means "every tenant
+    # can see this type" (the 7 seeded system types), while a real tenant_id
+    # means "only this tenant defined/sees this custom type".
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)  # e.g. "invoice"
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # An optional soft JSON schema — used only to help SCORE how confident an
+    # extraction is, never used to reject/validate documents strictly.
     json_schema: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )  # true for the 7 seeded types
