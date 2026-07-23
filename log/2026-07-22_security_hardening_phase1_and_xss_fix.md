@@ -89,18 +89,18 @@ escaped entities alongside real `<mark>` tags. Full 386-test suite green afterwa
   upstream-blocked, not something fixable from our side; documented to revisit when Next.js ships
   updated bundled deps.
 
-## Verification
+## First-pass verification (same day)
 
 - `pytest`: **386 passed** (full suite, including the two new test files/additions).
-- `ruff` + `black`: clean on every touched file (fixed the handful of new-code violations —
-  line length, import order — introduced by this pass; confirmed via careful line-by-line review
-  that the small number of remaining findings in `auth/router.py` and `search/query.py` predate
-  this change and sit outside every line touched here).
+- `ruff`: ran on every touched file; fixed the handful of new-code violations (line length,
+  import order) this pass introduced. A small number of pre-existing findings remain in
+  `auth/router.py` and `search/query.py`, confirmed to sit outside every line touched here.
 - `tsc --noEmit` + `eslint`: same pre-existing 26-problem baseline (2 `search/page.tsx` type
   errors, unrelated) — zero new issues from either the header config or the XSS-fix comment.
-- Live-server check: started the real Next.js dev server (not just TestClient) and curled
-  `/login` and `/documents` directly to confirm headers are actually present on real HTTP
-  responses, not just asserted in tests.
+
+Implementation and this first verification pass ran late in the day; `black` formatting,
+a second full test run, a live-server header check, and committing carried over past midnight —
+see the 2026-07-23 log entry for that tail end.
 
 ## Not done this pass (Phases 2–5, per the approved roadmap)
 
@@ -112,10 +112,3 @@ escaped entities alongside real `<mark>` tags. Full 386-test suite green afterwa
 - Extended audit-trail coverage + automated security regression tests (headers/tenant-isolation/
   auth-required-everywhere) — Phase 4.
 - Cookie-based auth, PDPA retention tooling, WAF/pen-test — Phase 5, only if/when needed.
-
-## Next
-
-9 commits from 07-20/07-21 plus today's security work now sit locally on `mvp3-prod`, still not
-pushed to `origin`. The detail-page race condition and a real worker-processing pass (both
-flagged 07-21) are still outstanding. Recommend deciding on push timing and picking the next
-target (more security phases vs. the outstanding UX items) explicitly rather than defaulting.
