@@ -1,0 +1,69 @@
+1. Daily Summary of Activities
+- Validated our self-hosted Qwen3-VL VLM API endpoint capabilities and confirmed its text generation performance is suitable for RAG query tasks.
+- Designed a schema-agnostic recursive JSON-to-Markdown serialisation strategy to convert arbitrary extracted metadata keys (such as varying vendor names or line items) into structured, readable markdown files before embedding.
+- Outlined a concrete hybrid retrieval pipeline combining PostgreSQL Vector Cosine Similarity (`pgvector`) and Full-Text Search (`tsvector`) grouped with Reciprocal Rank Fusion (RRF) for accurate keyword and semantic matching.
+- Compiled all review findings and revised implementation designs into `rag_revised_insights.md` under `nalan_plan/rag_folder`.
+- Developed a complete 7-phase build roadmap (`rag_roadmap.md`) mapping out code design paths, dataset generation, retrieval evaluations, prompt tuning, and containerization.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: LLM Compatibility Validation
+Description of Work Done: Checked the self-hosted vLLM configuration settings. Verified model compatibility with OpenAI SDK tools, and planned context window adjustments to support RAG query context sizes.
+Status: Completed
+Remarks: Confirmed LLM provider swappability via simple environment variables.
+
+Task Number: 2
+Task / Project Name: Generic JSON Markdown Serializer Design
+Description of Work Done: Developed a schema-agnostic parser to parse nested lists, scalars, and key-value properties from the extraction tables into uniform markdown text blocks, resolving key-variance issues.
+Status: Completed
+Remarks: Formulated the logic and verified against diverse mock schemas.
+
+Task Number: 3
+Task / Project Name: RAG Revised Insights and Roadmap
+Description of Work Done: Drafted `rag_revised_insights.md` and `rag_roadmap.md` under the `nalan_plan` workspace, detailing the simplified system architecture, step-by-step implementation order, and evaluation notebooks.
+Status: Completed
+Remarks: Ready for initial coding phase.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: High key variance in extraction schemas across document formats breaks hardcoded serializers.
+Root Cause: Different invoices extract varying keys for identical properties (e.g. `vendor_name` vs `supplier` vs `vendor`).
+Resolution Provided: Created a generic, recursive JSON-to-Markdown converter that formats nested lists, lists of objects, and scalars into readable text without relying on hardcoded field keys.
+
+Issue Number: 2
+Issue Description: Pure vector search fails on exact identification codes (e.g. searching for invoice number `INV-2026-0042`).
+Root Cause: Vector similarity models prioritise semantic meanings and frequently fail at exact numeric/code matches.
+Resolution Provided: Designed a hybrid search pipeline that merges `pgvector` results with Postgres Full-Text Search using Reciprocal Rank Fusion (RRF).
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, Markdown, PostgreSQL (pgvector/tsvector), OpenAI Python SDK, Docker.
+IDE / Tools: Git, PowerShell, Docker Compose.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Embedding cross-encoder models inside the Docker image significantly inflates container build sizes (~2GB) and burdens deployment.
+Solution: Decoupled advanced modules (re-ranking, query rewriting, and baseline keyword engine comparisons) into offline Jupyter notebooks for testing, keeping the core Streamlit container lightweight and fast to launch.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Learned more about structured data serialisation patterns for text embeddings and context formatting.
+- Deepened understanding of Reciprocal Rank Fusion (RRF) algorithms and ranking merge metrics.
+- Explored RAG evaluation metrics including Retrieval Hit Rate@K, Mean Reciprocal Rank (MRR), and LLM-as-a-judge prompts.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Begin Phase 1 of the RAG roadmap: construct the synthetic invoice generator script.
+- Seed database tables and write the schema-agnostic markdown ingestion worker.

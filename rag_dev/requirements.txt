@@ -1,0 +1,9 @@
+streamlit==1.32.0
+pandas==2.2.1
+psycopg[binary]>=3.2
+openai==1.14.1
+sentence-transformers==2.5.1
+faker==24.0.0
+python-dotenv==1.0.1
+plotly==5.19.0
+ipykernel==6.29.3

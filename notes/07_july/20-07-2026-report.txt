@@ -1,0 +1,70 @@
+1. Daily Summary of Activities
+- Resolved system library dependency conflicts on Windows by updating the base environment package manager, ensuring machine learning embedding models initialize cleanly without dynamic link library crashes.
+- Verified Phase 2 data ingestion execution: loaded 200 sample invoices, converted structured JSON fields into formatted markdown text, generated 384-dimensional vector embeddings, and stored all records in the PostgreSQL vector database.
+- Implemented Phase 3 retrieval search algorithms: built modules supporting Vector Search (semantic similarity matching), Keyword Search (exact full-text matching), and Hybrid Search (combining both methods using Reciprocal Rank Fusion ranking).
+- Developed a comprehensive retrieval evaluation test suite to benchmark search quality metrics (Hit Rate and Mean Reciprocal Rank) across 150 test questions.
+- Updated project task tracking sheets and development logs to document Phase 2 completion and Phase 3 retrieval design.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: System Environment & C++ Runtime Update
+Description of Work Done: Updated the environment package manager to refresh core system C++ runtime libraries, resolving dynamic link library initialization crashes when loading machine learning models.
+Status: Completed
+Remarks: Machine learning embedding models now load error-free.
+
+Task Number: 2
+Task / Project Name: Vector Data Ingestion Execution & Verification
+Description of Work Done: Executed the Phase 2 ingestion pipeline to vectorize 200 invoice documents, store 384-dimensional vector arrays in PostgreSQL, and verify stored record counts and vector attributes.
+Status: Completed
+Remarks: Vector database populated successfully.
+
+Task Number: 3
+Task / Project Name: Multi-Algorithm Search Engine Implementation
+Description of Work Done: Implemented vector semantic search, PostgreSQL full-text keyword search, and a hybrid search module combining both result sets via Reciprocal Rank Fusion.
+Status: Completed
+Remarks: Search module functions ready for testing.
+
+Task Number: 4
+Task / Project Name: Retrieval Evaluation Suite Setup
+Description of Work Done: Constructed an evaluation launcher to run 150 test queries against all three search algorithms and compute Hit Rate and Mean Reciprocal Rank metrics.
+Status: Completed
+Remarks: Ready for execution in the next testing session.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Machine learning embedding model fails to initialize with a dynamic link library (DLL) error on Windows.
+Root Cause: The virtual environment inherited older C++ runtime libraries from the base system environment, causing a symbol mismatch when loading modern machine learning binaries.
+Resolution Provided: Updated the base environment package manager, which refreshed the system C++ runtime libraries to a modern compatible version.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL (pgvector), Docker, PyTorch / Transformers.
+IDE / Tools: Git, PowerShell, Docker CLI, VS Code.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Combining exact keyword search results with dense vector semantic results to get balanced document retrieval.
+Solution: Implemented Reciprocal Rank Fusion (RRF), an algorithm that ranks candidate documents from both search methods by summing their inverse rank positions, yielding higher relevance precision.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Explored dynamic link library resolution and environment dependency management on Windows.
+- Studied Reciprocal Rank Fusion (RRF) algorithms for hybrid search scoring.
+- Learned standard RAG retrieval evaluation metrics (Hit Rate@K and Mean Reciprocal Rank @ K).
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Run the retrieval evaluation test suite (`03_retrieval_evaluation.py`) to measure and compare Hit Rate and MRR across Vector, Keyword, and Hybrid search algorithms.
+- Analyze retrieval quality and begin Phase 4: Prompt engineering and LLM answer generation.

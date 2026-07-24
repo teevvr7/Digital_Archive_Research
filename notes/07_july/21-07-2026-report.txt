@@ -1,0 +1,65 @@
+1. Daily Summary of Activities
+- Ran Phase 3 retrieval evaluation across 149 ground-truth test queries, benchmarking search performance across Vector Search (Cosine Similarity), Keyword Search (PostgreSQL Full-Text Search), and Hybrid Search (Reciprocal Rank Fusion).
+- Discovered and documented a critical retrieval insight: pure vector search achieved only a 4.70% Hit Rate because dense text embedding models capture semantic concepts but cannot distinguish between specific alphanumeric document IDs.
+- Analyzed Keyword Search performance (48.32% Hit Rate, 0.4832 MRR), confirming that exact token matching succeeds on ID queries but is limited by text search dictionary hyphenation rules.
+- Analyzed Hybrid Search trade-offs: achieved the highest Hit Rate (51.68%), but observed an MRR drop to 0.3173 because noisy vector search candidates diluted exact keyword match rankings.
+- Documented key experimental findings, failure root causes, and three proposed technical solutions (Weighted RRF, Regex ID Metadata Filtering, and Search Query Expansion) in the project development log.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Retrieval Evaluation Benchmark Execution
+Description of Work Done: Executed `03_retrieval_evaluation.py` to test 149 questions across Vector, Keyword, and Hybrid search algorithms, computing Hit Rate@5 and MRR@5 metrics.
+Status: Completed
+Remarks: Benchmark metrics successfully collected.
+
+Task Number: 2
+Task / Project Name: Experimental Analysis & Root Cause Diagnosis
+Description of Work Done: Analyzed vector search failures on alphanumeric document IDs and evaluated RRF score dilution mechanisms.
+Status: Completed
+Remarks: Documented architectural insights for project capstone reporting.
+
+Task Number: 3
+Task / Project Name: Retrieval Improvement Ideation & Log Documentation
+Description of Work Done: Recorded experimental findings, failure mechanisms, and proposed solutions (Weighted RRF and Metadata Filtering) in `rag_development_log.md`.
+Status: Completed
+Remarks: Development log updated with Phase 3 benchmark results.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Hybrid RRF search drops Mean Reciprocal Rank (MRR) compared to pure keyword search.
+Root Cause: Unweighted RRF treats high semantic similarity scores on generic words as equal to exact keyword token matches, allowing noisy vector hits to displace exact matches from Rank 1.
+Resolution Provided: Proposed Weighted RRF (2x weight on keyword ranks) and exact ID metadata filtering for next session implementation.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL (pgvector & FTS), Docker, Pandas, SentenceTransformers.
+IDE / Tools: Git, PowerShell, Docker CLI, VS Code.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Dense vector embedding models failing to match exact invoice numbers.
+Solution: Documented the necessity of hybrid retrieval and exact ID metadata filtering for structured document RAG systems.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Evaluated empirical performance metrics (Hit Rate@5, MRR@5) in RAG systems.
+- Analyzed text embedding limitations with alphanumeric identifiers.
+- Designed Reciprocal Rank Fusion (RRF) weighting strategies for domain-specific search optimization.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Implement Weighted RRF and Regex ID Metadata Filtering in `src/search.py`.
+- Re-run `03_retrieval_evaluation.py` to verify Hit Rate and MRR improvements.
+- Begin Phase 4: Prompt engineering and LLM answer generation using the self-hosted VLM model.
