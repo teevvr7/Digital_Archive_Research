@@ -28,29 +28,35 @@ function filterStateLabel(state: Record<string, unknown>): string {
   if (state.type) parts.push(`Type: ${state.type}`);
   if (state.q) parts.push(`Search: "${state.q}"`);
   if (state.inbox) parts.push("Inbox only");
-  if (state.dateFrom || state.dateTo) {
-    parts.push(`Date: ${state.dateFrom ?? "…"} → ${state.dateTo ?? "…"}`);
+  if (state.date_from || state.date_to) {
+    parts.push(`Date: ${state.date_from ?? "…"} → ${state.date_to ?? "…"}`);
   }
+  if (state.tag_id) parts.push("Tag filter");
+  if (state.correspondent_id) parts.push("Correspondent filter");
+  if (state.vendor) parts.push(`Vendor: "${state.vendor}"`);
+  if (state.amount_min != null || state.amount_max != null) {
+    parts.push(`Amount: ${state.amount_min ?? "…"} → ${state.amount_max ?? "…"}`);
+  }
+  if (state.custom_field_id) parts.push("Custom field filter");
   return parts.length > 0 ? parts.join(" · ") : "No filters";
 }
 
+// Every key the Documents page's own buildQuery()/currentFilterState() can
+// produce — must stay in sync with those so a saved view's "open" link
+// reconstructs the exact same filtered view, not a partial one.
+const FILTER_STATE_KEYS = [
+  "status", "type", "tag_id", "correspondent_id", "date_from", "date_to",
+  "vendor", "amount_min", "amount_max", "q", "sort", "inbox",
+  "custom_field_id", "custom_field_value", "custom_field_min", "custom_field_max",
+  "custom_field_date_from", "custom_field_date_to", "custom_field_number_mode",
+];
+
 function viewToQueryString(state: Record<string, unknown>): string {
   const params = new URLSearchParams();
-  const map: Record<string, string> = {
-    status: "status",
-    type: "type",
-    tag_id: "tag_id",
-    correspondent_id: "correspondent_id",
-    date_from: "date_from",
-    date_to: "date_to",
-    q: "q",
-    sort: "sort",
-    inbox: "inbox",
-  };
-  for (const [key, param] of Object.entries(map)) {
+  for (const key of FILTER_STATE_KEYS) {
     const val = state[key];
     if (val !== undefined && val !== null && val !== "" && val !== "all" && val !== false) {
-      params.set(param, String(val));
+      params.set(key, String(val));
     }
   }
   const qs = params.toString();

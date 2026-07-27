@@ -10,7 +10,6 @@ import {
   Settings,
   Archive,
   LogOut,
-  Bell,
   Tag,
   Users,
   SlidersHorizontal,
@@ -151,9 +150,6 @@ export function Sidebar() {
           <p className="text-slate-500 text-xs capitalize">{user?.role ?? "—"}</p>
         </div>
         <div className="flex items-center gap-1">
-          <button className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors">
-            <Bell className="w-3.5 h-3.5" />
-          </button>
           <button
             onClick={signOut}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"

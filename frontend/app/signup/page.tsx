@@ -80,7 +80,7 @@ export default function SignupPage() {
 
         <div>
           <blockquote className="text-2xl font-light leading-relaxed text-slate-200 mb-6">
-            "From mountains of paper to instant intelligence — your documents, organised and searchable in seconds."
+            &quot;From mountains of paper to instant intelligence — your documents, organised and searchable in seconds.&quot;
           </blockquote>
 
           <div className="grid grid-cols-3 gap-4">
@@ -100,7 +100,7 @@ export default function SignupPage() {
             <div className="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center flex-shrink-0 text-sm font-semibold">AR</div>
             <div>
               <p className="text-sm text-slate-200">
-                "We cut our invoice processing time from 3 days to 20 minutes. The AI extraction is remarkably accurate for Malaysian documents."
+                &quot;We cut our invoice processing time from 3 days to 20 minutes. The AI extraction is remarkably accurate for Malaysian documents.&quot;
               </p>
               <p className="text-slate-400 text-xs mt-2">Ahmad Razif — CFO, Syarikat Maju Sdn Bhd</p>
             </div>

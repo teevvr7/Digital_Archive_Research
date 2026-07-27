@@ -9,7 +9,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.document import Document
-from app.modules.files.service import _PAGE_SIZE, _doc_to_out, _names_for_ids
+from app.modules.files.service import (
+    _PAGE_SIZE,
+    _doc_to_out,
+    _fetch_correspondents_for_ids,
+    _fetch_tags_for_docs,
+    _names_for_ids,
+)
+from app.modules.metadata.service import fetch_field_values_for_docs
 from app.modules.search import query as q_builders
 from app.modules.search.schemas import SearchListOut, SearchResultOut
 
@@ -65,6 +72,12 @@ def search_documents(
     rows = db.execute(stmt.offset(offset).limit(_PAGE_SIZE)).all()
 
     names = _names_for_ids(db, {row[0].uploaded_by for row in rows})
+    doc_ids = [row[0].id for row in rows]
+    tags_by_doc = _fetch_tags_for_docs(db, doc_ids)
+    corresp_ids = {row[0].correspondent_id for row in rows if row[0].correspondent_id}
+    corresp_by_id = _fetch_correspondents_for_ids(db, corresp_ids)
+    field_values_by_doc = fetch_field_values_for_docs(db, doc_ids)
+
     items: list[SearchResultOut] = []
     for doc, score, snip, content_m, fname_m in rows:
         matched: list[str] = []
@@ -74,7 +87,15 @@ def search_documents(
             matched.append("filename")
         items.append(
             SearchResultOut(
-                document=_doc_to_out(doc, names.get(doc.uploaded_by, str(doc.uploaded_by))),
+                document=_doc_to_out(
+                    doc,
+                    names.get(doc.uploaded_by, str(doc.uploaded_by)),
+                    tags=tags_by_doc.get(doc.id, []),
+                    correspondent=corresp_by_id.get(doc.correspondent_id)
+                    if doc.correspondent_id
+                    else None,
+                    custom_field_values=field_values_by_doc.get(doc.id, []),
+                ),
                 score=float(score or 0.0),
                 snippet=q_builders.snippet_html_safe(snip),
                 matched_fields=matched,

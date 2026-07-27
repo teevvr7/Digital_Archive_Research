@@ -339,10 +339,11 @@ export default function SearchPage() {
 
                         {doc.tags.slice(0, 3).map((tag) => (
                           <span
-                            key={tag}
-                            className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-xs"
+                            key={tag.id}
+                            className="px-1.5 py-0.5 rounded text-xs font-medium"
+                            style={{ background: tag.color + "22", color: tag.color }}
                           >
-                            {tag}
+                            {tag.name}
                           </span>
                         ))}
                       </div>

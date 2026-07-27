@@ -37,7 +37,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   // The standard SSR-safe portal pattern — this setState-in-effect is the point,
   // not an oversight: it defers the portal to strictly after hydration.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const dismiss = useCallback((id: string) => {

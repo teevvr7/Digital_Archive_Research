@@ -144,6 +144,16 @@ def download_document(ctx: _DbCtx, doc_id: uuid.UUID) -> dict[str, str]:
 
 
 @router.get(
+    "/documents/{doc_id}/preview",
+    summary="Return a short-lived signed URL for inline viewing (does not log a download event)",
+)
+def preview_document(ctx: _DbCtx, doc_id: uuid.UUID) -> dict[str, str]:
+    db, _ = ctx
+    url = service.get_preview_url(db, doc_id)
+    return {"url": url}
+
+
+@router.get(
     "/documents/{doc_id}/thumbnail",
     summary="Return a short-lived signed thumbnail URL (404 if none was generated)",
 )

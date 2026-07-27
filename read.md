@@ -605,9 +605,10 @@ Every authenticated route calls `verify_token(token: str) → TokenData` in `app
 
 **When `tenant_id` is absent from the JWT** (first ever login):
 1. Creates a `Tenant` row — name derived from email domain (e.g. `"gmail"` from `user@gmail.com`, title-cased as `"Gmail"`).
-2. Calls `supabase_admin().auth.admin.update_user_by_id(user_id, {"app_metadata": {"tenant_id": "...", "role": "admin"}})` → patches the Supabase user record so all future JWTs carry the tenant.
-3. Creates a `User` row with `role="admin"`.
-4. Subsequent logins hit the idempotent path: upserts user, updates `last_login_at`, syncs role.
+2. Seeds 4 starter tags and the same starter **predefined custom fields** migration 0015 backfilled for pre-existing tenants (PO Number/Payment Terms on Invoice, Expense Category on Receipt, Contract End Date/Renewal Reminder on Contract, Department on Report) — mirrored in code, not read from the old migration, so every tenant created via normal signup gets the same onboarding value instead of an empty Custom Fields page.
+3. Calls `supabase_admin().auth.admin.update_user_by_id(user_id, {"app_metadata": {"tenant_id": "...", "role": "admin"}})` → patches the Supabase user record so all future JWTs carry the tenant.
+4. Creates a `User` row with `role="admin"`.
+5. Subsequent logins hit the idempotent path: upserts user, updates `last_login_at`, syncs role.
 
 **Why a dedicated bootstrap call?**
 Supabase JWTs are issued before the backend user/tenant rows exist. Bootstrap is the bridge: it creates the rows, patches the Supabase metadata, and makes the system self-configuring on first login with zero admin setup.
@@ -698,7 +699,8 @@ All response bodies use **camelCase** field names (via `CamelModel` alias genera
 | `POST` | `/documents` | Upload one or more files (rate-limited 300/min); batch-count capped |
 | `GET` | `/documents` | List with filters: status, type, tag, correspondent, date range, amount range, vendor, inbox, q, sort, page, trashed |
 | `GET` | `/documents/{id}` | Fetch one document |
-| `GET` | `/documents/{id}/download` | `{"url": "<signed-url>"}`, 5-min TTL |
+| `GET` | `/documents/{id}/download` | `{"url": "<signed-url>"}`, 5-min TTL; logs a `download` activity event |
+| `GET` | `/documents/{id}/preview` | Same signed-URL shape, for inline viewing — does **not** log a download event, so merely opening the detail page no longer pollutes the audit trail |
 | `GET` | `/documents/{id}/thumbnail` | Signed thumbnail URL; 404 if none generated |
 | `PATCH` | `/documents/{id}` | Edit title / type / date / correspondent / extracted-data patch |
 | `POST` | `/documents/{id}/retry` | Re-enqueue a failed document |
@@ -1159,7 +1161,8 @@ Every `lib/api.ts` function calls `authHeaders()` which calls `supabase.auth.get
 - After success: `router.push("/documents")`.
 
 #### `/documents`
-- Calls `apiDocuments({ status, type, tag, correspondent, dateFrom, dateTo, amountMin, amountMax, vendor, inbox, sort, q, page, trashed })` on mount and on filter change.
+- Calls `apiDocuments({ status, type, tag, correspondent, dateFrom, dateTo, amountMin, amountMax, vendor, inbox, sort, q, page, trashed })` on mount and on filter change. The vendor/min-amount/max-amount inputs live directly in the filter bar (not hidden behind saved views).
+- Filter state also seeds itself from the URL's own query string on navigation (`useSearchParams`, wrapped in a `Suspense` boundary per Next 16's requirement) — so the sidebar's Inbox link and a saved view's "open" link actually apply their filters instead of landing on an unfiltered list.
 - Grid and table view toggle; pagination; sort options.
 - **Polling** while any row is in a non-terminal status. Cleared once all visible rows reach a terminal status.
 - Per-row actions: Download, View, Retry, Restore/permanent-delete (trash view).
@@ -1168,7 +1171,7 @@ Every `lib/api.ts` function calls `authHeaders()` which calls `supabase.auth.get
 
 #### `/documents/:id`
 - Calls `apiDocument(id)` on mount; polls while non-terminal.
-- **Preview pane**: `<img>` for images; `<iframe>` for PDFs.
+- **Preview pane**: `<img>` for images; `<iframe>` for PDFs — fetches its signed URL via `apiPreviewUrl()` (`GET /documents/{id}/preview`), not `apiDownloadUrl()`, so simply opening a document no longer records a `download` activity event on every page load; the explicit Download button still uses `apiDownloadUrl()` and does log one.
 - **Tabs**: Extracted Data (key-value + line items + confidence badge, editable via correction UI — feeds the self-learning loop), Metadata (flat field table, editable title/type/date/correspondent), Custom Fields (typed values per the tenant's field catalog), History (per-document activity feed), Raw JSON.
 - "Possible duplicate" badge (links to the other document) when `duplicateOfDocumentId` is set.
 - Actions: Download, Retry, Re-run AI extraction, Trash/Restore, **Share** (create/list/revoke time-limited public links).
@@ -1182,6 +1185,7 @@ Every `lib/api.ts` function calls `authHeaders()` which calls `supabase.auth.get
 - Standard CRUD pages (list + create/edit modal + delete) matching the same list/modal/form pattern.
 - `/tags` additionally has an **"Apply rules to existing documents"** action — retroactively runs the match-rule engine over already-ingested docs (paginated, safe to call repeatedly).
 - `/correspondents` form includes an **email** field — auto-populated by `.eml` sender linking, or settable manually to seed the auto-link for future emails.
+- `/views` "Open" reconstructs the *complete* filter set on `/documents` — its query-string builder now covers every key the Documents page's filter bar can produce (tag, correspondent, vendor, amount range, custom-field filters), where it previously only carried status/type/date/q/sort/inbox and silently dropped the rest.
 
 #### `/settings`
 Fully wired to live data — no mock data anywhere in the app. Tabs: **Organisation** (real profile + live storage stats by mime family), **Users & Access** (real multi-row team list, invite modal, per-row role control, pending-invite badge — admin-gated), **Activity** (org-wide paginated audit feed), **Security** / **API Keys** / **Notifications** (explicit "coming soon" panels — deliberately not faked, since faking security controls in a document-archive product is a trust liability).
@@ -1519,6 +1523,32 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 
 ---
 
+### In progress: 2026-07-27 full feature QA + bugfix pass
+
+Every user-facing feature except the IDP pipeline's extraction internals is being manually
+re-tested end-to-end (real browser, fresh throwaway tenant) and fixed as issues surface. **Fixes
+so far are made in the working tree but not yet committed or covered by new tests** — treat the
+descriptions above as the current, not-yet-shipped truth:
+- Viewing a document's inline preview was recording it as a "download" in the audit trail on
+  every page load; it now uses a dedicated preview endpoint that doesn't log an activity event.
+- The Documents page had no vendor/amount-range filter inputs even though the API has supported
+  them since Level 3 — added to the filter bar.
+- Filters encoded in a URL (the sidebar's Inbox link, a saved view's "open" link) weren't applied
+  by the Documents page — it only read its filter state from local component state, never the URL.
+- Saved views silently dropped tag/correspondent/vendor/amount/custom-field filters when
+  reconstructing a view's URL, keeping only status/type/date/q/sort/inbox.
+- New tenants (post-migration-0015 signups) got an empty Custom Fields catalog; bootstrap now
+  seeds the same starter predefined fields the migration backfilled for existing tenants.
+- Upload page's file picker didn't accept XML (`.xml` / UBL/MyInvois e-invoices) even though the
+  backend has parsed it since Level 5; a stale "OCR via LiteParse" string was also corrected to
+  RapidOCR (LiteParse was dropped for stability reasons before this ever shipped).
+
+Once the pass completes, a dedicated log (`log/2026-07-27_full_feature_qa_pass.md`) will record
+every area tested with pass/fail verdicts, and these fixes will be committed with `pytest`/`tsc`
+verified green.
+
+---
+
 ## 17. What's Coming Next
 
 ### Blocked on external setup
@@ -1549,4 +1579,4 @@ DataWiz is a **multi-tenant** system — many companies use the same software, b
 ---
 
 *Last updated: 2026-07-27*
-*Complete: Milestones A-E, Phases 0-6 (production hardening → universal ingestion → deterministic extraction → file management → organization → metadata → retrieval/UX), and Production Level-Up Levels 1, 3, 4, and 5 (5 of 7 items — trash auto-retention shipped 2026-07-23). Level 2 (IDP pipeline upgrade) is blocked on external GPU setup. A dedicated security-hardening pass (headers, prod error hygiene, global rate-limit fallback, input validation, a stored-XSS fix in search) shipped 2026-07-22, plus predefined-per-document-type custom fields shipped 2026-07-16. See `CLAUDE.md` for the live status table.*
+*Complete: Milestones A-E, Phases 0-6 (production hardening → universal ingestion → deterministic extraction → file management → organization → metadata → retrieval/UX), and Production Level-Up Levels 1, 3, 4, and 5 (5 of 7 items — trash auto-retention shipped 2026-07-23; email-in ingestion and Malay FTS config dropped by user request 2026-07-27). Level 2 (IDP pipeline upgrade) is blocked on external GPU setup. A dedicated security-hardening pass (headers, prod error hygiene, global rate-limit fallback, input validation, a stored-XSS fix in search) shipped 2026-07-22, plus predefined-per-document-type custom fields shipped 2026-07-16. **Underway now: a full feature QA + bugfix pass (see "In progress" above §17) with several fixes already made but not yet committed.** See `CLAUDE.md` for the live status table.*

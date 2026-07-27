@@ -197,9 +197,18 @@ export const apiDocuments = (query: DocumentsQuery = {}) => {
 
 export const apiDocument = (id: string) => get<Document>(`/documents/${id}`);
 
-/** Returns a short-lived signed URL; open it in a new tab to trigger download. */
+/** Returns a short-lived signed URL; open it in a new tab to trigger download.
+ * Logs a download activity event server-side — only call this for an explicit
+ * user download action, never for rendering the inline preview (use
+ * apiPreviewUrl for that). */
 export const apiDownloadUrl = (id: string) =>
   get<{ url: string }>(`/documents/${id}/download`);
+
+/** Returns a short-lived signed URL for inline viewing. Unlike apiDownloadUrl,
+ * does not log a download activity event — safe to call on every document
+ * detail page load. */
+export const apiPreviewUrl = (id: string) =>
+  get<{ url: string }>(`/documents/${id}/preview`);
 
 /** Returns a short-lived signed thumbnail URL. Rejects with 404 if none was generated. */
 export const apiThumbnailUrl = (id: string) =>

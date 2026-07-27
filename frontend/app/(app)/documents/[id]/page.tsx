@@ -30,6 +30,7 @@ import { formatBytes, formatRelativeTime } from "@/lib/format";
 import {
   apiDocument,
   apiDownloadUrl,
+  apiPreviewUrl,
   apiExtractDocument,
   apiRetryDocument,
   apiPatchDocument,
@@ -131,7 +132,7 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   }
 
   if (typeof value === "string")
-    return <span className="text-green-700 text-xs font-mono">"{value}"</span>;
+    return <span className="text-green-700 text-xs font-mono">&quot;{value}&quot;</span>;
   if (typeof value === "number")
     return <span className="text-orange-600 text-xs font-mono">{value}</span>;
   if (typeof value === "boolean")
@@ -221,10 +222,12 @@ export default function DocumentViewerPage({
     return () => clearInterval(timerId);
   }, [id, doc?.status]);
 
-  // Fetch signed URL for inline preview once the doc is loaded.
+  // Fetch signed URL for inline preview once the doc is loaded. Uses the
+  // no-activity-log preview endpoint — merely viewing a document must not
+  // show up in the audit trail as a "download".
   useEffect(() => {
     if (!doc) return;
-    apiDownloadUrl(doc.id)
+    apiPreviewUrl(doc.id)
       .then(({ url }) => setPreviewUrl(url))
       .catch(() => {});
   }, [doc?.id]);

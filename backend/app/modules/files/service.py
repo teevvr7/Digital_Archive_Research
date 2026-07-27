@@ -783,6 +783,18 @@ def get_download_url(db: Session, user: TokenData, doc_id: uuid.UUID) -> str:
     return url
 
 
+def get_preview_url(db: Session, doc_id: uuid.UUID) -> str:
+    """Return a signed URL for inline viewing — unlike get_download_url, does NOT
+    record a download activity event. The document detail page fetches this on
+    every page load just to render the inline preview; logging that as a
+    "download" would falsely inflate the audit trail (a real PDPA-relevant
+    concern) every time a document is merely viewed, not exported."""
+    doc = db.get(Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return object_storage.create_signed_url(doc.storage_key)
+
+
 def get_thumbnail_url(db: Session, doc_id: uuid.UUID) -> str:
     """Return a signed URL for a document's thumbnail. 404 if none was generated."""
     doc = db.get(Document, doc_id)

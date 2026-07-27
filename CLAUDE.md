@@ -92,7 +92,9 @@ A multi-tenant, SaaS-based AI-supported **digital archive system** with an **Int
 | 2 | IDP pipeline upgrade — port `paddle_qwen` (remote-HTTP, gate-fail-only Tier 4), canonical `extracted_data` schema, IDP Control Center | ⏸ blocked — needs user-deployed Lightning AI PaddleOCR-VL endpoint + license check |
 | 3 | Data value — typed extraction columns (`vendor`/`invoice_no`/`total_amount`/`currency`), amount/vendor filters, CSV/XLSX/zip export, retroactive rule backfill, shareable links (token-gated public endpoint), auto-title + duplicate-invoice detection | ✅ done, committed (`6a013d6`) |
 | 4 | Team accounts — invite-by-email (Supabase Auth admin), enforced admin/member roles beyond the existing `require_admin`, real multi-row Users tab replacing the single-user Settings view | ✅ done, committed (`b4f1300`) |
-| 5 | SME growth & differentiators — **4 of 7 shipped**: onboarding starter kit, PWA/camera capture, email-sender→correspondent linking, MyInvois UBL-XML ingestion. Remaining (not started, pick per signal): email-in ingestion, Malay FTS config, trash auto-retention | 🔄 in progress |
+| 5 | SME growth & differentiators — **5 of 7 shipped**: onboarding starter kit, PWA/camera capture, email-sender→correspondent linking, MyInvois UBL-XML ingestion, trash auto-retention. Email-in ingestion and Malay FTS config **dropped by user request (2026-07-27)** — not being built | ✅ done (scope reduced) |
+
+**Done (2026-07-27): full feature QA + bugfix pass** — every user-facing feature except the IDP pipeline internals was manually re-tested (real browser, screenshots reviewed) against a fresh throwaway tenant, with 9 functional bugs and UX issues found and fixed, incl. CSV/XLSX export being 100% broken via the UI (a router-registration-order bug the existing test suite never caught). Log: `log/2026-07-27_full_feature_qa_pass.md`.
 
 **Decisions locked:**
 - Infrastructure: Supabase (DB + Auth + Storage), Redis + RQ (queue), vLLM on Lightning AI Studio

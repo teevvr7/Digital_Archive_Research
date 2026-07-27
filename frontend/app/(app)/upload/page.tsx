@@ -83,14 +83,16 @@ const ACCEPTED = [
   "text/csv",
   "text/markdown",
   "message/rfc822",
+  "text/xml",
+  "application/xml",
 ];
 // Browsers often report an empty/unreliable File.type for some of these
-// (markdown/eml especially) — fall back to extension for the client-side
+// (markdown/eml/xml especially) — fall back to extension for the client-side
 // picker filter. This is a UX nicety only; the real content check happens
 // server-side via magic-byte sniffing (idp/mimetype.py), never the extension.
 const ACCEPTED_EXTENSIONS = [
   "pdf", "jpg", "jpeg", "png", "webp", "tif", "tiff",
-  "docx", "xlsx", "pptx", "txt", "csv", "md", "markdown", "eml",
+  "docx", "xlsx", "pptx", "txt", "csv", "md", "markdown", "eml", "xml",
 ];
 const MAX_SIZE_MB = 50;
 
@@ -938,7 +940,7 @@ export default function UploadPage() {
         <ol className="space-y-1 text-blue-700 text-xs list-decimal list-inside">
           <li>File is stored securely in object storage</li>
           <li>Text layer check — if found, OCR is skipped (faster &amp; cheaper)</li>
-          <li>OCR via LiteParse for scanned documents</li>
+          <li>OCR via RapidOCR for scanned documents</li>
           <li>AI extraction (Qwen2.5-VL) for structured data on supported types</li>
           <li>Results indexed for full-text search</li>
         </ol>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
   FileImage,
@@ -188,9 +188,10 @@ function DocCard({
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const { tenant, refresh: refreshAuth } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -202,6 +203,9 @@ export default function DocumentsPage() {
   const [correspondentFilter, setCorrespondentFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [vendorFilter, setVendorFilter] = useState<string>("");
+  const [amountMin, setAmountMin] = useState<string>("");
+  const [amountMax, setAmountMax] = useState<string>("");
   const [inbox, setInbox] = useState(false);
   const [sortBy, setSortBy] = useState("date_desc");
   const [page, setPage] = useState(1);
@@ -271,6 +275,38 @@ export default function DocumentsPage() {
     apiPredefinedFields().then(setPredefinedFields).catch(() => {});
   }, []);
 
+  // Seed filter state from the URL's own query string — e.g. the sidebar's
+  // "Inbox" link (`/documents?inbox=true`) or a saved view's "open" link.
+  // Depends on `searchParams` (not just mount) because a soft Link navigation
+  // between two /documents-family URLs (e.g. clicking "Inbox" while already
+  // on this page) doesn't remount the component — a mount-only effect would
+  // silently miss the new query string. searchParams only changes on a real
+  // navigation, never from this page's own local filter-state changes (which
+  // don't push to the URL), so this can't loop or fight user-driven filtering.
+  useEffect(() => {
+    if (searchParams.get("inbox") === "true") setInbox(true);
+    if (searchParams.get("status")) setStatusFilter(searchParams.get("status") as ProcessingStatus);
+    if (searchParams.get("type")) setTypeFilter(searchParams.get("type") as DocumentType);
+    if (searchParams.get("tag_id")) setTagFilter(searchParams.get("tag_id")!);
+    if (searchParams.get("correspondent_id")) setCorrespondentFilter(searchParams.get("correspondent_id")!);
+    if (searchParams.get("date_from")) setDateFrom(searchParams.get("date_from")!);
+    if (searchParams.get("date_to")) setDateTo(searchParams.get("date_to")!);
+    if (searchParams.get("vendor")) setVendorFilter(searchParams.get("vendor")!);
+    if (searchParams.get("amount_min")) setAmountMin(searchParams.get("amount_min")!);
+    if (searchParams.get("amount_max")) setAmountMax(searchParams.get("amount_max")!);
+    if (searchParams.get("q")) setQuery(searchParams.get("q")!);
+    if (searchParams.get("sort")) setSortBy(searchParams.get("sort")!);
+    if (searchParams.get("custom_field_id")) setCustomFieldId(searchParams.get("custom_field_id")!);
+    if (searchParams.get("custom_field_value")) setCustomFieldValue(searchParams.get("custom_field_value")!);
+    if (searchParams.get("custom_field_min")) setCustomFieldMin(searchParams.get("custom_field_min")!);
+    if (searchParams.get("custom_field_max")) setCustomFieldMax(searchParams.get("custom_field_max")!);
+    if (searchParams.get("custom_field_date_from")) setCustomFieldDateFrom(searchParams.get("custom_field_date_from")!);
+    if (searchParams.get("custom_field_date_to")) setCustomFieldDateTo(searchParams.get("custom_field_date_to")!);
+    if (searchParams.get("custom_field_number_mode")) {
+      setCustomFieldNumberMode(searchParams.get("custom_field_number_mode") as "contains" | "range");
+    }
+  }, [searchParams]);
+
   // Close bulk menus on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -299,6 +335,9 @@ export default function DocumentsPage() {
     correspondent_id: correspondentFilter !== "all" ? correspondentFilter : undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
+    vendor: vendorFilter || undefined,
+    amount_min: amountMin ? Number(amountMin) : undefined,
+    amount_max: amountMax ? Number(amountMax) : undefined,
     inbox: inbox || undefined,
     q: query || undefined,
     sort: sortBy,
@@ -352,6 +391,7 @@ export default function DocumentsPage() {
 
   const filterDeps = [
     statusFilter, typeFilter, tagFilter, correspondentFilter, dateFrom, dateTo,
+    vendorFilter, amountMin, amountMax,
     inbox, sortBy, page, query, trashed,
     customFieldId, customFieldValue, customFieldMin, customFieldMax,
     customFieldDateFrom, customFieldDateTo, customFieldNumberMode,
@@ -403,6 +443,9 @@ export default function DocumentsPage() {
     setCorrespondentFilter("all");
     setDateFrom("");
     setDateTo("");
+    setVendorFilter("");
+    setAmountMin("");
+    setAmountMax("");
     setInbox(false);
     setSortBy("date_desc");
     setPage(1);
@@ -411,7 +454,7 @@ export default function DocumentsPage() {
 
   const hasActiveFilters =
     query || statusFilter !== "all" || typeFilter !== "all" || tagFilter !== "all" ||
-    correspondentFilter !== "all" || dateFrom || dateTo ||
+    correspondentFilter !== "all" || dateFrom || dateTo || vendorFilter || amountMin || amountMax ||
     inbox || customFieldId !== "all";
 
   const emptyStateProps = trashed
@@ -444,6 +487,9 @@ export default function DocumentsPage() {
     setCorrespondentFilter((s.correspondent_id as string) || "all");
     setDateFrom((s.date_from as string) || "");
     setDateTo((s.date_to as string) || "");
+    setVendorFilter((s.vendor as string) || "");
+    setAmountMin(s.amount_min !== undefined ? String(s.amount_min) : "");
+    setAmountMax(s.amount_max !== undefined ? String(s.amount_max) : "");
     setInbox(Boolean(s.inbox));
     setSortBy((s.sort as string) || "date_desc");
     setPage(1);
@@ -464,6 +510,9 @@ export default function DocumentsPage() {
     ...(correspondentFilter !== "all" && { correspondent_id: correspondentFilter }),
     ...(dateFrom && { date_from: dateFrom }),
     ...(dateTo && { date_to: dateTo }),
+    ...(vendorFilter && { vendor: vendorFilter }),
+    ...(amountMin && { amount_min: Number(amountMin) }),
+    ...(amountMax && { amount_max: Number(amountMax) }),
     ...(inbox && { inbox: true }),
     ...(sortBy !== "date_desc" && { sort: sortBy }),
     ...(customFieldId !== "all" && { custom_field_id: customFieldId }),
@@ -1009,6 +1058,34 @@ export default function DocumentsPage() {
             title="Document date to"
           />
 
+          <input
+            type="text"
+            placeholder="Vendor…"
+            value={vendorFilter}
+            onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
+            className="w-32 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Filter by vendor name"
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="Min amount"
+            value={amountMin}
+            onChange={(e) => { setAmountMin(e.target.value); setPage(1); }}
+            className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Minimum total amount"
+          />
+          <span className="text-slate-400 text-sm">→</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="Max amount"
+            value={amountMax}
+            onChange={(e) => { setAmountMax(e.target.value); setPage(1); }}
+            className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+            title="Maximum total amount"
+          />
+
           {/* Custom-field filter — only unlocks once a Type is picked, and
               only offers fields predefined for that type (never the whole
               tenant catalog at once). */}
@@ -1447,5 +1524,18 @@ export default function DocumentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Next 16 requires any `useSearchParams()` consumer to sit under a Suspense
+ * boundary, otherwise the route de-opts to full client rendering (and the
+ * build errors) — same pattern as `app/login/page.tsx`.
+ */
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DocumentsPageInner />
+    </Suspense>
   );
 }

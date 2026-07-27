@@ -33,6 +33,8 @@ from app.models.activity_event import (
     ACT_USER_ROLE_CHANGED,
     ActivityEvent,
 )
+from app.models.custom_field import CustomField
+from app.models.document_type_field import DocumentTypeField
 from app.models.tag import Tag
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -53,6 +55,42 @@ _STARTER_TAGS = [
 
 def _seed_starter_tags(db: Session, tenant_id: uuid.UUID) -> None:
     db.add_all(Tag(tenant_id=tenant_id, name=name, color=color) for name, color in _STARTER_TAGS)
+
+
+# Same starter predefined-fields set migration 0015 backfilled for tenants that
+# existed at that time. Mirrored here (not imported from the migration — past
+# migrations are historical and never edited/reused) so every tenant created
+# via normal signup afterward gets the same onboarding value instead of an
+# empty Custom Fields page for every document type.
+_STARTER_PREDEFINED_FIELDS: dict[str, list[tuple[str, str, list[str]]]] = {
+    "invoice": [
+        ("PO Number", "text", []),
+        ("Payment Terms", "text", []),
+    ],
+    "receipt": [
+        ("Expense Category", "select", ["Travel", "Meals", "Office", "Other"]),
+    ],
+    "contract": [
+        ("Contract End Date", "date", []),
+        ("Renewal Reminder", "boolean", []),
+    ],
+    "report": [
+        ("Department", "text", []),
+    ],
+}
+
+
+def _seed_starter_predefined_fields(db: Session, tenant_id: uuid.UUID) -> None:
+    for doc_type, fields in _STARTER_PREDEFINED_FIELDS.items():
+        for name, field_type, options in fields:
+            field = CustomField(
+                tenant_id=tenant_id, name=name, field_type=field_type, options=options
+            )
+            db.add(field)
+            db.flush()  # need field.id before attaching it to the document type
+            db.add(
+                DocumentTypeField(tenant_id=tenant_id, document_type=doc_type, field_id=field.id)
+            )
 
 
 def _supabase_admin():
@@ -112,6 +150,7 @@ def bootstrap(token: TokenData) -> tuple[User, Tenant]:
             db.add(tenant)
             db.flush()
             _seed_starter_tags(db, tenant.id)
+            _seed_starter_predefined_fields(db, tenant.id)
 
             # Update Supabase app_metadata so the JWT on next refresh has tenant_id + role.
             _supabase_admin().auth.admin.update_user_by_id(

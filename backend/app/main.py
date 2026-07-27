@@ -75,7 +75,14 @@ if _is_prod:
 
 
 # ---- Routers ----
+# export_router's literal "GET /documents/export" MUST be included before
+# files_router — Starlette matches routes in registration order, and
+# files_router's "GET /documents/{doc_id}" is a catch-all for that same verb
+# that would otherwise swallow the request first (doc_id="export" fails UUID
+# parsing -> a 422 that looks unrelated to the real cause). Any future router
+# adding a literal GET under /documents/ needs the same ordering care.
 app.include_router(auth_router, prefix="/api")
+app.include_router(export_router, prefix="/api")
 app.include_router(files_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
@@ -83,7 +90,6 @@ app.include_router(tags_router, prefix="/api")
 app.include_router(correspondents_router, prefix="/api")
 app.include_router(metadata_router, prefix="/api")
 app.include_router(views_router, prefix="/api")
-app.include_router(export_router, prefix="/api")
 app.include_router(shares_router, prefix="/api")
 app.include_router(shares_public_router, prefix="/api")
 
