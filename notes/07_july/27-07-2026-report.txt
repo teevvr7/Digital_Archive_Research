@@ -1,0 +1,66 @@
+1. Daily Summary of Activities
+- Resolved Python dependency compatibility issues between the HTTP client library and the OpenAI SDK wrapper to ensure smooth client initialization during pipeline execution.
+- Executed the Phase 4 Unified Router and Pipeline Evaluation benchmark across 150 evaluation questions, achieving a **99.33% Hit Rate@5** and a **0.9933 Mean Reciprocal Rank (MRR@5)**.
+- Conducted an in-depth router classification audit, revealing that 100% of current benchmark questions were classified as structured queries and routed to direct SQL JSONB execution.
+- Conducted single-query walkthrough inspections comparing SQL path execution against forced RAG path execution, demonstrating why direct SQL lookup succeeds on exact invoice IDs while semantic vector search fails.
+- Performed a critical R&D evaluation of the benchmark results, identifying that the current test dataset primarily evaluates structured query lookups and establishing a plan to add fuzzy contextual evaluation cases.
+- Conducted cloud infrastructure research on Google Cloud Platform (GCP) to explore optimal deployment architectures for the Document Archiving & Processing system (evaluating serverless container hosting via Cloud Run vs virtual machine infrastructure on Compute Engine).
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Client Wrapper Incompatibility Resolution
+Description of Work Done: Updated client instantiation logic to pass an explicit HTTP client wrapper, resolving parameter mismatch errors in the virtual environment.
+Status: Completed
+Remarks: Unified pipeline client initialization fully operational.
+
+Task Number: 2
+Task / Project Name: Unified Pipeline Benchmark Execution & Critical Analysis
+Description of Work Done: Executed full evaluation benchmark, audited query router classification metrics, conducted single-query path comparisons, and documented critical failure modes and dataset limitations.
+Status: Completed
+Remarks: Recorded 99.33% Hit Rate@5 and 0.9933 MRR@5.
+
+Task Number: 3
+Task / Project Name: Google Cloud Platform (GCP) Deployment Research
+Description of Work Done: Researched GCP deployment patterns for intelligent document processing and archiving systems, comparing serverless container deployment (Cloud Run) against virtual machine infrastructure (Compute Engine VMs).
+Status: Completed
+Remarks: Evaluated cost, scaling, and containerization trade-offs for cloud architecture.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Unexpected keyword argument error during API client initialization.
+Root Cause: Newer HTTP client versions removed a deprecated keyword parameter still referenced by older client wrapper constructors.
+Resolution Provided: Configured an explicit HTTP client instance during client setup to bypass default internal wrapper construction.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL (pgvector & JSONB), OpenAI API SDK, SentenceTransformers, Google Cloud Platform (GCP Cloud Run, Compute Engine VMs).
+IDE / Tools: VS Code, PowerShell, Docker CLI.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Diagnosing why pure vector search failed on exact document IDs in earlier benchmarks compared to 99.33% success on the routed SQL path.
+Solution: Conducted side-by-side walkthrough inspections showing that vector embeddings suffer from semantic blindness to alphanumeric IDs, whereas SQL JSONB lookup returns exact records in under 1 millisecond.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Analyzed API client wrapper initialization patterns across Python HTTP library versions.
+- Audited automated query routing efficiency for financial invoice search.
+- Researched GCP cloud deployment options (Cloud Run serverless containers vs Compute Engine VMs) for enterprise document archiving workloads.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Add side-by-side comparative benchmark cells (Pure RAG vs Pure SQL vs Routed Pipeline).
+- Expand evaluation ground truth dataset with 25-30 fuzzy conversational questions without explicit document IDs.
+- Begin Phase 5: Build Streamlit user interface and monitoring dashboard.

@@ -1,4 +1,5 @@
 import os
+import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -13,7 +14,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 
 def get_llm_client() -> OpenAI:
     """Return an OpenAI client configured for the specified API endpoint."""
+    http_client = httpx.Client(follow_redirects=True)
     return OpenAI(
         base_url=LLM_BASE_URL,
-        api_key=LLM_API_KEY if LLM_API_KEY != "none" else "placeholder"
+        api_key=LLM_API_KEY if LLM_API_KEY not in ("none", "") else "placeholder",
+        http_client=http_client
     )
+

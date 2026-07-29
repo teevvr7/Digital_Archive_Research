@@ -1,4 +1,4 @@
-"""Metadata module schemas — custom field catalog and document field values."""
+"""Metadata Custom Fields schemas."""
 
 import datetime
 import uuid
@@ -7,48 +7,65 @@ from typing import Any
 from app.core.camel import CamelModel
 
 
-class CustomFieldIn(CamelModel):
-    """Input for creating a custom field definition."""
-
+class CustomFieldCreate(CamelModel):
     name: str
     field_type: str  # text | number | date | boolean | select
-    options: list[str] = []  # populated only for field_type='select'
+    options: list[Any] = []
+    position: int = 0
+
+
+class CustomFieldIn(CamelModel):
+    name: str
+    field_type: str
+    options: list[Any] = []
     position: int = 0
 
 
 class CustomFieldPatchIn(CamelModel):
-    """Partial update for a custom field. Absent fields are left unchanged."""
-
     name: str | None = None
-    options: list[str] | None = None
+    field_type: str | None = None
+    options: list[Any] | None = None
     position: int | None = None
 
 
 class CustomFieldOut(CamelModel):
-    """A custom field definition as returned by the API."""
-
     id: uuid.UUID
+    tenant_id: uuid.UUID
     name: str
     field_type: str
-    options: list[str]
+    options: list[Any]
     position: int
     created_at: datetime.datetime
 
 
 class FieldValueIn(CamelModel):
-    """Input for setting (upserting) a custom field value on a document."""
+    value: Any
 
+
+class FieldValueSet(CamelModel):
+    field_id: uuid.UUID
     value: Any
 
 
 class FieldValueOut(CamelModel):
-    """A resolved custom field value embedded in document responses.
-
-    Includes the field's display metadata so the frontend does not need a
-    second call to look up the field definition.
-    """
-
+    id: uuid.UUID
+    document_id: uuid.UUID
     field_id: uuid.UUID
-    field_name: str
-    field_type: str
     value: Any
+    field: CustomFieldOut | None = None
+
+
+class TypeFieldAssign(CamelModel):
+    document_type_id: uuid.UUID
+    field_id: uuid.UUID
+    is_required: bool = False
+    position: int = 0
+
+
+class TypeFieldOut(CamelModel):
+    id: uuid.UUID
+    document_type_id: uuid.UUID
+    field_id: uuid.UUID
+    is_required: bool
+    position: int
+    field: CustomFieldOut

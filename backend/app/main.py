@@ -60,6 +60,8 @@ app.add_middleware(
 
 from app.modules.idp.config_router import router as idp_config_router
 
+from app.modules.shares.router import router as shares_router
+
 # ---- Routers ----
 app.include_router(auth_router, prefix="/api")
 app.include_router(files_router, prefix="/api")
@@ -71,6 +73,8 @@ app.include_router(correspondents_router, prefix="/api")
 app.include_router(metadata_router, prefix="/api")
 app.include_router(views_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
+app.include_router(shares_router, prefix="/api")
+
 
 
 @app.get("/api/health")

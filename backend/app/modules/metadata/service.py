@@ -1,32 +1,20 @@
-"""Metadata module — custom field CRUD + document field value upsert/delete."""
+"""Metadata Custom Fields service business logic."""
 
 import uuid
 from typing import Any
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.models.custom_field import VALID_FIELD_TYPES, CustomField, DocumentFieldValue
-from app.models.document import Document
-from app.modules.metadata.schemas import (
-    CustomFieldIn,
-    CustomFieldOut,
-    CustomFieldPatchIn,
-    FieldValueIn,
-    FieldValueOut,
-)
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+from app.models.custom_field import CustomField, DocumentFieldValue
+from app.models.document_type_field import DocumentTypeField
+from app.modules.metadata.schemas import CustomFieldOut, FieldValueOut
 
 
 def _field_to_out(field: CustomField) -> CustomFieldOut:
     return CustomFieldOut(
         id=field.id,
+        tenant_id=field.tenant_id,
         name=field.name,
         field_type=field.field_type,
         options=field.options or [],
@@ -35,174 +23,209 @@ def _field_to_out(field: CustomField) -> CustomFieldOut:
     )
 
 
-# ---------------------------------------------------------------------------
-# Custom field catalog
-# ---------------------------------------------------------------------------
-
-
-def list_custom_fields(db: Session) -> list[CustomFieldOut]:
-    """List all custom fields for the current tenant, ordered by position then name."""
-    fields = db.scalars(
-        select(CustomField).order_by(CustomField.position, CustomField.name)
-    ).all()
-    return [_field_to_out(f) for f in fields]
+def list_custom_fields(db: Session, tenant_id: uuid.UUID) -> list[CustomField]:
+    """List all custom fields defined for a tenant sorted by position."""
+    return (
+        db.query(CustomField)
+        .filter(CustomField.tenant_id == tenant_id)
+        .order_by(CustomField.position.asc(), CustomField.created_at.asc())
+        .all()
+    )
 
 
 def create_custom_field(
-    db: Session, tenant_id: uuid.UUID, data: CustomFieldIn
-) -> CustomFieldOut:
-    """Create a custom field definition. 422 on invalid type. 409 on duplicate name."""
-    if data.field_type not in VALID_FIELD_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                f"Invalid field_type '{data.field_type}'. "
-                f"Must be one of: {sorted(VALID_FIELD_TYPES)}"
-            ),
-        )
-    existing = db.scalars(
-        select(CustomField).where(
-            CustomField.tenant_id == tenant_id, CustomField.name == data.name
-        )
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Custom field '{data.name}' already exists.",
-        )
+    db: Session,
+    tenant_id: uuid.UUID,
+    name: str,
+    field_type: str,
+    options: list[Any] | None = None,
+    position: int = 0,
+) -> CustomField:
+    """Create a typed custom field definition for a tenant."""
     field = CustomField(
         tenant_id=tenant_id,
-        name=data.name,
-        field_type=data.field_type,
-        options=data.options,
-        position=data.position,
+        name=name,
+        field_type=field_type,
+        options=options or [],
+        position=position,
     )
     db.add(field)
-    db.flush()
-    return _field_to_out(field)
+    db.commit()
+    db.refresh(field)
+    return field
 
 
 def patch_custom_field(
-    db: Session, field_id: uuid.UUID, patch: CustomFieldPatchIn
-) -> CustomFieldOut:
-    """Update a custom field. Only fields present in the request are written."""
+    db: Session,
+    tenant_id: uuid.UUID,
+    field_id: uuid.UUID,
+    name: str | None = None,
+    field_type: str | None = None,
+    options: list[Any] | None = None,
+    position: int | None = None,
+) -> CustomField:
+    """Partial update of custom field schema."""
     field = db.get(CustomField, field_id)
-    if field is None:
-        raise HTTPException(status_code=404, detail="Custom field not found.")
-    updated = patch.model_fields_set
-    if "name" in updated and patch.name is not None:
-        field.name = patch.name
-    if "options" in updated and patch.options is not None:
-        field.options = patch.options
-    if "position" in updated and patch.position is not None:
-        field.position = patch.position
-    db.flush()
-    return _field_to_out(field)
+    if not field or field.tenant_id != tenant_id:
+        raise ValueError("Custom field not found")
+
+    if name is not None:
+        field.name = name
+    if field_type is not None:
+        field.field_type = field_type
+    if options is not None:
+        field.options = options
+    if position is not None:
+        field.position = position
+
+    db.commit()
+    db.refresh(field)
+    return field
 
 
-def delete_custom_field(db: Session, field_id: uuid.UUID) -> None:
-    """Delete a custom field (cascades document_field_values). 404 if not found."""
+def delete_custom_field(db: Session, tenant_id: uuid.UUID, field_id: uuid.UUID) -> None:
+    """Delete a custom field definition and its associated values."""
     field = db.get(CustomField, field_id)
-    if field is None:
-        raise HTTPException(status_code=404, detail="Custom field not found.")
+    if not field or field.tenant_id != tenant_id:
+        raise ValueError("Custom field not found")
+
     db.delete(field)
-    db.flush()
+    db.commit()
 
 
-# ---------------------------------------------------------------------------
-# Document field values
-# ---------------------------------------------------------------------------
+def assign_field_to_type(
+    db: Session,
+    tenant_id: uuid.UUID,
+    document_type_id: uuid.UUID,
+    field_id: uuid.UUID,
+    is_required: bool = False,
+    position: int = 0,
+) -> DocumentTypeField:
+    """Assign a predefined custom field to a DocumentType."""
+    existing = (
+        db.query(DocumentTypeField)
+        .filter(
+            DocumentTypeField.tenant_id == tenant_id,
+            DocumentTypeField.document_type_id == document_type_id,
+            DocumentTypeField.field_id == field_id,
+        )
+        .first()
+    )
+    if existing:
+        existing.is_required = is_required
+        existing.position = position
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    mapping = DocumentTypeField(
+        tenant_id=tenant_id,
+        document_type_id=document_type_id,
+        field_id=field_id,
+        is_required=is_required,
+        position=position,
+    )
+    db.add(mapping)
+    db.commit()
+    db.refresh(mapping)
+    return mapping
+
+
+def list_type_fields(db: Session, tenant_id: uuid.UUID, document_type_id: uuid.UUID) -> list[DocumentTypeField]:
+    """Get all predefined custom fields configured for a specific DocumentType."""
+    return (
+        db.query(DocumentTypeField)
+        .filter(
+            DocumentTypeField.tenant_id == tenant_id,
+            DocumentTypeField.document_type_id == document_type_id,
+        )
+        .order_by(DocumentTypeField.position.asc())
+        .all()
+    )
+
+
+def fetch_field_values_for_docs(db: Session, doc_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[FieldValueOut]]:
+    """Batch fetch all custom field values assigned to a list of document IDs."""
+    if not doc_ids:
+        return {}
+
+    values = (
+        db.query(DocumentFieldValue)
+        .filter(DocumentFieldValue.document_id.in_(doc_ids))
+        .all()
+    )
+
+    result: dict[uuid.UUID, list[FieldValueOut]] = {did: [] for did in doc_ids}
+    for fv in values:
+        field_out = _field_to_out(fv.field) if fv.field else None
+        out = FieldValueOut(
+            id=fv.id,
+            document_id=fv.document_id,
+            field_id=fv.field_id,
+            value=fv.value,
+            field=field_out,
+        )
+        result[fv.document_id].append(out)
+
+    return result
 
 
 def set_field_value(
     db: Session,
     tenant_id: uuid.UUID,
-    doc_id: uuid.UUID,
+    document_id: uuid.UUID,
     field_id: uuid.UUID,
-    data: FieldValueIn,
-) -> FieldValueOut:
-    """Upsert a custom field value for a document. 404 if doc or field not found."""
-    doc = db.get(Document, doc_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found.")
+    value: Any,
+) -> DocumentFieldValue:
+    """Set or update a custom field value on a specific document."""
     field = db.get(CustomField, field_id)
-    if field is None:
-        raise HTTPException(status_code=404, detail="Custom field not found.")
+    if not field or field.tenant_id != tenant_id:
+        raise ValueError("Custom field not found")
 
-    db.execute(
-        pg_insert(DocumentFieldValue)
-        .values(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            document_id=doc_id,
-            field_id=field_id,
-            value=data.value,
+    existing = (
+        db.query(DocumentFieldValue)
+        .filter(
+            DocumentFieldValue.tenant_id == tenant_id,
+            DocumentFieldValue.document_id == document_id,
+            DocumentFieldValue.field_id == field_id,
         )
-        .on_conflict_do_update(
-            index_elements=["document_id", "field_id"],
-            set_={"value": data.value},
-        )
+        .first()
     )
-    db.flush()
 
-    return FieldValueOut(
-        field_id=field.id,
-        field_name=field.name,
-        field_type=field.field_type,
-        value=data.value,
+    if existing:
+        existing.value = value
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    fv = DocumentFieldValue(
+        tenant_id=tenant_id,
+        document_id=document_id,
+        field_id=field_id,
+        value=value,
     )
+    db.add(fv)
+    db.commit()
+    db.refresh(fv)
+    return fv
 
 
 def delete_field_value(
-    db: Session, doc_id: uuid.UUID, field_id: uuid.UUID
+    db: Session,
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    field_id: uuid.UUID,
 ) -> None:
-    """Clear a custom field value. 404 if no value is currently set."""
-    row = db.scalars(
-        select(DocumentFieldValue).where(
-            DocumentFieldValue.document_id == doc_id,
+    """Remove a custom field value from a document."""
+    existing = (
+        db.query(DocumentFieldValue)
+        .filter(
+            DocumentFieldValue.tenant_id == tenant_id,
+            DocumentFieldValue.document_id == document_id,
             DocumentFieldValue.field_id == field_id,
         )
-    ).first()
-    if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No value is set for this field on this document.",
-        )
-    db.delete(row)
-    db.flush()
-
-
-def fetch_field_values_for_docs(
-    db: Session, doc_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, list[FieldValueOut]]:
-    """Batch-fetch all custom field values for a list of doc IDs (single query).
-
-    Called by ``files.service`` to avoid N+1 queries when building a page of
-    ``DocumentOut`` objects. Returns a mapping from ``document_id`` to the
-    (possibly empty) list of ``FieldValueOut`` for that document.
-    """
-    if not doc_ids:
-        return {}
-    rows = db.execute(
-        select(
-            DocumentFieldValue.document_id,
-            DocumentFieldValue.field_id,
-            DocumentFieldValue.value,
-            CustomField.name,
-            CustomField.field_type,
-        )
-        .join(CustomField, CustomField.id == DocumentFieldValue.field_id)
-        .where(DocumentFieldValue.document_id.in_(doc_ids))
-        .order_by(CustomField.position, CustomField.name)
-    ).all()
-    result: dict[uuid.UUID, list[FieldValueOut]] = {}
-    for row in rows:
-        result.setdefault(row.document_id, []).append(
-            FieldValueOut(
-                field_id=row.field_id,
-                field_name=row.name,
-                field_type=row.field_type,
-                value=row.value,
-            )
-        )
-    return result
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()

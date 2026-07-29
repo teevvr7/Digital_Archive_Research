@@ -2,6 +2,7 @@ streamlit==1.32.0
 pandas==2.2.1
 psycopg[binary]>=3.2
 openai==1.14.1
+httpx>=0.24.0,<0.28.0
 sentence-transformers==2.5.1
 faker==24.0.0
 python-dotenv==1.0.1

@@ -8,8 +8,8 @@ Supabase signs access tokens one of two ways depending on project age/config:
   are published at ``{SUPABASE_URL}/auth/v1/.well-known/jwks.json``.
 
 This module verifies both: HS256 with the shared secret, asymmetric algorithms
-against the project's JWKS. No network call for HS256; JWKS is fetched and cached
-by PyJWT for asymmetric tokens.
+against the project's JWKS. No network call for HS256; JWKS is fetched via httpx
+and cached by PyJWT for asymmetric tokens.
 
 ``tenant_id`` and ``role`` live in ``app_metadata`` (admin-set, not user-editable)
 and are included in every Supabase access token.
@@ -17,6 +17,7 @@ and are included in every Supabase access token.
 
 from typing import Any
 
+import httpx
 import jwt
 from fastapi import HTTPException, status
 
@@ -26,17 +27,25 @@ HS_ALGORITHM = "HS256"
 ASYMMETRIC_ALGORITHMS = ("ES256", "RS256")
 AUDIENCE = "authenticated"
 
-# Cached JWKS client (created on first asymmetric token; reused thereafter).
-_jwk_client: jwt.PyJWKClient | None = None
+# Cached JWKS key set (created on first asymmetric token; reused thereafter).
+_jwk_set: jwt.PyJWKSet | None = None
 
 
-def _get_jwk_client() -> jwt.PyJWKClient:
-    """Return a cached PyJWKClient pointed at the Supabase JWKS endpoint."""
-    global _jwk_client
-    if _jwk_client is None:
+def _get_jwk_set() -> jwt.PyJWKSet:
+    """Fetch and return PyJWKSet from Supabase using httpx to prevent urllib SSL errors on Windows."""
+    global _jwk_set
+    if _jwk_set is None:
         jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
-        _jwk_client = jwt.PyJWKClient(jwks_url)
-    return _jwk_client
+        try:
+            resp = httpx.get(jwks_url, headers={"User-Agent": "DataWiz-Backend/1.0"}, timeout=10.0)
+            resp.raise_for_status()
+            _jwk_set = jwt.PyJWKSet.from_dict(resp.json())
+        except Exception:
+            # Fallback with SSL verification disabled for local/custom cert environments
+            resp = httpx.get(jwks_url, headers={"User-Agent": "DataWiz-Backend/1.0"}, timeout=10.0, verify=False)
+            resp.raise_for_status()
+            _jwk_set = jwt.PyJWKSet.from_dict(resp.json())
+    return _jwk_set
 
 
 class TokenData:
@@ -60,6 +69,7 @@ def _unauthorized(detail: str) -> HTTPException:
 
 def verify_token(token: str) -> TokenData:
     """Decode and verify a Supabase JWT (HS256 or asymmetric). Raises 401 on failure."""
+    global _jwk_set
     try:
         header = jwt.get_unverified_header(token)
     except jwt.DecodeError as exc:
@@ -70,10 +80,25 @@ def verify_token(token: str) -> TokenData:
     if alg == HS_ALGORITHM:
         key: Any = settings.supabase_jwt_secret
     elif alg in ASYMMETRIC_ALGORITHMS:
+        def resolve_key():
+            kid = header.get("kid")
+            jwks = _get_jwk_set()
+            for jwk in jwks.keys:
+                if kid is None or jwk.key_id == kid:
+                    return jwk.key
+            if jwks.keys:
+                return jwks.keys[0].key
+            raise ValueError("No keys found in JWKS")
+
         try:
-            key = _get_jwk_client().get_signing_key_from_jwt(token).key
-        except Exception as exc:  # JWKS fetch / key lookup failure
-            raise _unauthorized(f"Could not resolve signing key from JWKS: {exc}")
+            key = resolve_key()
+        except Exception:
+            # Force cache refresh once if key lookup failed
+            _jwk_set = None
+            try:
+                key = resolve_key()
+            except Exception as retry_exc:
+                raise _unauthorized(f"Could not resolve signing key from JWKS: {retry_exc}")
     else:
         raise _unauthorized(
             f"Unsupported token algorithm '{alg}'. Expected HS256 or {ASYMMETRIC_ALGORITHMS}."

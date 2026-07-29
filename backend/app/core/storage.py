@@ -40,3 +40,7 @@ def delete_file(storage_key: str) -> None:
 def download_file(storage_key: str) -> bytes:
     """Download a file's bytes (used by the worker to retrieve documents for parsing)."""
     return _client().storage.from_(settings.supabase_storage_bucket).download(storage_key)
+
+
+get_signed_url = create_signed_url
+

@@ -551,3 +551,24 @@ export async function downloadExportCsv(
   URL.revokeObjectURL(url);
 }
 
+/** Create a shareable token link for a document. */
+export async function createDocumentShare(
+  documentId: string,
+  expiresInDays: number = 7
+): Promise<{ id: string; token: string; shareUrl: string; expiresAt: string | null }> {
+  return post<{ id: string; token: string; shareUrl: string; expiresAt: string | null }>("/shares", {
+    documentId,
+    expiresInDays,
+  });
+}
+
+/** Fetch public shared document (unauthenticated). */
+export async function getPublicSharedDocument(
+  token: string
+): Promise<{ document: Document; previewUrl: string }> {
+  const res = await fetch(`${BASE}/shares/public/${token}`);
+  if (!res.ok) throw new Error(`Shared link invalid or expired: ${res.status}`);
+  return res.json();
+}
+
+
