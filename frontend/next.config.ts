@@ -18,7 +18,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Allows phones/other devices on the LAN to load dev-server resources (HMR, JS chunks)
   // when testing via http://192.168.0.56:3000 instead of localhost.
-  allowedDevOrigins: ["192.168.0.56"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.56.1", "192.168.0.56"],
+
   async headers() {
     return [
       {

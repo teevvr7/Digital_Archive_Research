@@ -35,22 +35,19 @@ def init_sentry(component: str) -> None:
     if _initialized or not settings.sentry_dsn:
         return
 
-    # Imported lazily (only when actually needed) rather than at module load
-    # time, so importing this file never requires sentry_sdk to be usable.
-    import sentry_sdk
+    try:
+        import sentry_sdk
 
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,  # where to send error reports
-        environment=settings.env,  # tags events as "development" or "production"
-        # Conservative default — trace sampling is a cost knob, not a
-        # correctness one; start low and raise it later if needed.
-        traces_sample_rate=0.1,  # only trace/sample 10% of requests for performance data
-        send_default_pii=False,  # don't send IP addresses/headers by default
-        include_local_variables=False,  # don't send local variable values from stack frames
-    )
-    # Tag every event from this process with which component sent it, so the
-    # Sentry dashboard can filter "api" errors separately from "worker" ones.
-    sentry_sdk.set_tag("component", component)
-    # Remember that we've already initialized, so a second call becomes a no-op.
-    _initialized = True
-    logger.info("Sentry initialized (component=%s, env=%s)", component, settings.env)
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.env,
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+            include_local_variables=False,
+        )
+        sentry_sdk.set_tag("component", component)
+        _initialized = True
+        logger.info("Sentry initialized (component=%s, env=%s)", component, settings.env)
+    except ImportError:
+        logger.info("sentry_sdk package not installed — error monitoring disabled")
+

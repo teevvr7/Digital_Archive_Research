@@ -44,8 +44,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Only send the referring page's origin (not full URL) when navigating
         # away from this site, and never when going from HTTPS to HTTP.
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Isolates this page's browsing context from cross-origin popups it opens.
-        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        if settings.env == "production":
+            # Isolates this page's browsing context from cross-origin popups it opens.
+            response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
         # Explicitly denies the browser permissions APIs this API has no use for.
         response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
         # The docs routes need to load external Swagger/ReDoc assets, so they're

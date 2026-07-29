@@ -20,12 +20,21 @@ slowapi logs it and skips the check rather than raising — the app fails open
 on this defense-in-depth ceiling instead of 500ing every request.
 """
 
-# Limiter is slowapi's main class — one instance is shared across the whole app.
-from slowapi import Limiter
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+except ImportError:
+    class DummyLimiter:
+        def __init__(self, *args, **kwargs):
+            pass
+        def limit(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
 
-# get_remote_address extracts the caller's IP address from the request, which
-# is what we key rate limits on (as opposed to per-user or per-API-key).
-from slowapi.util import get_remote_address
+    Limiter = DummyLimiter
+    get_remote_address = lambda request: "127.0.0.1"
+
 
 from app.core.config import settings
 

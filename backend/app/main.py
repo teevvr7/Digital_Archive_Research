@@ -1,14 +1,23 @@
-"""FastAPI application entrypoint."""
+try:
+    import sentry_sdk
+except ImportError:
+    sentry_sdk = None
 
-import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
+
+try:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+except ImportError:
+    SlowAPIMiddleware = None
+    _rate_limit_exceeded_handler = None
+    RateLimitExceeded = Exception
 
 from app.core.config import settings
+
 from app.core.monitoring import init_sentry
 from app.core.rate_limit import limiter
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -44,8 +53,11 @@ app = FastAPI(
 
 # ---- Rate limiting (targeted — see core/rate_limit.py) ----
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
+if _rate_limit_exceeded_handler and RateLimitExceeded != Exception:
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+if SlowAPIMiddleware is not None:
+    app.add_middleware(SlowAPIMiddleware)
+
 
 
 # ---- Custom OpenAPI schema (Swagger UI file-upload support) ----

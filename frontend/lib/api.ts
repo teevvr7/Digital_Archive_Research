@@ -8,7 +8,17 @@
 import { supabase } from "@/lib/supabase";
 import type { Correspondent, CustomField, Document, ActivityEvent, FieldValue, PredefinedField, SavedView, SearchListResponse, Tag } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+function getBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname || "localhost";
+    if (envUrl) {
+      return envUrl.replace(/localhost|127\.0\.0\.1/, host);
+    }
+    return `http://${host}:8000/api`;
+  }
+  return envUrl ?? "http://127.0.0.1:8000/api";
+}
 
 // ---- Shared types --------------------------------------------------------
 
@@ -67,20 +77,21 @@ export interface DocumentListResponse {
 
 async function authHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession();
+
   const token = data.session?.access_token;
   if (!token) throw new Error("Not authenticated");
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: await authHeaders() });
+  const res = await fetch(`${getBaseUrl()}${path}`, { headers: await authHeaders() });
   if (!res.ok) throw new Error(`GET ${path} → ${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${getBaseUrl()}${path}`, {
     method: "POST",
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -94,7 +105,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 
 async function put<T>(path: string, body?: unknown): Promise<T> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${getBaseUrl()}${path}`, {
     method: "PUT",
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -105,7 +116,7 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
 
 async function patch_<T>(path: string, body?: unknown): Promise<T> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${getBaseUrl()}${path}`, {
     method: "PATCH",
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -116,7 +127,7 @@ async function patch_<T>(path: string, body?: unknown): Promise<T> {
 
 async function delete_<T>(path: string): Promise<T> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+  const res = await fetch(`${getBaseUrl()}${path}`, { method: "DELETE", headers });
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status} ${await res.text()}`);
   // 204 No Content — return undefined (typed as T via void callers)
   if (res.status === 204) return undefined as unknown as T;
@@ -128,7 +139,7 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("Not authenticated");
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${getBaseUrl()}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -137,6 +148,7 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+
 // ---- Auth ----------------------------------------------------------------
 
 /**
@@ -144,7 +156,8 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
  * Unauthenticated — no session exists yet, so this bypasses `authHeaders()`.
  */
 export async function apiSignup(email: string, password: string): Promise<void> {
-  const res = await fetch(`${BASE}/auth/signup`, {
+  const res = await fetch(`${getBaseUrl()}/auth/signup`, {
+
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -576,7 +589,7 @@ async function downloadFile(
   opts: { method?: string; body?: unknown; fallbackName: string }
 ): Promise<{ truncated: boolean }> {
   const headers = await authHeaders();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${getBaseUrl()}${path}`, {
     method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
@@ -641,7 +654,7 @@ export interface ResolvedShare {
  * the token itself is the authorization. Used by the public /shared/[token]
  * page, which has no logged-in session. */
 export async function apiResolveShare(token: string): Promise<ResolvedShare> {
-  const res = await fetch(`${BASE}/share/${token}`);
+  const res = await fetch(`${getBaseUrl()}/share/${token}`);
   if (!res.ok) {
     let detail = await res.text();
     try {
@@ -720,12 +733,13 @@ export async function downloadExportCsv(
   const token = data.session?.access_token;
   if (!token) throw new Error("Not authenticated");
 
-  const res = await fetch(`${BASE}/export/spreadsheet?format=csv`, {
+  const res = await fetch(`${getBaseUrl()}/export/spreadsheet?format=csv`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
+
     body: JSON.stringify({ ...filters, columns, mode }),
   });
 
