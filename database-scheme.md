@@ -2,7 +2,7 @@
 
 > Complete reference for every table, column, relationship, index, and RLS policy in the system.
 > Source of truth: `backend/app/models/*.py` (SQLAlchemy models) + `backend/app/migrations/versions/*.py`
-> (Alembic migrations). Current migration head: **`0016`**.
+> (Alembic migrations). Current migration head: **`0019`**.
 
 ---
 
@@ -82,9 +82,8 @@ only metadata and the extracted results. The actual bytes live in Supabase Stora
 | `status` | VARCHAR | no | `"queued"` | Pipeline state — see the status machine below |
 | `error_message` | TEXT | yes | `NULL` | Populated only when `status = "failed"`; capped at 2000 characters |
 | `document_type` | VARCHAR | no | `"other"` | e.g. `invoice`, `receipt`, `contract` — one of the 7 fixed values (see §2.9) |
-| `document_type_id` | UUID (FK → `document_types.id`, SET NULL) | yes | `NULL` | Reserved link to the dynamic type catalog (not yet the primary source of truth — `document_type` above is) |
-| `template_id` | UUID (FK → `document_templates.id`, SET NULL) | yes | `NULL` | Reserved for the self-learning template-matching loop |
-| `layout_fingerprint` | VARCHAR | yes | `NULL` | Reserved for future layout-based template matching |
+| `document_type_id` | UUID (FK → `document_types.id`, SET NULL) | yes | `NULL` | Link to the dynamic type catalog; resolved from `document_type` (the string) on upload/reprocess if not passed explicitly. Also what picks a document's `extraction_method` strategy — see §2.4 |
+| `template_id` | UUID (FK → `document_templates.id`, SET NULL) | yes | `NULL` | An explicitly-selected extraction template (upload popup or `reprocess_document`), or the tenant's default/promoted template for the resolved type if none was chosen. Drives per-document strategy resolution alongside `document_type_id` — see §2.5 |
 | `page_count` | INTEGER | yes | `NULL` | |
 | `has_text_layer` | BOOLEAN | no | `false` | True if the PDF had extractable text (no OCR needed) |
 | `ocr_used` | BOOLEAN | no | `false` | True if the scanned-image OCR path ran |
@@ -92,7 +91,6 @@ only metadata and the extracted results. The actual bytes live in Supabase Stora
 | `extracted_data` | JSONB | yes | `NULL` | The accepted structured-extraction result (vendor, invoice number, amounts, line items, etc.) — an open-ended JSON blob so any document type's fields fit without a schema migration |
 | `extracted_text` | TEXT | yes | `NULL` | Full plain-text content, used for full-text search |
 | `confidence` | REAL | yes | `NULL` | The accepted extraction's confidence score (0.0–1.0), from whichever tier (deterministic or VLM) produced it |
-| `tags` | VARCHAR[] | no | `[]` | **Dead column** — an early array-based tagging approach, superseded by the `tags`/`document_tags` tables (§2.10). Kept only so nothing breaks; never written to |
 | `search_tsv` | TSVECTOR | yes | `NULL` | Postgres full-text-search index column, built from title + filename + extracted text |
 | `document_date` | DATE | yes | `NULL` | Best-effort guess at "the date on the document" (invoice date, letter date, etc.) — never a hard fact, just a heuristic |
 | `thumbnail_key` | VARCHAR | yes | `NULL` | Storage key for a generated preview thumbnail PNG, if one was generated |
@@ -138,6 +136,7 @@ Document types are **data, not code** — adding a new one is a database insert,
 | `description` | TEXT | yes | `NULL` | |
 | `json_schema` | JSONB | yes | `NULL` | An optional soft schema, used only to help score extraction confidence — never enforced strictly |
 | `is_system` | BOOLEAN | no | `false` | True for the 7 seeded types |
+| `extraction_method` | VARCHAR | no | `"paddle_qwen"` (app-level) / `"default"` (DB `server_default`, applied to pre-existing rows by migration `0017`) | Which IDP strategy documents of this type use by default when no template overrides it: `"paddle_qwen"` (remote PaddleOCR-VL + Qwen — the primary engine, default for newly-created types) or `"cascade"` (the local deterministic-extraction + gate + VLM-fallback pipeline — zero-network, still fully functional, resolved as the fallback for any value that isn't literally `"paddle_qwen"`) |
 | `created_at` | TIMESTAMPTZ | no | `now()` | |
 
 **The 7 seeded system types:** `invoice`, `receipt`, `contract`, `report`, `letter`, `form`, `other`.
@@ -159,6 +158,10 @@ deterministically without re-inventing the extraction rules each time.
 | `examples_count` | INTEGER | no | `0` | How many accepted extractions have used this template |
 | `confidence` | REAL | yes | `NULL` | |
 | `version` | INTEGER | no | `1` | |
+| `extraction_method` | VARCHAR | no | `"default"` | Overrides the parent document type's `extraction_method` for documents using this specific template — `"paddle_qwen"` or `"cascade"` (same meaning as `document_types.extraction_method`, §2.4). `"default"` defers to the type |
+| `is_default` | BOOLEAN | no | `false` | The template auto-selected for a document type when no explicit template is chosen (upload popup / `reprocess_document`) |
+| `use_image` | BOOLEAN | no | `false` | For the `paddle_qwen` strategy: whether to send the page image (not just OCR'd text) to the remote engine |
+| `use_ocr` | BOOLEAN | no | `true` | For the `paddle_qwen` strategy: whether to run OCR at all before sending to the remote engine |
 | `sample_document_id` | UUID (FK → `documents.id`, SET NULL) | yes | `NULL` | One example document that produced this template |
 | `created_at` / `updated_at` | TIMESTAMPTZ | no | `now()` | `updated_at` auto-refreshes on every row update |
 
@@ -250,8 +253,8 @@ monthly token budget (`tenants.llm_monthly_token_cap`).
 ### 2.11 `tags` + `document_tags` — organisation labels
 
 Two tables: the tag definitions themselves, and a many-to-many join table linking tags to
-documents (this is the **real, active** tagging system — not the dead `documents.tags` array
-column mentioned in §2.3).
+documents. (An earlier array-based `documents.tags` column existed briefly but was never the
+real tagging system — dropped entirely in migration `0019`.)
 
 **`tags`**
 
@@ -468,6 +471,9 @@ The `tenants` table itself uses `id = ...` instead of `tenant_id = ...` (it does
 | `0014` | Added `correspondents.email` + a per-tenant unique constraint |
 | `0015` | Created `document_type_fields` (predefined custom fields per document type); seeded a starter set of fields for every existing tenant |
 | `0016` | Added `tenants.trash_retention_days` + `tenants.trash_last_purged_at` (trash auto-retention) |
+| `0017` | Added `document_types.extraction_method` + `document_templates.extraction_method` (per-type/template IDP strategy selection — `"paddle_qwen"` vs `"cascade"`; part of the `Tev-Nal` merge, 2026-07-29) |
+| `0018` | Added `document_templates.is_default`, `use_image`, `use_ocr` (explicit multi-template selection + per-template modality flags for the `paddle_qwen` strategy) |
+| `0019` | Dropped `documents.layout_fingerprint` and `documents.tags` (both dead weight — real layout matching lives on `document_templates.fingerprint`; real tagging lives on `tags`/`document_tags`), and their indexes `ix_documents_tenant_fingerprint` / `ix_documents_tags_gin` |
 
 ### Running migrations
 
