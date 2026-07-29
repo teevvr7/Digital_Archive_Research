@@ -35,3 +35,8 @@ class DocumentType(Base, TimestampMixin):
     is_system: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )  # true for the 7 seeded types
+    # Which IDP strategy new documents of this type use by default: "paddle_qwen"
+    # (remote PaddleOCR-VL + Qwen, the primary engine) or "cascade" (mvp3-prod's
+    # original local deterministic-extraction + gate + VLM-fallback path, still
+    # fully functional and selectable per type/template).
+    extraction_method: Mapped[str] = mapped_column(String, nullable=False, default="paddle_qwen")

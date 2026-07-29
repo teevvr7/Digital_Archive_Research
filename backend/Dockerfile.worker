@@ -1,21 +1,19 @@
-# Worker image — includes the heavy IDP deps (LiteParse, PyMuPDF) and
-# system packages LiteParse needs for image inputs (ImageMagick).
+# Worker image — includes the heavy IDP deps (PyMuPDF, RapidOCR). RapidOCR
+# runs on ONNX Runtime (pure pip install, CPU-only) so no system packages
+# are needed here (LiteParse, which did need ImageMagick, was dropped
+# project-wide in favor of RapidOCR — see CLAUDE.md).
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-# System deps for LiteParse image handling.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    imagemagick \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install ".[worker]"
-
+# pyproject.toml declares `packages = ["app"]` (a local package, not just a
+# dependency list) — `pip install .` needs app/ present on disk, so the
+# source must be copied in BEFORE installing, not after.
 COPY . .
+RUN pip install --upgrade pip && pip install ".[worker]"
 
 CMD ["python", "-m", "app.worker"]

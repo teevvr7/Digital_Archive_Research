@@ -23,6 +23,9 @@ from app.modules.shares.router import public_router as shares_public_router
 from app.modules.shares.router import router as shares_router
 from app.modules.tags.router import router as tags_router
 from app.modules.views.router import router as views_router
+from app.modules.idp.config_router import router as idp_config_router
+
+from fastapi.openapi.utils import get_openapi
 
 # Must run before the app is constructed so startup errors are also captured.
 init_sentry("api")
@@ -43,6 +46,33 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+# ---- Custom OpenAPI schema (Swagger UI file-upload support) ----
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    # Modify schema to support Swagger UI file upload for OpenAPI 3.1
+    # Convert 'contentMediaType: application/octet-stream' to 'format: binary'
+    for schema in openapi_schema.get("components", {}).get("schemas", {}).values():
+        if "properties" in schema:
+            for prop in schema["properties"].values():
+                if prop.get("type") == "string" and prop.get("contentMediaType") == "application/octet-stream":
+                    prop.pop("contentMediaType", None)
+                    prop["format"] = "binary"
+                elif prop.get("type") == "array" and prop.get("items", {}).get("type") == "string" and prop.get("items", {}).get("contentMediaType") == "application/octet-stream":
+                    prop["items"].pop("contentMediaType", None)
+                    prop["items"]["format"] = "binary"
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # ---- CORS ----
 app.add_middleware(
@@ -73,7 +103,6 @@ if _is_prod:
         sentry_sdk.capture_exception(exc)
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-
 # ---- Routers ----
 # export_router's literal "GET /documents/export" MUST be included before
 # files_router — Starlette matches routes in registration order, and
@@ -86,6 +115,7 @@ app.include_router(export_router, prefix="/api")
 app.include_router(files_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
+app.include_router(idp_config_router, prefix="/api")
 app.include_router(tags_router, prefix="/api")
 app.include_router(correspondents_router, prefix="/api")
 app.include_router(metadata_router, prefix="/api")

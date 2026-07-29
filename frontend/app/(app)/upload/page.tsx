@@ -23,7 +23,15 @@ import {
   Plus,
   Save,
 } from "lucide-react";
-import { apiUploadDocument, apiPredefinedFields, apiCustomFields } from "@/lib/api";
+import {
+  apiUploadDocument,
+  apiPredefinedFields,
+  apiCustomFields,
+  apiListTemplates,
+  apiListIDPConfigs,
+  type Template,
+  type IDPConfig,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
 import { Modal } from "@/components/ui/modal";
@@ -45,6 +53,7 @@ interface PendingFile {
   id: string;
   file: File;
   docType: DocumentType;
+  templateId?: string;
   status: "pending" | "uploading" | "queued" | "duplicate" | "error";
   error?: string;
   fieldValues: Record<string, unknown>;
@@ -531,10 +540,26 @@ export default function UploadPage() {
   const [fieldsModalTarget, setFieldsModalTarget] = useState<
     { mode: "single"; fileId: string } | { mode: "bulk"; fileIds: string[] } | null
   >(null);
+  const [configs, setConfigs] = useState<IDPConfig[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
     apiPredefinedFields().then(setPredefinedFields).catch(() => {});
     apiCustomFields().then(setAllFields).catch(() => {});
+
+    const fetchConfigsAndTemplates = async () => {
+      try {
+        const [configRes, templateRes] = await Promise.all([
+          apiListIDPConfigs(),
+          apiListTemplates(),
+        ]);
+        setConfigs(configRes.configs);
+        setTemplates(templateRes);
+      } catch (e) {
+        console.error("Failed to load IDP configs/templates:", e);
+      }
+    };
+    fetchConfigsAndTemplates();
   }, []);
 
   const addFiles = useCallback(
@@ -544,10 +569,18 @@ export default function UploadPage() {
       for (const f of Array.from(incoming)) {
         if (!isAcceptedFile(f)) continue;
         if (f.size > MAX_SIZE_MB * 1_048_576) continue;
+
+        // Auto-assign default template if exists for the default document type
+        const docTypeConfig = configs.find((c) => c.name.toLowerCase() === defaultType.toLowerCase());
+        const defaultTpl = docTypeConfig
+          ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+          : undefined;
+
         newItems.push({
           id: `${Date.now()}-${Math.random()}`,
           file: f,
           docType: defaultType,
+          templateId: defaultTpl?.id,
           status: "pending",
           fieldValues: {},
           newFields: [],
@@ -556,7 +589,7 @@ export default function UploadPage() {
       }
       setFiles((prev) => [...prev, ...newItems]);
     },
-    [defaultType]
+    [defaultType, configs, templates]
   );
 
   const onDrop = (e: React.DragEvent) => {
@@ -576,7 +609,24 @@ export default function UploadPage() {
   };
 
   const updateType = (id: string, docType: DocumentType) =>
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, docType } : f)));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id === id) {
+          // Sync and find default template for this newly selected document type
+          const docTypeConfig = configs.find((c) => c.name.toLowerCase() === docType.toLowerCase());
+          const defaultTpl = docTypeConfig
+            ? templates.find((t) => t.documentTypeId === docTypeConfig.documentTypeId && t.isDefault)
+            : undefined;
+          return { ...f, docType, templateId: defaultTpl?.id };
+        }
+        return f;
+      })
+    );
+
+  const updateTemplate = (id: string, templateId: string) =>
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, templateId: templateId || undefined } : f))
+    );
 
   // Only pending files have an editable type — once uploading/queued/etc.,
   // the type was already submitted with the request.
@@ -643,6 +693,9 @@ export default function UploadPage() {
         if (pf.attachFields.length > 0) {
           form.append("attach_fields", JSON.stringify(pf.attachFields));
         }
+        if (pf.templateId) {
+          form.append("template_id", pf.templateId);
+        }
         const result = await apiUploadDocument(form);
         const isDuplicate = result.duplicates.length > 0;
         if (!isDuplicate) anyStored = true;
@@ -688,29 +741,6 @@ export default function UploadPage() {
         <p className="text-slate-500 text-sm mt-0.5">
           Supports PDF, scans, images, Word/Excel/PowerPoint, text/CSV/Markdown,
           email (.eml), and e-invoices (UBL/MyInvois XML) — up to {MAX_SIZE_MB} MB each.
-        </p>
-      </div>
-
-      {/* Default type selector */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 mb-5">
-        <p className="text-sm font-medium text-slate-700 mb-3">Default document type</p>
-        <div className="flex flex-wrap gap-2">
-          {DOC_TYPES.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setDefaultType(value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                defaultType === value
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-slate-400 mt-2">
-          Applied to newly added files. You can override per file below.
         </p>
       </div>
 
@@ -881,38 +911,66 @@ export default function UploadPage() {
                       {pf.error ?? "Upload failed"}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5">
-                      <div className="relative inline-block">
-                        <select
-                          value={pf.docType}
-                          onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
-                          className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          {DOC_TYPES.map(({ value, label }) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                      </div>
-                      <button
-                        onClick={() => setFieldsModalTarget({ mode: "single", fileId: pf.id })}
-                        className={`relative p-1 rounded border transition-colors ${
-                          Object.keys(pf.fieldValues).length > 0 ||
-                          pf.newFields.length > 0 ||
-                          pf.attachFields.length > 0
-                            ? "border-blue-300 bg-blue-50 text-blue-600"
-                            : "border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600"
-                        }`}
-                        title="Fill in details for this file"
-                      >
-                        <ListChecks className="w-3.5 h-3.5" />
-                        {(Object.keys(pf.fieldValues).length > 0 ||
-                          pf.newFields.length > 0 ||
-                          pf.attachFields.length > 0) && (
-                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500" />
-                        )}
-                      </button>
-                    </div>
+                    (() => {
+                      const docTypeConfig = configs.find((c) => c.name.toLowerCase() === pf.docType.toLowerCase());
+                      const matchingTemplates = docTypeConfig
+                        ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
+                        : [];
+
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative inline-block">
+                            <select
+                              value={pf.docType}
+                              onChange={(e) => updateType(pf.id, e.target.value as DocumentType)}
+                              className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            >
+                              {DOC_TYPES.map(({ value, label }) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                          </div>
+
+                          {matchingTemplates.length > 0 && (
+                            <div className="relative inline-block">
+                              <select
+                                value={pf.templateId || ""}
+                                onChange={(e) => updateTemplate(pf.id, e.target.value)}
+                                className="appearance-none text-xs pl-2 pr-6 py-1 rounded border border-slate-200 bg-slate-50 text-slate-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                              >
+                                <option value="">Default Strategy</option>
+                                {matchingTemplates.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} {t.isDefault ? "(Default)" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => setFieldsModalTarget({ mode: "single", fileId: pf.id })}
+                            className={`relative p-1 rounded border transition-colors ${
+                              Object.keys(pf.fieldValues).length > 0 ||
+                              pf.newFields.length > 0 ||
+                              pf.attachFields.length > 0
+                                ? "border-blue-300 bg-blue-50 text-blue-600"
+                                : "border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600"
+                            }`}
+                            title="Fill in details for this file"
+                          >
+                            <ListChecks className="w-3.5 h-3.5" />
+                            {(Object.keys(pf.fieldValues).length > 0 ||
+                              pf.newFields.length > 0 ||
+                              pf.attachFields.length > 0) && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500" />
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
 

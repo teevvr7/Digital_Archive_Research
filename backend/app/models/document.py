@@ -18,9 +18,9 @@ from sqlalchemy import (
     func,
 )
 
-# ARRAY/JSONB/TSVECTOR are Postgres-specific column types (not available on
+# JSONB/TSVECTOR are Postgres-specific column types (not available on
 # every database backend, but this app only ever targets Postgres).
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, uuid_pk
@@ -80,8 +80,6 @@ class Document(Base):
     )
     # Denormalised type name for the UI dropdown enum (invoice|receipt|...). "other" by default.
     document_type: Mapped[str] = mapped_column(String, nullable=False, default="other")
-    layout_fingerprint: Mapped[str | None] = mapped_column(String, nullable=True)  # reserved
-
     # Parsing results
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     has_text_layer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -95,10 +93,9 @@ class Document(Base):
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # full plain text
     confidence: Mapped[float | None] = mapped_column(REAL, nullable=True)  # 0.0-1.0 score
 
-    # Organisation
-    # Dead column — kept only so nothing that still references it breaks;
-    # the REAL tagging system is the tags/document_tags tables (see tag.py).
-    tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
+    # Organisation — the REAL tagging system is the tags/document_tags tables
+    # (see tag.py); this table no longer carries a raw tags column (dropped in
+    # migration 0019, matching dev's cleanup — it was dead weight even before).
     search_tsv: Mapped[str | None] = mapped_column(
         TSVECTOR, nullable=True
     )  # full-text search index

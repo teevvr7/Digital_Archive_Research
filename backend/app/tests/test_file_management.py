@@ -58,7 +58,6 @@ def _make_doc(
     doc.confidence = None
     doc.extracted_data = None
     doc.extracted_text = None
-    doc.tags = []
     doc.correspondent_id = None
     doc.storage_key = "tenant/docs/test.pdf"
     doc.thumbnail_key = thumbnail_key
@@ -351,21 +350,22 @@ class TestEmptyTrash:
         mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=trashed))
         user = _make_token()
 
-        with patch(_STORAGE_DELETE):
+        with patch("app.modules.idp.queue.enqueue_storage_deletion"):
             count = files_service.empty_trash(mock_db, user)
 
         assert count == 3
 
-    def test_calls_delete_file_for_each_doc(self, mock_db: MagicMock) -> None:
+    def test_calls_enqueue_storage_deletion(self, mock_db: MagicMock) -> None:
         trashed = [_make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc)) for _ in range(2)]
         mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=trashed))
         user = _make_token()
 
-        with patch(_STORAGE_DELETE) as mock_delete:
+        with patch("app.modules.idp.queue.enqueue_storage_deletion") as mock_enqueue:
             files_service.empty_trash(mock_db, user)
 
-        # 2 docs × 1 storage key each (no thumbnails)
-        assert mock_delete.call_count == 2
+        assert mock_enqueue.call_count == 1
+        called_keys = mock_enqueue.call_args[0][0]
+        assert len(called_keys) == 2
 
     def test_also_deletes_thumbnail(self, mock_db: MagicMock) -> None:
         doc = _make_doc(
@@ -375,12 +375,12 @@ class TestEmptyTrash:
         mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=[doc]))
         user = _make_token()
 
-        with patch(_STORAGE_DELETE) as mock_delete:
+        with patch("app.modules.idp.queue.enqueue_storage_deletion") as mock_enqueue:
             files_service.empty_trash(mock_db, user)
 
-        # Called for both storage_key and thumbnail_key
-        assert mock_delete.call_count == 2
-        called_keys = {c.args[0] for c in mock_delete.call_args_list}
+        assert mock_enqueue.call_count == 1
+        called_keys = mock_enqueue.call_args[0][0]
+        assert len(called_keys) == 2
         assert doc.storage_key in called_keys
         assert doc.thumbnail_key in called_keys
 
@@ -391,27 +391,16 @@ class TestEmptyTrash:
         mock_db.delete.side_effect = deleted_objects.append
         user = _make_token()
 
-        with patch(_STORAGE_DELETE):
+        with patch("app.modules.idp.queue.enqueue_storage_deletion"):
             files_service.empty_trash(mock_db, user)
 
         assert len(deleted_objects) == 2
-
-    def test_storage_error_does_not_abort(self, mock_db: MagicMock) -> None:
-        doc = _make_doc(deleted_at=datetime.datetime.now(datetime.timezone.utc))
-        mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=[doc]))
-        user = _make_token()
-
-        with patch(_STORAGE_DELETE, side_effect=Exception("storage unreachable")):
-            # Should NOT raise
-            count = files_service.empty_trash(mock_db, user)
-
-        assert count == 1
 
     def test_empty_trash_returns_zero_when_nothing_trashed(self, mock_db: MagicMock) -> None:
         mock_db.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
         user = _make_token()
 
-        with patch(_STORAGE_DELETE):
+        with patch("app.modules.idp.queue.enqueue_storage_deletion"):
             count = files_service.empty_trash(mock_db, user)
 
         assert count == 0

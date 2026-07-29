@@ -78,9 +78,15 @@ class DocumentOut(CamelModel):
     correspondent: CorrespondentOut | None
     custom_field_values: list[FieldValueOut] = []
     storage_key: str
+    document_type_id: uuid.UUID | None = None
+    template_id: uuid.UUID | None = None
     has_thumbnail: bool
     deleted_at: datetime.datetime | None
     duplicate_of_document_id: uuid.UUID | None = None
+    extraction_method: str | None = None
+    ocr_used: bool = False
+    ocr_engine: str | None = None
+    vlm_model: str | None = None
 
 
 class DocumentListOut(CamelModel):

@@ -92,6 +92,17 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+async function put<T>(path: string, body?: unknown): Promise<T> {
+  const headers = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`PUT ${path} → ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
 async function patch_<T>(path: string, body?: unknown): Promise<T> {
   const headers = await authHeaders();
   const res = await fetch(`${BASE}${path}`, {
@@ -320,6 +331,108 @@ export const apiActivity = (opts: { documentId?: string; page?: number } = {}) =
   return get<ActivityListResponse>(`/activity${params ? `?${params}` : ""}`);
 };
 
+// ---- IDP Config -----------------------------------------------------------
+
+export interface IDPConfig {
+  documentTypeId: string;
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, unknown> | null;
+  instruction: string;
+  rules: string;
+  isCustomized: boolean;
+  isSystem: boolean;
+}
+
+export interface IDPConfigUpdateRequest {
+  extractionMethod: string;
+  jsonSchema?: Record<string, unknown> | null;
+  instruction?: string | null;
+  rules?: string | null;
+}
+
+export const apiGetIDPConfig = (documentTypeId: string) =>
+  get<IDPConfig>(`/idp/config/${documentTypeId}`);
+
+export const apiUpdateIDPConfig = (documentTypeId: string, body: IDPConfigUpdateRequest) =>
+  post<IDPConfig>(`/idp/config/${documentTypeId}`, body);
+
+export const apiListIDPConfigs = () =>
+  get<{ configs: IDPConfig[] }>("/idp/config");
+
+export interface DocumentTypeCreateRequest {
+  name: string;
+  description?: string | null;
+  extractionMethod?: string;
+}
+
+export const apiCreateDocumentType = (body: DocumentTypeCreateRequest) =>
+  post<IDPConfig>("/idp/config/document-types", body);
+
+export const apiDeleteDocumentType = (id: string) =>
+  delete_<void>(`/idp/config/document-types/${id}`);
+
+
+// ---- Templates ------------------------------------------------------------
+
+export interface Template {
+  id: string;
+  documentTypeId: string;
+  name: string;
+  isDefault: boolean;
+  useImage: boolean;
+  useOcr: boolean;
+  extractionMethod: string;
+  jsonSchema: Record<string, unknown> | null;
+  instruction: string;
+  rules: string;
+  status: string;
+}
+
+export interface TemplateCreateRequest {
+  documentTypeId: string;
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, unknown>;
+  instruction?: string | null;
+  rules?: string | null;
+  useImage: boolean;
+  useOcr: boolean;
+}
+
+export interface TemplateUpdateRequest {
+  name: string;
+  extractionMethod: string;
+  jsonSchema: Record<string, unknown>;
+  instruction?: string | null;
+  rules?: string | null;
+  useImage: boolean;
+  useOcr: boolean;
+}
+
+export const apiListTemplates = () =>
+  get<Template[]>("/idp/config/templates");
+
+export const apiCreateTemplate = (body: TemplateCreateRequest) =>
+  post<Template>("/idp/config/templates", body);
+
+export const apiUpdateTemplate = (id: string, body: TemplateUpdateRequest) =>
+  put<Template>(`/idp/config/templates/${id}`, body);
+
+export const apiSetDefaultTemplate = (id: string) =>
+  post<Template>(`/idp/config/templates/${id}/set-default`);
+
+export const apiDeleteTemplate = (id: string) =>
+  delete_<void>(`/idp/config/templates/${id}`);
+
+export const apiReprocessDocument = (id: string, templateId?: string | null, documentTypeId?: string | null) => {
+  const params = new URLSearchParams();
+  if (templateId) params.append("template_id", templateId);
+  if (documentTypeId) params.append("document_type_id", documentTypeId);
+  const query = params.toString();
+  return post<Document>(`/documents/${id}/reprocess${query ? `?${query}` : ""}`);
+};
+
 // ---- Tags (Phase 4) -------------------------------------------------------
 
 export type TagCreateInput = {
@@ -539,4 +652,95 @@ export async function apiResolveShare(token: string): Promise<ResolvedShare> {
     throw new Error(detail || `Failed to resolve link (${res.status})`);
   }
   return res.json() as Promise<ResolvedShare>;
+}
+
+// ---------------------------------------------------------------------------
+// Spreadsheet Center — Export API
+// ---------------------------------------------------------------------------
+
+export interface ExportDocumentType {
+  name: string;
+  count: number;
+}
+
+export interface ExportTemplate {
+  id: string;
+  name: string;
+  documentType: string;
+}
+
+export interface ExportMeta {
+  documentTypes: ExportDocumentType[];
+  templates: ExportTemplate[];
+}
+
+export interface ExportFilters {
+  documentType?: string;
+  templateId?: string;
+  status?: string;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;   // YYYY-MM-DD
+}
+
+export interface SpreadsheetPreviewResponse {
+  rows: Record<string, unknown>[];
+  total: number;
+}
+
+/** Fetch doc types and templates for the Spreadsheet Center filter dropdowns. */
+export async function fetchExportMeta(): Promise<ExportMeta> {
+  return get<ExportMeta>("/export/meta");
+}
+
+/** Fetch available canonical column names for the current filter selection. */
+export async function fetchExportFields(filters: ExportFilters): Promise<string[]> {
+  return post<string[]>("/export/fields", filters);
+}
+
+/** Fetch a preview of the spreadsheet rows (JSON, max reasonable limit). */
+export async function fetchExportPreview(
+  filters: ExportFilters,
+  columns: string[],
+  mode: "summary" | "expanded"
+): Promise<SpreadsheetPreviewResponse> {
+  return post<SpreadsheetPreviewResponse>("/export/spreadsheet?format=preview", {
+    ...filters,
+    columns,
+    mode,
+  });
+}
+
+/** Trigger a CSV download via the browser. */
+export async function downloadExportCsv(
+  filters: ExportFilters,
+  columns: string[],
+  mode: "summary" | "expanded"
+): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Not authenticated");
+
+  const res = await fetch(`${BASE}/export/spreadsheet?format=csv`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...filters, columns, mode }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Export failed: ${res.status} ${text}`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

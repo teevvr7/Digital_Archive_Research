@@ -31,6 +31,7 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.0",     # error monitoring (api + worker) — no-op until SENTRY_DSN is set
     "slowapi>=0.1.9",               # rate limiting (Redis-backed, reuses the existing queue's Redis)
     "openpyxl>=3.1",                # XLSX export from the API process (pure-Python, no native deps)
+    "beautifulsoup4>=4.12",         # idp/paddle_qwen.py: HTML <table> -> Markdown for the LLM prompt
 ]
 
 [project.optional-dependencies]

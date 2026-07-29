@@ -1,0 +1,76 @@
+1. Daily Summary of Activities
+- Configured a dedicated virtual environment within the RAG chatbot development directory to isolate project dependencies and resolve workspace editor warning indicators.
+- Transitioned the project layout to an industry-standard modular architecture by nesting core logic and configuration modules inside a source directory (`src`) while keeping execution scripts and GUI entrypoints in the project root.
+- Adjusted local database connection strings from `localhost` to `127.0.0.1` to prevent network latency hangs during database connections on Windows environments.
+- Implemented Phase 2 of the RAG roadmap: built the text-to-vector ingestion pipeline that converts structured document data into text blocks, generates 384-dimensional vector embeddings, and prepares data for database storage.
+- Constructed an automated verification script to execute the ingestion process, save 200 document vectors into PostgreSQL, and check database record counts and embedding dimensions.
+- Updated project task tracking sheets and development logs to reflect the modular architecture and ingestion milestones.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Local Virtual Environment Creation & Package Installation
+Description of Work Done: Created an isolated virtual environment (`venv`) inside the chatbot project folder and installed all required package dependencies using fast package installer tools.
+Status: Completed
+Remarks: Solved editor import resolution and package isolation issues.
+
+Task Number: 2
+Task / Project Name: Modular Workspace Architecture
+Description of Work Done: Refactored the project folder layout to place source code in a dedicated `src` directory, updating package imports across setup scripts and launchers.
+Status: Completed
+Remarks: Project structure now follows industry-standard layout practices.
+
+Task Number: 3
+Task / Project Name: Database Network Host Resolution Fix
+Description of Work Done: Replaced `localhost` with `127.0.0.1` in environment configuration files to eliminate IPv6 loopback connection latency hangs.
+Status: Completed
+Remarks: Database connection stability confirmed.
+
+Task Number: 4
+Task / Project Name: Ingestion Pipeline & Verification Script
+Description of Work Done: Implemented vector embedding and database upsert functions, and created an execution script to process 200 synthetic document records into PostgreSQL.
+Status: Completed
+Remarks: Ingestion pipeline code completed and ready for execution.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Database connection check hangs indefinitely during script execution.
+Root Cause: Default host configurations resolved to an IPv6 loopback address that was not bound by the local database container.
+Resolution Provided: Updated environment connection settings to explicitly use the IPv4 loopback address (`127.0.0.1`).
+
+Issue Number: 2
+Issue Description: Red warning lines appearing under import statements in the workspace editor.
+Root Cause: The editor was scanning from the parent folder root and could not resolve subfolder paths without explicit workspace configuration.
+Resolution Provided: Established a self-contained virtual environment within the project folder and adjusted workspace interpreter mappings.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL (pgvector), Docker, PyTorch / Transformers.
+IDE / Tools: Git, PowerShell, Docker CLI, VS Code.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Maintaining clean import paths while separating source code modules from launcher scripts.
+Solution: Placed all core modules inside a dedicated source directory (`src`) and placed execution launchers at the project root level, allowing standard package imports to work cleanly without pathing hacks.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Explored vector embedding generation using local Transformer models.
+- Studied database upsert logic (`ON CONFLICT DO UPDATE`) for vector data persistence.
+- Deepened understanding of network loopback resolution and Python environment isolation.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Run the ingestion script to populate PostgreSQL vector tables with all 200 invoice embeddings.
+- Start Phase 3: Implement vector similarity search and evaluate retrieval accuracy (Hit Rate and Mean Reciprocal Rank) against ground-truth queries.

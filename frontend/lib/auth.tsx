@@ -90,10 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
   return (
     <AuthContext.Provider value={{ user, tenant, signOut, refresh }}>
-      {children}
+      {user ? children : null}
     </AuthContext.Provider>
   );
 }

@@ -105,8 +105,8 @@ def _name_similarity(q: str):
     and its original name after a correction-UI rename."""
     effective_title = func.coalesce(Document.title, Document.original_filename)
     return func.greatest(
-        func.extensions.word_similarity(q.lower(), func.lower(effective_title)),
-        func.extensions.word_similarity(q.lower(), func.lower(Document.original_filename)),
+        func.word_similarity(q.lower(), func.lower(effective_title)),
+        func.word_similarity(q.lower(), func.lower(Document.original_filename)),
     )
 
 

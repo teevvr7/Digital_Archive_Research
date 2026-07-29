@@ -1,0 +1,67 @@
+1. Daily Summary of Activities
+- Conducted deep critical analysis of Phase 3 retrieval benchmark findings (Vector Search Hit Rate 4.70%, Keyword Search 48.32%, Hybrid RRF 51.68%).
+- Identified core root cause: invoice data is structured (JSON with typed fields) and SME business queries are structured lookups/aggregations, whereas standard RAG treats everything as unstructured text.
+- Formulated and documented 9 retrieval improvement ideas ranked by implementation speed in `retrieval_improvement_brainstorm.md`.
+- Evaluated real-world SME business user query patterns (single-doc lookup, vendor filtering, date ranges, product aggregations, fuzzy context lookups).
+- Decided on an architectural pivot from a pure RAG pipeline to a Hybrid (Text-to-SQL + RAG) architecture managed by a lightweight query intent router.
+- Verified project alignment with the LLM Zoomcamp Capstone grading rubric and DataWiz Digital Archive sandbox goals.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Failure Analysis & Root Cause Diagnosis
+Description of Work Done: Evaluated why vector embeddings (`all-MiniLM-L6-v2`) fail on alphanumeric identifiers and why standard RRF ranks are diluted by generic semantic hits.
+Status: Completed
+Remarks: Pinpointed fundamental mismatch between structured JSON data and text-only RAG.
+
+Task Number: 2
+Task / Project Name: Retrieval Improvement Brainstorming & Documentation
+Description of Work Done: Created `retrieval_improvement_brainstorm.md` containing 9 prioritized improvement strategies (Direct JSONB lookup, Query Router, Text-to-SQL, Weighted RRF, Metadata Columns, FTS fixing, Agentic RAG, Chunk-per-field, and Hybrid SQL+RAG).
+Status: Completed
+Remarks: Document committed to `rag_dev/`.
+
+Task Number: 3
+Task / Project Name: Architecture Pivot Planning (Text-to-SQL + RAG)
+Description of Work Done: Formulated hybrid architecture plan combining Text-to-SQL for structured queries/aggregations and RAG for fuzzy contextual search.
+Status: Completed
+Remarks: Selected rule-based query intent router strategy for maximum simplicity and debuggability.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Pure RAG retrieval cannot handle aggregate business queries (e.g., "total sales of Laptops last month") across multiple documents.
+Root Cause: RAG retrieves top-K document chunks (e.g. 5 out of 200), whereas aggregation requires scanning 100% of matching records.
+Resolution Provided: Proposed Text-to-SQL execution against PostgreSQL JSONB (`content_json`) for structured/aggregate queries, leaving RAG strictly for fuzzy semantic search.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL (pgvector & JSONB), Markdown.
+IDE / Tools: Git, PowerShell, VS Code.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Balancing capstone rubric requirements (simplicity, reproducibility) with realistic SME business user query needs.
+Solution: Designed a lightweight ~20-line deterministic Python query router rather than heavy multi-agent orchestration frameworks.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Analyzed structural vs semantic query taxonomy in enterprise document RAG systems.
+- Designed JSONB schema querying strategies in PostgreSQL for financial invoice data.
+- Evaluated architectural trade-offs between pure vector RAG, hybrid search, and Text-to-SQL engines.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Implement Phase 3B retrieval fixes (FTS tokenization testing & Weighted RRF).
+- Re-run `03_retrieval_evaluation.py` benchmark to measure MRR improvement.
+- Create revised development roadmap `rag_roadmap_v2.md`.
+- Implement Phase 4 modules (`src/config.py`, `src/router.py`, `src/sql_engine.py`, `src/rag.py`, `src/pipeline.py`).

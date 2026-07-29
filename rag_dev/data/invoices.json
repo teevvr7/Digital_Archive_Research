@@ -1,0 +1,7238 @@
+[
+  {
+    "invoice_id": "INV-2025-0001",
+    "vendor": "Summit Hardware",
+    "date": "2026-03-21",
+    "buyer": "Johnson LLC",
+    "buyer_address": "181 Johnson Course, East William, AK 74064",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 12,
+        "unit_price": 1267.55,
+        "amount": 15210.6
+      }
+    ],
+    "subtotal": 15210.6,
+    "tax_rate": "6%",
+    "tax": 912.64,
+    "grand_total": 16123.24,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0002",
+    "vendor": "PrintPro Solutions",
+    "date": "2025-10-01",
+    "buyer": "Santos, Gardner and Robinson",
+    "buyer_address": "65423 Garcia Light, West Melanieview, AS 06196",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 4,
+        "unit_price": 50.32,
+        "amount": 201.28
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 1,
+        "unit_price": 36.84,
+        "amount": 36.84
+      },
+      {
+        "description": "Laptop",
+        "qty": 12,
+        "unit_price": 1904.8,
+        "amount": 22857.6
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 9,
+        "unit_price": 21.65,
+        "amount": 194.85
+      },
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 553.56,
+        "amount": 4428.48
+      },
+      {
+        "description": "Office Chair",
+        "qty": 13,
+        "unit_price": 447.72,
+        "amount": 5820.36
+      }
+    ],
+    "subtotal": 33539.41,
+    "tax_rate": "6%",
+    "tax": 2012.36,
+    "grand_total": 35551.77,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0003",
+    "vendor": "Optima Consultants",
+    "date": "2026-04-25",
+    "buyer": "Herrera-Dudley",
+    "buyer_address": "959 Janet Cape Apt. 413, South Joshuastad, GA 49021",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 19.6,
+        "amount": 117.6
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 164.51,
+        "amount": 1151.57
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 50.64,
+        "amount": 708.96
+      }
+    ],
+    "subtotal": 1978.13,
+    "tax_rate": "8%",
+    "tax": 158.25,
+    "grand_total": 2136.38,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0004",
+    "vendor": "Zenith Software",
+    "date": "2025-11-30",
+    "buyer": "Santiago Ltd",
+    "buyer_address": "USS Lynch, FPO AE 70511",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 14,
+        "unit_price": 351.46,
+        "amount": 4920.44
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 15,
+        "unit_price": 81.7,
+        "amount": 1225.5
+      },
+      {
+        "description": "Monitor",
+        "qty": 10,
+        "unit_price": 315.37,
+        "amount": 3153.7
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 2,
+        "unit_price": 16.37,
+        "amount": 32.74
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 4,
+        "unit_price": 49.79,
+        "amount": 199.16
+      }
+    ],
+    "subtotal": 9531.54,
+    "tax_rate": "6%",
+    "tax": 571.89,
+    "grand_total": 10103.43,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0005",
+    "vendor": "Prime Catering",
+    "date": "2026-04-25",
+    "buyer": "Martin Group",
+    "buyer_address": "503 Linda Locks, Carlshire, FM 94599",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 6,
+        "unit_price": 20.17,
+        "amount": 121.02
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 11,
+        "unit_price": 34.34,
+        "amount": 377.74
+      },
+      {
+        "description": "Keyboard",
+        "qty": 15,
+        "unit_price": 61.01,
+        "amount": 915.15
+      }
+    ],
+    "subtotal": 1413.91,
+    "tax_rate": "6%",
+    "tax": 84.83,
+    "grand_total": 1498.74,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0006",
+    "vendor": "FreshFood Distribution",
+    "date": "2025-11-15",
+    "buyer": "Rios Group",
+    "buyer_address": "42388 Burgess Meadow Suite 532, Daviston, VI 14872",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 15,
+        "unit_price": 274.0,
+        "amount": 4110.0
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 9,
+        "unit_price": 11.73,
+        "amount": 105.57
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 6,
+        "unit_price": 398.14,
+        "amount": 2388.84
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 13,
+        "unit_price": 158.39,
+        "amount": 2059.07
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 14,
+        "unit_price": 16.44,
+        "amount": 230.16
+      }
+    ],
+    "subtotal": 8893.64,
+    "tax_rate": "8%",
+    "tax": 711.49,
+    "grand_total": 9605.13,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0007",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-09-13",
+    "buyer": "Moore, Becker and Carlson",
+    "buyer_address": "480 Erin Plain Suite 514, Mooretown, VA 94830",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 19.98,
+        "amount": 219.78
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 15,
+        "unit_price": 287.18,
+        "amount": 4307.7
+      }
+    ],
+    "subtotal": 4527.48,
+    "tax_rate": "8%",
+    "tax": 362.2,
+    "grand_total": 4889.68,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0008",
+    "vendor": "CloudNet Services",
+    "date": "2025-10-26",
+    "buyer": "Gill, Romero and Rodriguez",
+    "buyer_address": "52880 Burns Creek, Natashaport, IA 08093",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 15,
+        "unit_price": 32.51,
+        "amount": 487.65
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 26.58,
+        "amount": 159.48
+      }
+    ],
+    "subtotal": 647.13,
+    "tax_rate": "6%",
+    "tax": 38.83,
+    "grand_total": 685.96,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0009",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-10-17",
+    "buyer": "Arroyo, Miller and Tucker",
+    "buyer_address": "78248 Brandt Plains, Lake Larry, TN 85681",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 3,
+        "unit_price": 350.98,
+        "amount": 1052.94
+      }
+    ],
+    "subtotal": 1052.94,
+    "tax_rate": "10%",
+    "tax": 105.29,
+    "grand_total": 1158.23,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0010",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-12-08",
+    "buyer": "Lam-Hayes",
+    "buyer_address": "0983 Adrian Station, East Carloston, VI 43810",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 9,
+        "unit_price": 81.65,
+        "amount": 734.85
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 1,
+        "unit_price": 27.65,
+        "amount": 27.65
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 2,
+        "unit_price": 35.45,
+        "amount": 70.9
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 9,
+        "unit_price": 48.79,
+        "amount": 439.11
+      }
+    ],
+    "subtotal": 1272.51,
+    "tax_rate": "10%",
+    "tax": 127.25,
+    "grand_total": 1399.76,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0011",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-08-12",
+    "buyer": "Young, Caldwell and Lewis",
+    "buyer_address": "76311 Gomez Loop Suite 010, Chandlerville, IA 25613",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 15,
+        "unit_price": 20.23,
+        "amount": 303.45
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 9,
+        "unit_price": 29.53,
+        "amount": 265.77
+      },
+      {
+        "description": "Laptop",
+        "qty": 9,
+        "unit_price": 2351.47,
+        "amount": 21163.23
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 14,
+        "unit_price": 46.89,
+        "amount": 656.46
+      }
+    ],
+    "subtotal": 22388.91,
+    "tax_rate": "10%",
+    "tax": 2238.89,
+    "grand_total": 24627.8,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0012",
+    "vendor": "Apex Engineering",
+    "date": "2025-09-27",
+    "buyer": "West, Henderson and Ramirez",
+    "buyer_address": "8108 Tanya Terrace, East Richard, NJ 28517",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 9,
+        "unit_price": 58.37,
+        "amount": 525.33
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 15,
+        "unit_price": 17.02,
+        "amount": 255.3
+      }
+    ],
+    "subtotal": 780.63,
+    "tax_rate": "6%",
+    "tax": 46.84,
+    "grand_total": 827.47,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0013",
+    "vendor": "Aero Industries",
+    "date": "2026-06-16",
+    "buyer": "Barrera-Martin",
+    "buyer_address": "7468 Moore Hill Apt. 098, Lake Leeton, OR 62994",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 15,
+        "unit_price": 245.19,
+        "amount": 3677.85
+      }
+    ],
+    "subtotal": 3677.85,
+    "tax_rate": "8%",
+    "tax": 294.23,
+    "grand_total": 3972.08,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0014",
+    "vendor": "BuildMart Materials",
+    "date": "2026-01-27",
+    "buyer": "Moore, Yu and Miller",
+    "buyer_address": "361 Beth Canyon, South Dianeshire, NC 41968",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 13,
+        "unit_price": 51.96,
+        "amount": 675.48
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 3,
+        "unit_price": 162.37,
+        "amount": 487.11
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 8,
+        "unit_price": 58.14,
+        "amount": 465.12
+      },
+      {
+        "description": "Software License",
+        "qty": 3,
+        "unit_price": 142.77,
+        "amount": 428.31
+      },
+      {
+        "description": "Monitor",
+        "qty": 14,
+        "unit_price": 563.96,
+        "amount": 7895.44
+      }
+    ],
+    "subtotal": 9951.46,
+    "tax_rate": "6%",
+    "tax": 597.09,
+    "grand_total": 10548.55,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0015",
+    "vendor": "Apex Engineering",
+    "date": "2026-07-14",
+    "buyer": "Harris-Moran",
+    "buyer_address": "47510 Howell Port Apt. 183, Davidstad, FM 09517",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 81.41,
+        "amount": 1221.15
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 2,
+        "unit_price": 44.87,
+        "amount": 89.74
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 16.76,
+        "amount": 33.52
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 10,
+        "unit_price": 24.74,
+        "amount": 247.4
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 10,
+        "unit_price": 11.74,
+        "amount": 117.4
+      },
+      {
+        "description": "Software License",
+        "qty": 2,
+        "unit_price": 297.74,
+        "amount": 595.48
+      }
+    ],
+    "subtotal": 2304.69,
+    "tax_rate": "6%",
+    "tax": 138.28,
+    "grand_total": 2442.97,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0016",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2026-06-22",
+    "buyer": "Wood and Sons",
+    "buyer_address": "808 Huynh Cove Apt. 411, West Juan, IL 94559",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 11,
+        "unit_price": 49.12,
+        "amount": 540.32
+      },
+      {
+        "description": "Software License",
+        "qty": 9,
+        "unit_price": 96.31,
+        "amount": 866.79
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 15,
+        "unit_price": 54.71,
+        "amount": 820.65
+      }
+    ],
+    "subtotal": 2227.76,
+    "tax_rate": "10%",
+    "tax": 222.78,
+    "grand_total": 2450.54,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0017",
+    "vendor": "Aero Industries",
+    "date": "2025-11-26",
+    "buyer": "Watts LLC",
+    "buyer_address": "16400 Wise Route Suite 278, Hoffmanville, CA 91074",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 203.14,
+        "amount": 1421.98
+      },
+      {
+        "description": "Office Chair",
+        "qty": 7,
+        "unit_price": 286.81,
+        "amount": 2007.67
+      },
+      {
+        "description": "Monitor",
+        "qty": 12,
+        "unit_price": 232.5,
+        "amount": 2790.0
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 29.68,
+        "amount": 326.48
+      }
+    ],
+    "subtotal": 6546.13,
+    "tax_rate": "6%",
+    "tax": 392.77,
+    "grand_total": 6938.9,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0018",
+    "vendor": "Optima Consultants",
+    "date": "2026-07-02",
+    "buyer": "Gardner LLC",
+    "buyer_address": "2045 Rachel Fords, Lake Curtis, WI 73886",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 4,
+        "unit_price": 116.57,
+        "amount": 466.28
+      }
+    ],
+    "subtotal": 466.28,
+    "tax_rate": "8%",
+    "tax": 37.3,
+    "grand_total": 503.58,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0019",
+    "vendor": "FreshFood Distribution",
+    "date": "2026-06-24",
+    "buyer": "Dickson-Brady",
+    "buyer_address": "PSC 3226, Box 0256, APO AP 96846",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 15,
+        "unit_price": 13.73,
+        "amount": 205.95
+      },
+      {
+        "description": "Software License",
+        "qty": 13,
+        "unit_price": 351.47,
+        "amount": 4569.11
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 9,
+        "unit_price": 22.94,
+        "amount": 206.46
+      }
+    ],
+    "subtotal": 4981.52,
+    "tax_rate": "10%",
+    "tax": 498.15,
+    "grand_total": 5479.67,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0020",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-05-26",
+    "buyer": "Adams Ltd",
+    "buyer_address": "3375 Hoover Well, East Andrew, ID 52728",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 16.18,
+        "amount": 129.44
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 14,
+        "unit_price": 32.03,
+        "amount": 448.42
+      }
+    ],
+    "subtotal": 577.86,
+    "tax_rate": "6%",
+    "tax": 34.67,
+    "grand_total": 612.53,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0021",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2025-11-20",
+    "buyer": "Lin-Rasmussen",
+    "buyer_address": "850 Natalie Green Apt. 940, New Ryanmouth, NE 79958",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 43.72,
+        "amount": 524.64
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 13,
+        "unit_price": 24.78,
+        "amount": 322.14
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 12,
+        "unit_price": 36.9,
+        "amount": 442.8
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 4,
+        "unit_price": 194.51,
+        "amount": 778.04
+      }
+    ],
+    "subtotal": 2067.62,
+    "tax_rate": "6%",
+    "tax": 124.06,
+    "grand_total": 2191.68,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0022",
+    "vendor": "Nexus Utilities",
+    "date": "2026-01-30",
+    "buyer": "Cruz PLC",
+    "buyer_address": "608 Michael Cliff, Cindyville, VA 39864",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 1,
+        "unit_price": 11.0,
+        "amount": 11.0
+      }
+    ],
+    "subtotal": 11.0,
+    "tax_rate": "8%",
+    "tax": 0.88,
+    "grand_total": 11.88,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0023",
+    "vendor": "FreshFood Distribution",
+    "date": "2026-01-28",
+    "buyer": "Estrada-Nguyen",
+    "buyer_address": "66299 Sullivan Village, West Justinchester, WY 76520",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 2,
+        "unit_price": 400.94,
+        "amount": 801.88
+      }
+    ],
+    "subtotal": 801.88,
+    "tax_rate": "6%",
+    "tax": 48.11,
+    "grand_total": 849.99,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0024",
+    "vendor": "BuildMart Materials",
+    "date": "2026-03-08",
+    "buyer": "Morris, Ramos and Lowe",
+    "buyer_address": "148 Davis Terrace, Lake Lance, AS 26601",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 1,
+        "unit_price": 347.75,
+        "amount": 347.75
+      },
+      {
+        "description": "Software License",
+        "qty": 7,
+        "unit_price": 280.08,
+        "amount": 1960.56
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 10,
+        "unit_price": 81.82,
+        "amount": 818.2
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 15,
+        "unit_price": 18.0,
+        "amount": 270.0
+      }
+    ],
+    "subtotal": 3396.51,
+    "tax_rate": "10%",
+    "tax": 339.65,
+    "grand_total": 3736.16,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0025",
+    "vendor": "BuildMart Materials",
+    "date": "2025-09-11",
+    "buyer": "Williams Group",
+    "buyer_address": "6936 Ross Drive, Port Michelleville, WI 56225",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 11,
+        "unit_price": 48.0,
+        "amount": 528.0
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 56.81,
+        "amount": 340.86
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 11.45,
+        "amount": 171.75
+      }
+    ],
+    "subtotal": 1040.61,
+    "tax_rate": "8%",
+    "tax": 83.25,
+    "grand_total": 1123.86,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0026",
+    "vendor": "PrintPro Solutions",
+    "date": "2025-10-08",
+    "buyer": "Brock Ltd",
+    "buyer_address": "317 Laurie Shores, Stephaniemouth, RI 94777",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 9,
+        "unit_price": 189.78,
+        "amount": 1708.02
+      }
+    ],
+    "subtotal": 1708.02,
+    "tax_rate": "8%",
+    "tax": 136.64,
+    "grand_total": 1844.66,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0027",
+    "vendor": "Pinnacle Designs",
+    "date": "2026-06-27",
+    "buyer": "Simmons, Meadows and Griffin",
+    "buyer_address": "4348 Sims Harbor Suite 143, Matthewside, CO 18637",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 9,
+        "unit_price": 19.96,
+        "amount": 179.64
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 10,
+        "unit_price": 34.63,
+        "amount": 346.3
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 13,
+        "unit_price": 39.62,
+        "amount": 515.06
+      }
+    ],
+    "subtotal": 1041.0,
+    "tax_rate": "6%",
+    "tax": 62.46,
+    "grand_total": 1103.46,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0028",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-09-12",
+    "buyer": "Reyes and Sons",
+    "buyer_address": "6587 Brown Village, Priceshire, UT 03061",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 9,
+        "unit_price": 162.18,
+        "amount": 1459.62
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 5,
+        "unit_price": 42.22,
+        "amount": 211.1
+      },
+      {
+        "description": "Server Rack",
+        "qty": 12,
+        "unit_price": 842.88,
+        "amount": 10114.56
+      },
+      {
+        "description": "Monitor",
+        "qty": 11,
+        "unit_price": 580.54,
+        "amount": 6385.94
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 5,
+        "unit_price": 35.16,
+        "amount": 175.8
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 5,
+        "unit_price": 56.69,
+        "amount": 283.45
+      }
+    ],
+    "subtotal": 18630.47,
+    "tax_rate": "6%",
+    "tax": 1117.83,
+    "grand_total": 19748.3,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0029",
+    "vendor": "Elite Cleaners",
+    "date": "2026-06-13",
+    "buyer": "James, Smith and Bell",
+    "buyer_address": "893 Robinson Mews Suite 065, Ramseymouth, PW 17229",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 13,
+        "unit_price": 278.49,
+        "amount": 3620.37
+      },
+      {
+        "description": "Laptop",
+        "qty": 5,
+        "unit_price": 1074.69,
+        "amount": 5373.45
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 17.38,
+        "amount": 139.04
+      }
+    ],
+    "subtotal": 9132.86,
+    "tax_rate": "8%",
+    "tax": 730.63,
+    "grand_total": 9863.49,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0030",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-03-14",
+    "buyer": "Johnson, Long and Elliott",
+    "buyer_address": "72046 Lewis Islands Suite 646, Maryfort, AK 98677",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 9,
+        "unit_price": 16.62,
+        "amount": 149.58
+      }
+    ],
+    "subtotal": 149.58,
+    "tax_rate": "8%",
+    "tax": 11.97,
+    "grand_total": 161.55,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0031",
+    "vendor": "CloudNet Services",
+    "date": "2026-02-10",
+    "buyer": "Cooke LLC",
+    "buyer_address": "003 Mary Road, East David, TN 15494",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 15,
+        "unit_price": 56.99,
+        "amount": 854.85
+      },
+      {
+        "description": "Monitor",
+        "qty": 14,
+        "unit_price": 223.94,
+        "amount": 3135.16
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 6,
+        "unit_price": 189.33,
+        "amount": 1135.98
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 4,
+        "unit_price": 19.34,
+        "amount": 77.36
+      }
+    ],
+    "subtotal": 5203.35,
+    "tax_rate": "8%",
+    "tax": 416.27,
+    "grand_total": 5619.62,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0032",
+    "vendor": "Quantum Labs",
+    "date": "2026-02-20",
+    "buyer": "Marshall LLC",
+    "buyer_address": "912 Rodriguez Burg, Barbarafurt, MO 94219",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 15,
+        "unit_price": 33.55,
+        "amount": 503.25
+      },
+      {
+        "description": "Software License",
+        "qty": 3,
+        "unit_price": 307.8,
+        "amount": 923.4
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 43.47,
+        "amount": 260.82
+      },
+      {
+        "description": "Keyboard",
+        "qty": 7,
+        "unit_price": 68.13,
+        "amount": 476.91
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 74.1,
+        "amount": 1037.4
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 4,
+        "unit_price": 18.14,
+        "amount": 72.56
+      }
+    ],
+    "subtotal": 3274.34,
+    "tax_rate": "10%",
+    "tax": 327.43,
+    "grand_total": 3601.77,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0033",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2025-10-01",
+    "buyer": "Vargas Ltd",
+    "buyer_address": "919 Michael Meadow Suite 185, Port Robertfort, CT 57323",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 6,
+        "unit_price": 156.82,
+        "amount": 940.92
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 13,
+        "unit_price": 280.7,
+        "amount": 3649.1
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 4,
+        "unit_price": 20.71,
+        "amount": 82.84
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 4,
+        "unit_price": 251.49,
+        "amount": 1005.96
+      }
+    ],
+    "subtotal": 5678.82,
+    "tax_rate": "8%",
+    "tax": 454.31,
+    "grand_total": 6133.13,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0034",
+    "vendor": "Pinnacle Designs",
+    "date": "2025-12-03",
+    "buyer": "Snow, Stevens and Hernandez",
+    "buyer_address": "877 Petersen Ramp Suite 531, Nicolebury, WV 61411",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 1,
+        "unit_price": 158.06,
+        "amount": 158.06
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 5,
+        "unit_price": 40.71,
+        "amount": 203.55
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 5,
+        "unit_price": 10.77,
+        "amount": 53.85
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 10,
+        "unit_price": 33.04,
+        "amount": 330.4
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 38.59,
+        "amount": 463.08
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 7,
+        "unit_price": 18.31,
+        "amount": 128.17
+      }
+    ],
+    "subtotal": 1337.11,
+    "tax_rate": "10%",
+    "tax": 133.71,
+    "grand_total": 1470.82,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0035",
+    "vendor": "Stellar Media",
+    "date": "2026-02-22",
+    "buyer": "Barnett, Rogers and Snyder",
+    "buyer_address": "54549 Peters Path Apt. 136, Petersbury, UT 62903",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 28.08,
+        "amount": 336.96
+      },
+      {
+        "description": "Monitor",
+        "qty": 9,
+        "unit_price": 755.35,
+        "amount": 6798.15
+      }
+    ],
+    "subtotal": 7135.11,
+    "tax_rate": "10%",
+    "tax": 713.51,
+    "grand_total": 7848.62,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0036",
+    "vendor": "Apex Engineering",
+    "date": "2026-03-23",
+    "buyer": "Henry, Mcguire and Davis",
+    "buyer_address": "9578 Coleman Summit, Michaelmouth, KY 40690",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 15,
+        "unit_price": 29.91,
+        "amount": 448.65
+      },
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 59.8,
+        "amount": 358.8
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 24.4,
+        "amount": 48.8
+      }
+    ],
+    "subtotal": 856.25,
+    "tax_rate": "8%",
+    "tax": 68.5,
+    "grand_total": 924.75,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0037",
+    "vendor": "Elite Cleaners",
+    "date": "2025-10-21",
+    "buyer": "Martinez and Sons",
+    "buyer_address": "37498 Hooper Village, West Jeremy, HI 40119",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 3,
+        "unit_price": 41.51,
+        "amount": 124.53
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 11,
+        "unit_price": 115.23,
+        "amount": 1267.53
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 37.44,
+        "amount": 411.84
+      }
+    ],
+    "subtotal": 1803.9,
+    "tax_rate": "6%",
+    "tax": 108.23,
+    "grand_total": 1912.13,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0038",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-07-21",
+    "buyer": "Ferguson, Hill and Mccann",
+    "buyer_address": "710 Harrison Mill, Jackton, KS 63117",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 7,
+        "unit_price": 2135.79,
+        "amount": 14950.53
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 10,
+        "unit_price": 92.38,
+        "amount": 923.8
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 8,
+        "unit_price": 34.88,
+        "amount": 279.04
+      },
+      {
+        "description": "Office Chair",
+        "qty": 11,
+        "unit_price": 185.48,
+        "amount": 2040.28
+      }
+    ],
+    "subtotal": 18193.65,
+    "tax_rate": "8%",
+    "tax": 1455.49,
+    "grand_total": 19649.14,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0039",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-08-29",
+    "buyer": "Morales Inc",
+    "buyer_address": "29413 Angela Mall, Port Alexandra, NV 58529",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 14,
+        "unit_price": 434.16,
+        "amount": 6078.24
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 4,
+        "unit_price": 23.46,
+        "amount": 93.84
+      },
+      {
+        "description": "Monitor",
+        "qty": 4,
+        "unit_price": 683.94,
+        "amount": 2735.76
+      }
+    ],
+    "subtotal": 8907.84,
+    "tax_rate": "6%",
+    "tax": 534.47,
+    "grand_total": 9442.31,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0040",
+    "vendor": "BuildMart Materials",
+    "date": "2025-11-08",
+    "buyer": "Branch, Torres and Oliver",
+    "buyer_address": "34123 Andrea Estate, South Shannonfort, LA 04779",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 10,
+        "unit_price": 31.67,
+        "amount": 316.7
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 12,
+        "unit_price": 20.83,
+        "amount": 249.96
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 186.6,
+        "amount": 1306.2
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 23.75,
+        "amount": 261.25
+      }
+    ],
+    "subtotal": 2134.11,
+    "tax_rate": "6%",
+    "tax": 128.05,
+    "grand_total": 2262.16,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0041",
+    "vendor": "FreshFood Distribution",
+    "date": "2025-10-13",
+    "buyer": "Mann-Warner",
+    "buyer_address": "9361 Deborah Grove, North Brian, WY 40820",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 8,
+        "unit_price": 164.0,
+        "amount": 1312.0
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 8,
+        "unit_price": 27.35,
+        "amount": 218.8
+      },
+      {
+        "description": "Laptop",
+        "qty": 9,
+        "unit_price": 1812.27,
+        "amount": 16310.43
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 13,
+        "unit_price": 41.74,
+        "amount": 542.62
+      },
+      {
+        "description": "Office Chair",
+        "qty": 10,
+        "unit_price": 426.0,
+        "amount": 4260.0
+      },
+      {
+        "description": "Monitor",
+        "qty": 15,
+        "unit_price": 502.87,
+        "amount": 7543.05
+      }
+    ],
+    "subtotal": 30186.9,
+    "tax_rate": "10%",
+    "tax": 3018.69,
+    "grand_total": 33205.59,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0042",
+    "vendor": "Aero Industries",
+    "date": "2026-03-04",
+    "buyer": "Holloway, Morse and Gonzales",
+    "buyer_address": "648 Kim Rapid Apt. 659, Anthonybury, TX 75893",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 5,
+        "unit_price": 37.97,
+        "amount": 189.85
+      },
+      {
+        "description": "Software License",
+        "qty": 9,
+        "unit_price": 219.61,
+        "amount": 1976.49
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 4,
+        "unit_price": 28.24,
+        "amount": 112.96
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 24.27,
+        "amount": 48.54
+      }
+    ],
+    "subtotal": 2327.84,
+    "tax_rate": "6%",
+    "tax": 139.67,
+    "grand_total": 2467.51,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0043",
+    "vendor": "Optima Consultants",
+    "date": "2026-03-01",
+    "buyer": "Key Ltd",
+    "buyer_address": "78742 Walters Overpass, South Michaelmouth, MD 88336",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 12,
+        "unit_price": 29.17,
+        "amount": 350.04
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 4,
+        "unit_price": 17.89,
+        "amount": 71.56
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 7,
+        "unit_price": 229.19,
+        "amount": 1604.33
+      },
+      {
+        "description": "Office Chair",
+        "qty": 8,
+        "unit_price": 266.31,
+        "amount": 2130.48
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 4,
+        "unit_price": 274.93,
+        "amount": 1099.72
+      }
+    ],
+    "subtotal": 5256.13,
+    "tax_rate": "8%",
+    "tax": 420.49,
+    "grand_total": 5676.62,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0044",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2025-08-25",
+    "buyer": "Rivera Ltd",
+    "buyer_address": "071 King Crescent Suite 808, Gutierrezborough, NC 47920",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 13,
+        "unit_price": 53.4,
+        "amount": 694.2
+      },
+      {
+        "description": "Server Rack",
+        "qty": 15,
+        "unit_price": 1453.43,
+        "amount": 21801.45
+      },
+      {
+        "description": "Laptop",
+        "qty": 7,
+        "unit_price": 1714.97,
+        "amount": 12004.79
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 12,
+        "unit_price": 17.28,
+        "amount": 207.36
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 10,
+        "unit_price": 55.4,
+        "amount": 554.0
+      }
+    ],
+    "subtotal": 35261.8,
+    "tax_rate": "8%",
+    "tax": 2820.94,
+    "grand_total": 38082.74,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0045",
+    "vendor": "Elite Cleaners",
+    "date": "2026-03-14",
+    "buyer": "Garrett-Wolf",
+    "buyer_address": "7710 Jennifer Inlet, New Rickybury, MP 15372",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 11,
+        "unit_price": 2156.84,
+        "amount": 23725.24
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 12,
+        "unit_price": 39.9,
+        "amount": 478.8
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 23.63,
+        "amount": 189.04
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 10,
+        "unit_price": 20.68,
+        "amount": 206.8
+      }
+    ],
+    "subtotal": 24599.88,
+    "tax_rate": "8%",
+    "tax": 1967.99,
+    "grand_total": 26567.87,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0046",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2026-01-11",
+    "buyer": "Holland and Sons",
+    "buyer_address": "467 Sanchez Plaza Apt. 639, Port Chad, WI 54888",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 3,
+        "unit_price": 46.01,
+        "amount": 138.03
+      }
+    ],
+    "subtotal": 138.03,
+    "tax_rate": "6%",
+    "tax": 8.28,
+    "grand_total": 146.31,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0047",
+    "vendor": "Prime Catering",
+    "date": "2025-11-24",
+    "buyer": "Adams, Smith and Barber",
+    "buyer_address": "78755 Gibson Islands Apt. 396, Port Kimberly, AZ 42205",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 6,
+        "unit_price": 264.18,
+        "amount": 1585.08
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 7,
+        "unit_price": 18.4,
+        "amount": 128.8
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 14,
+        "unit_price": 15.17,
+        "amount": 212.38
+      }
+    ],
+    "subtotal": 1926.26,
+    "tax_rate": "6%",
+    "tax": 115.58,
+    "grand_total": 2041.84,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0048",
+    "vendor": "Nexus Utilities",
+    "date": "2026-05-01",
+    "buyer": "Thornton-Shepherd",
+    "buyer_address": "0289 Kane Well, Garciamouth, AL 95193",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 4,
+        "unit_price": 47.76,
+        "amount": 191.04
+      }
+    ],
+    "subtotal": 191.04,
+    "tax_rate": "10%",
+    "tax": 19.1,
+    "grand_total": 210.14,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0049",
+    "vendor": "BuildMart Materials",
+    "date": "2025-09-09",
+    "buyer": "Pitts-Booker",
+    "buyer_address": "9615 Finley Road Suite 809, East Crystalport, IN 98381",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 4,
+        "unit_price": 1014.58,
+        "amount": 4058.32
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 11,
+        "unit_price": 20.15,
+        "amount": 221.65
+      }
+    ],
+    "subtotal": 4279.97,
+    "tax_rate": "6%",
+    "tax": 256.8,
+    "grand_total": 4536.77,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0050",
+    "vendor": "Swift Logistics",
+    "date": "2025-08-20",
+    "buyer": "Good-Hodges",
+    "buyer_address": "2400 Flynn Hill, Nicholasberg, IA 70122",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 14,
+        "unit_price": 10.78,
+        "amount": 150.92
+      },
+      {
+        "description": "Office Chair",
+        "qty": 5,
+        "unit_price": 143.24,
+        "amount": 716.2
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 1,
+        "unit_price": 85.73,
+        "amount": 85.73
+      }
+    ],
+    "subtotal": 952.85,
+    "tax_rate": "10%",
+    "tax": 95.29,
+    "grand_total": 1048.14,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0051",
+    "vendor": "Prime Catering",
+    "date": "2025-12-23",
+    "buyer": "Maldonado, White and Thompson",
+    "buyer_address": "379 Jesse Route Suite 740, Santanaside, GA 10182",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 2,
+        "unit_price": 254.58,
+        "amount": 509.16
+      },
+      {
+        "description": "Keyboard",
+        "qty": 5,
+        "unit_price": 71.02,
+        "amount": 355.1
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 10,
+        "unit_price": 104.44,
+        "amount": 1044.4
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 13,
+        "unit_price": 59.43,
+        "amount": 772.59
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 13,
+        "unit_price": 10.82,
+        "amount": 140.66
+      },
+      {
+        "description": "Office Chair",
+        "qty": 9,
+        "unit_price": 271.35,
+        "amount": 2442.15
+      }
+    ],
+    "subtotal": 5264.06,
+    "tax_rate": "8%",
+    "tax": 421.12,
+    "grand_total": 5685.18,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0052",
+    "vendor": "Summit Hardware",
+    "date": "2026-01-03",
+    "buyer": "Huerta-Evans",
+    "buyer_address": "USNV Bryant, FPO AA 26612",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 8,
+        "unit_price": 979.42,
+        "amount": 7835.36
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 39.07,
+        "amount": 234.42
+      },
+      {
+        "description": "Server Rack",
+        "qty": 14,
+        "unit_price": 959.74,
+        "amount": 13436.36
+      }
+    ],
+    "subtotal": 21506.14,
+    "tax_rate": "6%",
+    "tax": 1290.37,
+    "grand_total": 22796.51,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0053",
+    "vendor": "Delta Energy",
+    "date": "2025-12-12",
+    "buyer": "Rodriguez-James",
+    "buyer_address": "406 Smith Way Apt. 974, New Laurie, IN 83943",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 5,
+        "unit_price": 24.67,
+        "amount": 123.35
+      },
+      {
+        "description": "Server Rack",
+        "qty": 4,
+        "unit_price": 1330.73,
+        "amount": 5322.92
+      },
+      {
+        "description": "Software License",
+        "qty": 2,
+        "unit_price": 147.62,
+        "amount": 295.24
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 8,
+        "unit_price": 186.58,
+        "amount": 1492.64
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 8,
+        "unit_price": 44.94,
+        "amount": 359.52
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 11,
+        "unit_price": 70.32,
+        "amount": 773.52
+      }
+    ],
+    "subtotal": 8367.19,
+    "tax_rate": "6%",
+    "tax": 502.03,
+    "grand_total": 8869.22,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0054",
+    "vendor": "FreshFood Distribution",
+    "date": "2025-09-27",
+    "buyer": "King, Campos and Saunders",
+    "buyer_address": "104 Johnson Lakes, North Renee, MD 98474",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 6,
+        "unit_price": 191.95,
+        "amount": 1151.7
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 10,
+        "unit_price": 49.54,
+        "amount": 495.4
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 5,
+        "unit_price": 63.35,
+        "amount": 316.75
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 9,
+        "unit_price": 57.66,
+        "amount": 518.94
+      }
+    ],
+    "subtotal": 2482.79,
+    "tax_rate": "6%",
+    "tax": 148.97,
+    "grand_total": 2631.76,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0055",
+    "vendor": "Elite Cleaners",
+    "date": "2025-12-24",
+    "buyer": "Gonzalez PLC",
+    "buyer_address": "842 Sloan Orchard Suite 517, East Karenbury, VI 89148",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 8,
+        "unit_price": 206.86,
+        "amount": 1654.88
+      },
+      {
+        "description": "Server Rack",
+        "qty": 1,
+        "unit_price": 593.05,
+        "amount": 593.05
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 4,
+        "unit_price": 18.09,
+        "amount": 72.36
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 4,
+        "unit_price": 35.72,
+        "amount": 142.88
+      }
+    ],
+    "subtotal": 2463.17,
+    "tax_rate": "10%",
+    "tax": 246.32,
+    "grand_total": 2709.49,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0056",
+    "vendor": "Nexus Utilities",
+    "date": "2026-04-23",
+    "buyer": "Whitney, Coffey and Ballard",
+    "buyer_address": "48175 Richards View Suite 137, New Nicoleside, MD 80465",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 6,
+        "unit_price": 49.6,
+        "amount": 297.6
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 5,
+        "unit_price": 29.2,
+        "amount": 146.0
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 4,
+        "unit_price": 159.82,
+        "amount": 639.28
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 4,
+        "unit_price": 24.47,
+        "amount": 97.88
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 12,
+        "unit_price": 17.11,
+        "amount": 205.32
+      }
+    ],
+    "subtotal": 1386.08,
+    "tax_rate": "10%",
+    "tax": 138.61,
+    "grand_total": 1524.69,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0057",
+    "vendor": "Apex Engineering",
+    "date": "2025-10-09",
+    "buyer": "Brown, Colon and Blankenship",
+    "buyer_address": "20047 Colton Plain Apt. 675, Matthewsberg, FM 54880",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 10,
+        "unit_price": 783.0,
+        "amount": 7830.0
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 2,
+        "unit_price": 39.98,
+        "amount": 79.96
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 5,
+        "unit_price": 32.96,
+        "amount": 164.8
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 3,
+        "unit_price": 64.18,
+        "amount": 192.54
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 12,
+        "unit_price": 62.05,
+        "amount": 744.6
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 5,
+        "unit_price": 135.02,
+        "amount": 675.1
+      }
+    ],
+    "subtotal": 9687.0,
+    "tax_rate": "6%",
+    "tax": 581.22,
+    "grand_total": 10268.22,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0058",
+    "vendor": "CloudNet Services",
+    "date": "2026-03-27",
+    "buyer": "Bass PLC",
+    "buyer_address": "53773 Garcia Spur Suite 850, Hillville, PR 60101",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 8,
+        "unit_price": 978.71,
+        "amount": 7829.68
+      },
+      {
+        "description": "Office Chair",
+        "qty": 6,
+        "unit_price": 173.75,
+        "amount": 1042.5
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 1,
+        "unit_price": 27.57,
+        "amount": 27.57
+      },
+      {
+        "description": "Laptop",
+        "qty": 14,
+        "unit_price": 1612.14,
+        "amount": 22569.96
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 14,
+        "unit_price": 45.23,
+        "amount": 633.22
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 8,
+        "unit_price": 18.33,
+        "amount": 146.64
+      }
+    ],
+    "subtotal": 32249.57,
+    "tax_rate": "10%",
+    "tax": 3224.96,
+    "grand_total": 35474.53,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0059",
+    "vendor": "CloudNet Services",
+    "date": "2025-08-20",
+    "buyer": "Lewis, Fowler and Maddox",
+    "buyer_address": "29318 Brenda Via Apt. 529, West Micheleberg, DC 71308",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 4,
+        "unit_price": 49.48,
+        "amount": 197.92
+      },
+      {
+        "description": "Keyboard",
+        "qty": 13,
+        "unit_price": 44.97,
+        "amount": 584.61
+      }
+    ],
+    "subtotal": 782.53,
+    "tax_rate": "10%",
+    "tax": 78.25,
+    "grand_total": 860.78,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0060",
+    "vendor": "Delta Energy",
+    "date": "2025-10-21",
+    "buyer": "Rodriguez Inc",
+    "buyer_address": "95024 David Manor Apt. 177, Williamville, NV 66540",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 10,
+        "unit_price": 34.77,
+        "amount": 347.7
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 5,
+        "unit_price": 307.65,
+        "amount": 1538.25
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 1,
+        "unit_price": 42.43,
+        "amount": 42.43
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 12,
+        "unit_price": 22.98,
+        "amount": 275.76
+      }
+    ],
+    "subtotal": 2204.14,
+    "tax_rate": "6%",
+    "tax": 132.25,
+    "grand_total": 2336.39,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0061",
+    "vendor": "Swift Logistics",
+    "date": "2025-10-10",
+    "buyer": "Williams, Logan and Camacho",
+    "buyer_address": "007 Simmons Coves Suite 711, Charleneland, DC 36547",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 3,
+        "unit_price": 20.16,
+        "amount": 60.48
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 19.72,
+        "amount": 157.76
+      },
+      {
+        "description": "Office Chair",
+        "qty": 8,
+        "unit_price": 216.5,
+        "amount": 1732.0
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 4,
+        "unit_price": 215.07,
+        "amount": 860.28
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 5,
+        "unit_price": 36.09,
+        "amount": 180.45
+      },
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 242.71,
+        "amount": 1941.68
+      }
+    ],
+    "subtotal": 4932.65,
+    "tax_rate": "6%",
+    "tax": 295.96,
+    "grand_total": 5228.61,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0062",
+    "vendor": "Stellar Media",
+    "date": "2026-03-15",
+    "buyer": "Richards, Joseph and James",
+    "buyer_address": "8961 Melissa Run Apt. 673, Morganmouth, MO 55025",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 3,
+        "unit_price": 286.26,
+        "amount": 858.78
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 14,
+        "unit_price": 24.27,
+        "amount": 339.78
+      },
+      {
+        "description": "Monitor",
+        "qty": 1,
+        "unit_price": 299.55,
+        "amount": 299.55
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 5,
+        "unit_price": 32.85,
+        "amount": 164.25
+      },
+      {
+        "description": "Office Chair",
+        "qty": 14,
+        "unit_price": 327.68,
+        "amount": 4587.52
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 5,
+        "unit_price": 18.78,
+        "amount": 93.9
+      }
+    ],
+    "subtotal": 6343.78,
+    "tax_rate": "8%",
+    "tax": 507.5,
+    "grand_total": 6851.28,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0063",
+    "vendor": "Prime Catering",
+    "date": "2026-04-25",
+    "buyer": "Edwards LLC",
+    "buyer_address": "71111 Davis Streets Suite 280, Elizabethchester, MI 87708",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 2,
+        "unit_price": 317.35,
+        "amount": 634.7
+      },
+      {
+        "description": "Server Rack",
+        "qty": 15,
+        "unit_price": 932.03,
+        "amount": 13980.45
+      },
+      {
+        "description": "Software License",
+        "qty": 6,
+        "unit_price": 261.3,
+        "amount": 1567.8
+      }
+    ],
+    "subtotal": 16182.95,
+    "tax_rate": "6%",
+    "tax": 970.98,
+    "grand_total": 17153.93,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0064",
+    "vendor": "Stellar Media",
+    "date": "2026-07-16",
+    "buyer": "Parrish-Griffith",
+    "buyer_address": "Unit 9451 Box 9832, DPO AP 63702",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 13,
+        "unit_price": 1097.82,
+        "amount": 14271.66
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 9,
+        "unit_price": 34.55,
+        "amount": 310.95
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 62.25,
+        "amount": 933.75
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 10,
+        "unit_price": 263.84,
+        "amount": 2638.4
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 59.5,
+        "amount": 833.0
+      }
+    ],
+    "subtotal": 18987.76,
+    "tax_rate": "6%",
+    "tax": 1139.27,
+    "grand_total": 20127.03,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0065",
+    "vendor": "Elite Cleaners",
+    "date": "2025-10-11",
+    "buyer": "Bell PLC",
+    "buyer_address": "368 Chelsea Shoals Suite 024, Sandrastad, AL 24278",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 3,
+        "unit_price": 16.6,
+        "amount": 49.8
+      },
+      {
+        "description": "Office Chair",
+        "qty": 12,
+        "unit_price": 298.19,
+        "amount": 3578.28
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 11,
+        "unit_price": 48.36,
+        "amount": 531.96
+      }
+    ],
+    "subtotal": 4160.04,
+    "tax_rate": "10%",
+    "tax": 416.0,
+    "grand_total": 4576.04,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0066",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-06-18",
+    "buyer": "Knight Group",
+    "buyer_address": "83667 Moore Inlet, Kimberlyshire, PA 11636",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 13,
+        "unit_price": 27.13,
+        "amount": 352.69
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 9,
+        "unit_price": 26.5,
+        "amount": 238.5
+      },
+      {
+        "description": "Monitor",
+        "qty": 1,
+        "unit_price": 594.6,
+        "amount": 594.6
+      }
+    ],
+    "subtotal": 1185.79,
+    "tax_rate": "10%",
+    "tax": 118.58,
+    "grand_total": 1304.37,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0067",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2026-06-24",
+    "buyer": "Moore PLC",
+    "buyer_address": "7679 Perry Forge, West Russellport, TX 89431",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 10,
+        "unit_price": 369.63,
+        "amount": 3696.3
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 11,
+        "unit_price": 40.47,
+        "amount": 445.17
+      }
+    ],
+    "subtotal": 4141.47,
+    "tax_rate": "6%",
+    "tax": 248.49,
+    "grand_total": 4389.96,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0068",
+    "vendor": "Nexus Utilities",
+    "date": "2026-03-03",
+    "buyer": "Rose-Parker",
+    "buyer_address": "34324 Murphy Avenue, Burgessburgh, DC 50335",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 95.86,
+        "amount": 1437.9
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 2,
+        "unit_price": 12.66,
+        "amount": 25.32
+      }
+    ],
+    "subtotal": 1463.22,
+    "tax_rate": "10%",
+    "tax": 146.32,
+    "grand_total": 1609.54,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0069",
+    "vendor": "FreshFood Distribution",
+    "date": "2026-02-07",
+    "buyer": "Hall, Hansen and Barnett",
+    "buyer_address": "060 Morse Wall Suite 969, Mckinneychester, LA 15597",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 4,
+        "unit_price": 2486.84,
+        "amount": 9947.36
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 15,
+        "unit_price": 23.4,
+        "amount": 351.0
+      },
+      {
+        "description": "Monitor",
+        "qty": 2,
+        "unit_price": 588.63,
+        "amount": 1177.26
+      }
+    ],
+    "subtotal": 11475.62,
+    "tax_rate": "6%",
+    "tax": 688.54,
+    "grand_total": 12164.16,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0070",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-12-20",
+    "buyer": "Burch and Sons",
+    "buyer_address": "516 John Radial Suite 816, Juliebury, MA 22538",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 4,
+        "unit_price": 28.7,
+        "amount": 114.8
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 3,
+        "unit_price": 31.51,
+        "amount": 94.53
+      },
+      {
+        "description": "Server Rack",
+        "qty": 15,
+        "unit_price": 1099.38,
+        "amount": 16490.7
+      },
+      {
+        "description": "Software License",
+        "qty": 12,
+        "unit_price": 357.76,
+        "amount": 4293.12
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 14,
+        "unit_price": 13.61,
+        "amount": 190.54
+      }
+    ],
+    "subtotal": 21183.69,
+    "tax_rate": "8%",
+    "tax": 1694.7,
+    "grand_total": 22878.39,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0071",
+    "vendor": "Swift Logistics",
+    "date": "2025-08-14",
+    "buyer": "Schultz, Schmidt and Lee",
+    "buyer_address": "231 Jonathan Extensions Apt. 127, Webstershire, NV 89778",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 12,
+        "unit_price": 63.88,
+        "amount": 766.56
+      }
+    ],
+    "subtotal": 766.56,
+    "tax_rate": "10%",
+    "tax": 76.66,
+    "grand_total": 843.22,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0072",
+    "vendor": "Aero Industries",
+    "date": "2026-07-09",
+    "buyer": "Day, Downs and Morris",
+    "buyer_address": "Unit 5271 Box 7744, DPO AP 07863",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 6,
+        "unit_price": 19.65,
+        "amount": 117.9
+      },
+      {
+        "description": "Server Rack",
+        "qty": 13,
+        "unit_price": 1043.43,
+        "amount": 13564.59
+      }
+    ],
+    "subtotal": 13682.49,
+    "tax_rate": "8%",
+    "tax": 1094.6,
+    "grand_total": 14777.09,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0073",
+    "vendor": "BuildMart Materials",
+    "date": "2025-11-29",
+    "buyer": "Jones, Murray and Johnson",
+    "buyer_address": "19986 Carpenter Turnpike Apt. 793, Cassidyhaven, FL 08610",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 1,
+        "unit_price": 49.09,
+        "amount": 49.09
+      },
+      {
+        "description": "Software License",
+        "qty": 8,
+        "unit_price": 296.83,
+        "amount": 2374.64
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 13,
+        "unit_price": 31.44,
+        "amount": 408.72
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 11,
+        "unit_price": 381.49,
+        "amount": 4196.39
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 11,
+        "unit_price": 297.12,
+        "amount": 3268.32
+      }
+    ],
+    "subtotal": 10297.16,
+    "tax_rate": "8%",
+    "tax": 823.77,
+    "grand_total": 11120.93,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0074",
+    "vendor": "Delta Energy",
+    "date": "2026-01-06",
+    "buyer": "Shepherd LLC",
+    "buyer_address": "Unit 1820 Box 3778, DPO AP 80429",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 20.52,
+        "amount": 41.04
+      },
+      {
+        "description": "Office Chair",
+        "qty": 8,
+        "unit_price": 106.14,
+        "amount": 849.12
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 3,
+        "unit_price": 32.3,
+        "amount": 96.9
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 11,
+        "unit_price": 34.31,
+        "amount": 377.41
+      },
+      {
+        "description": "Software License",
+        "qty": 2,
+        "unit_price": 214.32,
+        "amount": 428.64
+      }
+    ],
+    "subtotal": 1793.11,
+    "tax_rate": "8%",
+    "tax": 143.45,
+    "grand_total": 1936.56,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0075",
+    "vendor": "Prime Catering",
+    "date": "2025-09-15",
+    "buyer": "Watson-Campbell",
+    "buyer_address": "905 Mark Point Suite 449, West Christopher, TN 19038",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 57.61,
+        "amount": 345.66
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 25.19,
+        "amount": 377.85
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 14,
+        "unit_price": 36.23,
+        "amount": 507.22
+      },
+      {
+        "description": "Server Rack",
+        "qty": 10,
+        "unit_price": 568.42,
+        "amount": 5684.2
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 35.53,
+        "amount": 390.83
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 5,
+        "unit_price": 299.61,
+        "amount": 1498.05
+      }
+    ],
+    "subtotal": 8803.81,
+    "tax_rate": "10%",
+    "tax": 880.38,
+    "grand_total": 9684.19,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0076",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-07-07",
+    "buyer": "Collins-Douglas",
+    "buyer_address": "148 Schneider Isle, Lake Jacqueline, WA 90339",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 1,
+        "unit_price": 229.75,
+        "amount": 229.75
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 1,
+        "unit_price": 18.75,
+        "amount": 18.75
+      },
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 45.84,
+        "amount": 275.04
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 4,
+        "unit_price": 43.59,
+        "amount": 174.36
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 10,
+        "unit_price": 45.68,
+        "amount": 456.8
+      },
+      {
+        "description": "Laptop",
+        "qty": 3,
+        "unit_price": 1088.97,
+        "amount": 3266.91
+      }
+    ],
+    "subtotal": 4421.61,
+    "tax_rate": "6%",
+    "tax": 265.3,
+    "grand_total": 4686.91,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0077",
+    "vendor": "Quantum Labs",
+    "date": "2026-07-05",
+    "buyer": "Davis, Santiago and Romero",
+    "buyer_address": "35733 Eric Hill Apt. 888, Lake Matthewberg, PA 49878",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 8,
+        "unit_price": 273.27,
+        "amount": 2186.16
+      },
+      {
+        "description": "Server Rack",
+        "qty": 8,
+        "unit_price": 755.33,
+        "amount": 6042.64
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 1,
+        "unit_price": 32.67,
+        "amount": 32.67
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 8,
+        "unit_price": 112.1,
+        "amount": 896.8
+      },
+      {
+        "description": "Keyboard",
+        "qty": 11,
+        "unit_price": 52.8,
+        "amount": 580.8
+      },
+      {
+        "description": "Office Chair",
+        "qty": 2,
+        "unit_price": 276.69,
+        "amount": 553.38
+      }
+    ],
+    "subtotal": 10292.45,
+    "tax_rate": "8%",
+    "tax": 823.4,
+    "grand_total": 11115.85,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0078",
+    "vendor": "Summit Hardware",
+    "date": "2025-09-13",
+    "buyer": "White Ltd",
+    "buyer_address": "706 Rhodes Freeway, Bishopmouth, IN 70494",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 4,
+        "unit_price": 44.98,
+        "amount": 179.92
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 14,
+        "unit_price": 23.11,
+        "amount": 323.54
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 4,
+        "unit_price": 31.44,
+        "amount": 125.76
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 40.87,
+        "amount": 245.22
+      }
+    ],
+    "subtotal": 874.44,
+    "tax_rate": "10%",
+    "tax": 87.44,
+    "grand_total": 961.88,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0079",
+    "vendor": "Prime Catering",
+    "date": "2025-10-16",
+    "buyer": "Sheppard-Mueller",
+    "buyer_address": "PSC 3597, Box 7468, APO AP 55375",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 10,
+        "unit_price": 2066.79,
+        "amount": 20667.9
+      },
+      {
+        "description": "Monitor",
+        "qty": 14,
+        "unit_price": 742.49,
+        "amount": 10394.86
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 5,
+        "unit_price": 29.84,
+        "amount": 149.2
+      }
+    ],
+    "subtotal": 31211.96,
+    "tax_rate": "6%",
+    "tax": 1872.72,
+    "grand_total": 33084.68,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0080",
+    "vendor": "BuildMart Materials",
+    "date": "2025-09-16",
+    "buyer": "Solis and Sons",
+    "buyer_address": "758 Jennifer Path, West Christopherburgh, KY 59394",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 11,
+        "unit_price": 275.75,
+        "amount": 3033.25
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 17.91,
+        "amount": 197.01
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 22.93,
+        "amount": 252.23
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 5,
+        "unit_price": 77.32,
+        "amount": 386.6
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 1,
+        "unit_price": 45.29,
+        "amount": 45.29
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 12,
+        "unit_price": 15.02,
+        "amount": 180.24
+      }
+    ],
+    "subtotal": 4094.62,
+    "tax_rate": "8%",
+    "tax": 327.57,
+    "grand_total": 4422.19,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0081",
+    "vendor": "Elite Cleaners",
+    "date": "2026-07-02",
+    "buyer": "Hernandez, Kim and Potts",
+    "buyer_address": "0606 Young Common Suite 305, Port Jennifermouth, WY 19643",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 13,
+        "unit_price": 230.91,
+        "amount": 3001.83
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 38.89,
+        "amount": 233.34
+      }
+    ],
+    "subtotal": 3235.17,
+    "tax_rate": "8%",
+    "tax": 258.81,
+    "grand_total": 3493.98,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0082",
+    "vendor": "Aero Industries",
+    "date": "2025-09-07",
+    "buyer": "Mitchell Group",
+    "buyer_address": "779 Rebecca Brook, Jasonberg, OH 95821",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 12.82,
+        "amount": 25.64
+      },
+      {
+        "description": "Office Chair",
+        "qty": 4,
+        "unit_price": 444.06,
+        "amount": 1776.24
+      },
+      {
+        "description": "Software License",
+        "qty": 12,
+        "unit_price": 286.04,
+        "amount": 3432.48
+      }
+    ],
+    "subtotal": 5234.36,
+    "tax_rate": "8%",
+    "tax": 418.75,
+    "grand_total": 5653.11,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0083",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-03-09",
+    "buyer": "Henderson, Parsons and Young",
+    "buyer_address": "9711 Carlson Brook, Lake Douglas, NE 00706",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 8,
+        "unit_price": 1426.6,
+        "amount": 11412.8
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 35.17,
+        "amount": 422.04
+      },
+      {
+        "description": "Server Rack",
+        "qty": 10,
+        "unit_price": 881.03,
+        "amount": 8810.3
+      },
+      {
+        "description": "Monitor",
+        "qty": 11,
+        "unit_price": 764.18,
+        "amount": 8405.98
+      }
+    ],
+    "subtotal": 29051.12,
+    "tax_rate": "6%",
+    "tax": 1743.07,
+    "grand_total": 30794.19,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0084",
+    "vendor": "Aero Industries",
+    "date": "2026-03-11",
+    "buyer": "Allen-Butler",
+    "buyer_address": "518 Peter Mountains, Lake Paulstad, KS 98453",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 22.2,
+        "amount": 333.0
+      }
+    ],
+    "subtotal": 333.0,
+    "tax_rate": "10%",
+    "tax": 33.3,
+    "grand_total": 366.3,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0085",
+    "vendor": "Zenith Software",
+    "date": "2025-07-22",
+    "buyer": "Kramer-Cooper",
+    "buyer_address": "520 Payne Via, Port Kimberly, NH 91647",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 5,
+        "unit_price": 119.67,
+        "amount": 598.35
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 2,
+        "unit_price": 22.92,
+        "amount": 45.84
+      },
+      {
+        "description": "Monitor",
+        "qty": 15,
+        "unit_price": 522.53,
+        "amount": 7837.95
+      },
+      {
+        "description": "Keyboard",
+        "qty": 7,
+        "unit_price": 47.22,
+        "amount": 330.54
+      },
+      {
+        "description": "Laptop",
+        "qty": 11,
+        "unit_price": 2413.95,
+        "amount": 26553.45
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 12,
+        "unit_price": 86.76,
+        "amount": 1041.12
+      }
+    ],
+    "subtotal": 36407.25,
+    "tax_rate": "8%",
+    "tax": 2912.58,
+    "grand_total": 39319.83,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0086",
+    "vendor": "CloudNet Services",
+    "date": "2026-01-17",
+    "buyer": "White, Taylor and Baldwin",
+    "buyer_address": "USS Carter, FPO AE 26645",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 5,
+        "unit_price": 113.09,
+        "amount": 565.45
+      },
+      {
+        "description": "Server Rack",
+        "qty": 6,
+        "unit_price": 717.27,
+        "amount": 4303.62
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 8,
+        "unit_price": 116.04,
+        "amount": 928.32
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 14,
+        "unit_price": 204.4,
+        "amount": 2861.6
+      }
+    ],
+    "subtotal": 8658.99,
+    "tax_rate": "10%",
+    "tax": 865.9,
+    "grand_total": 9524.89,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0087",
+    "vendor": "Summit Hardware",
+    "date": "2026-06-25",
+    "buyer": "Stewart LLC",
+    "buyer_address": "0345 Michelle Isle Suite 156, Paulfurt, MA 24987",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 4,
+        "unit_price": 780.92,
+        "amount": 3123.68
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 79.45,
+        "amount": 1112.3
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 2,
+        "unit_price": 44.82,
+        "amount": 89.64
+      }
+    ],
+    "subtotal": 4325.62,
+    "tax_rate": "10%",
+    "tax": 432.56,
+    "grand_total": 4758.18,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0088",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2026-01-24",
+    "buyer": "Jimenez, Glass and Stone",
+    "buyer_address": "69284 Garcia Islands Suite 479, Jacksonmouth, MI 59107",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 4,
+        "unit_price": 29.78,
+        "amount": 119.12
+      }
+    ],
+    "subtotal": 119.12,
+    "tax_rate": "10%",
+    "tax": 11.91,
+    "grand_total": 131.03,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0089",
+    "vendor": "Nexus Utilities",
+    "date": "2025-08-01",
+    "buyer": "Berg, Gomez and Bolton",
+    "buyer_address": "65820 Melinda Springs, Johnsonland, IA 85063",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 6,
+        "unit_price": 266.16,
+        "amount": 1596.96
+      },
+      {
+        "description": "Software License",
+        "qty": 13,
+        "unit_price": 365.19,
+        "amount": 4747.47
+      }
+    ],
+    "subtotal": 6344.43,
+    "tax_rate": "6%",
+    "tax": 380.67,
+    "grand_total": 6725.1,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0090",
+    "vendor": "CloudNet Services",
+    "date": "2025-12-05",
+    "buyer": "Reyes-Bradley",
+    "buyer_address": "5719 Alyssa Locks Suite 431, Lake Jacobhaven, MS 74120",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 3,
+        "unit_price": 15.45,
+        "amount": 46.35
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 13,
+        "unit_price": 21.4,
+        "amount": 278.2
+      },
+      {
+        "description": "Monitor",
+        "qty": 10,
+        "unit_price": 394.26,
+        "amount": 3942.6
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 3,
+        "unit_price": 15.31,
+        "amount": 45.93
+      },
+      {
+        "description": "Laptop",
+        "qty": 3,
+        "unit_price": 2060.92,
+        "amount": 6182.76
+      }
+    ],
+    "subtotal": 10495.84,
+    "tax_rate": "10%",
+    "tax": 1049.58,
+    "grand_total": 11545.42,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0091",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-08-30",
+    "buyer": "Hampton-Padilla",
+    "buyer_address": "731 Melissa Mission Apt. 715, Jennaside, ND 38559",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 2,
+        "unit_price": 22.4,
+        "amount": 44.8
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 4,
+        "unit_price": 58.09,
+        "amount": 232.36
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 1,
+        "unit_price": 36.82,
+        "amount": 36.82
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 109.36,
+        "amount": 1640.4
+      }
+    ],
+    "subtotal": 1954.38,
+    "tax_rate": "10%",
+    "tax": 195.44,
+    "grand_total": 2149.82,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0092",
+    "vendor": "Summit Hardware",
+    "date": "2026-06-27",
+    "buyer": "York-Joseph",
+    "buyer_address": "PSC 2583, Box 1323, APO AA 03946",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 708.38,
+        "amount": 5667.04
+      }
+    ],
+    "subtotal": 5667.04,
+    "tax_rate": "8%",
+    "tax": 453.36,
+    "grand_total": 6120.4,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2025-0093",
+    "vendor": "Aero Industries",
+    "date": "2025-12-03",
+    "buyer": "Armstrong, Mcdonald and Bird",
+    "buyer_address": "46786 Morrow Cliffs, West Dawn, NV 61558",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 3,
+        "unit_price": 13.51,
+        "amount": 40.53
+      },
+      {
+        "description": "Keyboard",
+        "qty": 5,
+        "unit_price": 57.46,
+        "amount": 287.3
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 10,
+        "unit_price": 300.96,
+        "amount": 3009.6
+      },
+      {
+        "description": "Monitor",
+        "qty": 6,
+        "unit_price": 428.54,
+        "amount": 2571.24
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 10,
+        "unit_price": 17.02,
+        "amount": 170.2
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 8,
+        "unit_price": 80.44,
+        "amount": 643.52
+      }
+    ],
+    "subtotal": 6722.39,
+    "tax_rate": "8%",
+    "tax": 537.79,
+    "grand_total": 7260.18,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0094",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-04-06",
+    "buyer": "Cooper, Humphrey and Deleon",
+    "buyer_address": "68018 Kevin Estates, Sarahbury, MI 68513",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 14,
+        "unit_price": 218.02,
+        "amount": 3052.28
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 7,
+        "unit_price": 41.89,
+        "amount": 293.23
+      },
+      {
+        "description": "Software License",
+        "qty": 6,
+        "unit_price": 199.37,
+        "amount": 1196.22
+      },
+      {
+        "description": "Office Chair",
+        "qty": 11,
+        "unit_price": 201.96,
+        "amount": 2221.56
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 3,
+        "unit_price": 346.65,
+        "amount": 1039.95
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 9.14,
+        "amount": 73.12
+      }
+    ],
+    "subtotal": 7876.36,
+    "tax_rate": "6%",
+    "tax": 472.58,
+    "grand_total": 8348.94,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0095",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-06-28",
+    "buyer": "Singleton-King",
+    "buyer_address": "49818 Brittany Prairie Apt. 299, Meganshire, AZ 04219",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 9,
+        "unit_price": 36.54,
+        "amount": 328.86
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 2,
+        "unit_price": 33.49,
+        "amount": 66.98
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 14,
+        "unit_price": 34.96,
+        "amount": 489.44
+      },
+      {
+        "description": "Laptop",
+        "qty": 13,
+        "unit_price": 1518.99,
+        "amount": 19746.87
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 97.68,
+        "amount": 1465.2
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 5,
+        "unit_price": 25.81,
+        "amount": 129.05
+      }
+    ],
+    "subtotal": 22226.4,
+    "tax_rate": "8%",
+    "tax": 1778.11,
+    "grand_total": 24004.51,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0096",
+    "vendor": "Delta Energy",
+    "date": "2025-08-16",
+    "buyer": "Fry PLC",
+    "buyer_address": "690 Small Plains, Dawnport, NJ 32597",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 4,
+        "unit_price": 53.13,
+        "amount": 212.52
+      },
+      {
+        "description": "Server Rack",
+        "qty": 6,
+        "unit_price": 1345.37,
+        "amount": 8072.22
+      }
+    ],
+    "subtotal": 8284.74,
+    "tax_rate": "8%",
+    "tax": 662.78,
+    "grand_total": 8947.52,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0097",
+    "vendor": "Stellar Media",
+    "date": "2026-05-24",
+    "buyer": "Sullivan, Chavez and Barker",
+    "buyer_address": "7359 Larry Stravenue Suite 562, Zacharyville, MD 32186",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 10,
+        "unit_price": 47.87,
+        "amount": 478.7
+      },
+      {
+        "description": "Laptop",
+        "qty": 14,
+        "unit_price": 1978.9,
+        "amount": 27704.6
+      }
+    ],
+    "subtotal": 28183.3,
+    "tax_rate": "6%",
+    "tax": 1691.0,
+    "grand_total": 29874.3,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2025-0098",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-01-13",
+    "buyer": "Adams and Sons",
+    "buyer_address": "6963 Lisa Ports, Jamesburgh, NM 67967",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 14,
+        "unit_price": 30.01,
+        "amount": 420.14
+      },
+      {
+        "description": "Laptop",
+        "qty": 11,
+        "unit_price": 1481.33,
+        "amount": 16294.63
+      },
+      {
+        "description": "Keyboard",
+        "qty": 3,
+        "unit_price": 64.46,
+        "amount": 193.38
+      }
+    ],
+    "subtotal": 16908.15,
+    "tax_rate": "6%",
+    "tax": 1014.49,
+    "grand_total": 17922.64,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2025-0099",
+    "vendor": "Delta Energy",
+    "date": "2026-01-13",
+    "buyer": "Koch-Jimenez",
+    "buyer_address": "733 Williams Haven Suite 974, Port Danielberg, FM 35165",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 8,
+        "unit_price": 50.45,
+        "amount": 403.6
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 29.35,
+        "amount": 176.1
+      }
+    ],
+    "subtotal": 579.7,
+    "tax_rate": "8%",
+    "tax": 46.38,
+    "grand_total": 626.08,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0100",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-04-24",
+    "buyer": "Gallagher-Diaz",
+    "buyer_address": "8416 Duran Harbors, East Theresafurt, MN 44945",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 48.95,
+        "amount": 146.85
+      }
+    ],
+    "subtotal": 146.85,
+    "tax_rate": "6%",
+    "tax": 8.81,
+    "grand_total": 155.66,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0101",
+    "vendor": "Swift Logistics",
+    "date": "2026-02-17",
+    "buyer": "Fischer-Gonzalez",
+    "buyer_address": "02578 Hernandez Passage, West Sarah, MD 21800",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 7,
+        "unit_price": 28.2,
+        "amount": 197.4
+      },
+      {
+        "description": "Server Rack",
+        "qty": 13,
+        "unit_price": 1012.35,
+        "amount": 13160.55
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 6,
+        "unit_price": 74.39,
+        "amount": 446.34
+      },
+      {
+        "description": "Software License",
+        "qty": 5,
+        "unit_price": 287.38,
+        "amount": 1436.9
+      }
+    ],
+    "subtotal": 15241.19,
+    "tax_rate": "10%",
+    "tax": 1524.12,
+    "grand_total": 16765.31,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0102",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-12-15",
+    "buyer": "Stevenson, Evans and Rogers",
+    "buyer_address": "947 Micheal Spring Apt. 694, New Thomasshire, OK 30325",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 7,
+        "unit_price": 394.56,
+        "amount": 2761.92
+      }
+    ],
+    "subtotal": 2761.92,
+    "tax_rate": "6%",
+    "tax": 165.72,
+    "grand_total": 2927.64,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0103",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-04-22",
+    "buyer": "Silva and Sons",
+    "buyer_address": "30913 Scott Manor Apt. 636, Salaston, VT 18599",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 5,
+        "unit_price": 29.77,
+        "amount": 148.85
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 1,
+        "unit_price": 29.92,
+        "amount": 29.92
+      }
+    ],
+    "subtotal": 178.77,
+    "tax_rate": "8%",
+    "tax": 14.3,
+    "grand_total": 193.07,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0104",
+    "vendor": "Prime Catering",
+    "date": "2026-02-02",
+    "buyer": "Hoffman Ltd",
+    "buyer_address": "2785 Lowe Ways Suite 973, West Angela, IN 39509",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 1,
+        "unit_price": 202.68,
+        "amount": 202.68
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 8,
+        "unit_price": 57.24,
+        "amount": 457.92
+      },
+      {
+        "description": "Monitor",
+        "qty": 14,
+        "unit_price": 387.84,
+        "amount": 5429.76
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 236.01,
+        "amount": 1652.07
+      },
+      {
+        "description": "Server Rack",
+        "qty": 12,
+        "unit_price": 1140.14,
+        "amount": 13681.68
+      }
+    ],
+    "subtotal": 21424.11,
+    "tax_rate": "8%",
+    "tax": 1713.93,
+    "grand_total": 23138.04,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0105",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2026-05-11",
+    "buyer": "Bush-Vaughn",
+    "buyer_address": "8441 Huang Locks Suite 240, Stephanieland, MI 58484",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 12,
+        "unit_price": 23.64,
+        "amount": 283.68
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 2,
+        "unit_price": 22.04,
+        "amount": 44.08
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 2,
+        "unit_price": 27.3,
+        "amount": 54.6
+      }
+    ],
+    "subtotal": 382.36,
+    "tax_rate": "10%",
+    "tax": 38.24,
+    "grand_total": 420.6,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0106",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-03-27",
+    "buyer": "Burgess-Lewis",
+    "buyer_address": "421 John Skyway Apt. 301, Riverafort, CT 89786",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 13,
+        "unit_price": 53.45,
+        "amount": 694.85
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 9,
+        "unit_price": 22.66,
+        "amount": 203.94
+      },
+      {
+        "description": "Office Chair",
+        "qty": 9,
+        "unit_price": 303.98,
+        "amount": 2735.82
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 15,
+        "unit_price": 21.2,
+        "amount": 318.0
+      }
+    ],
+    "subtotal": 3952.61,
+    "tax_rate": "8%",
+    "tax": 316.21,
+    "grand_total": 4268.82,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0107",
+    "vendor": "CloudNet Services",
+    "date": "2026-05-11",
+    "buyer": "Smith PLC",
+    "buyer_address": "Unit 2677 Box 3454, DPO AP 08255",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 5,
+        "unit_price": 178.91,
+        "amount": 894.55
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 10,
+        "unit_price": 21.88,
+        "amount": 218.8
+      }
+    ],
+    "subtotal": 1113.35,
+    "tax_rate": "10%",
+    "tax": 111.33,
+    "grand_total": 1224.68,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0108",
+    "vendor": "Summit Hardware",
+    "date": "2026-07-03",
+    "buyer": "Pearson and Sons",
+    "buyer_address": "62067 Sharon Well, Nancytown, ME 74944",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 11,
+        "unit_price": 26.61,
+        "amount": 292.71
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 10,
+        "unit_price": 226.66,
+        "amount": 2266.6
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 16.32,
+        "amount": 179.52
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 8,
+        "unit_price": 45.46,
+        "amount": 363.68
+      }
+    ],
+    "subtotal": 3102.51,
+    "tax_rate": "8%",
+    "tax": 248.2,
+    "grand_total": 3350.71,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0109",
+    "vendor": "Swift Logistics",
+    "date": "2026-03-07",
+    "buyer": "Hebert LLC",
+    "buyer_address": "87431 Martin Mount Suite 205, Ashleyborough, HI 80580",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 471.15,
+        "amount": 3769.2
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 1,
+        "unit_price": 37.91,
+        "amount": 37.91
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 5,
+        "unit_price": 17.3,
+        "amount": 86.5
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 14,
+        "unit_price": 442.53,
+        "amount": 6195.42
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 2,
+        "unit_price": 42.68,
+        "amount": 85.36
+      }
+    ],
+    "subtotal": 10174.39,
+    "tax_rate": "10%",
+    "tax": 1017.44,
+    "grand_total": 11191.83,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0110",
+    "vendor": "Stellar Media",
+    "date": "2026-06-13",
+    "buyer": "Prince, Wilcox and Robertson",
+    "buyer_address": "27530 Reyes Mission, Stephanieport, OR 95250",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 11,
+        "unit_price": 312.94,
+        "amount": 3442.34
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 10,
+        "unit_price": 22.94,
+        "amount": 229.4
+      },
+      {
+        "description": "Server Rack",
+        "qty": 3,
+        "unit_price": 1457.72,
+        "amount": 4373.16
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 8,
+        "unit_price": 36.21,
+        "amount": 289.68
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 106.99,
+        "amount": 1604.85
+      }
+    ],
+    "subtotal": 9939.43,
+    "tax_rate": "10%",
+    "tax": 993.94,
+    "grand_total": 10933.37,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0111",
+    "vendor": "Summit Hardware",
+    "date": "2026-02-23",
+    "buyer": "Green LLC",
+    "buyer_address": "174 Richard Parkway, Hannahport, MN 81061",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 12,
+        "unit_price": 462.65,
+        "amount": 5551.8
+      },
+      {
+        "description": "Software License",
+        "qty": 8,
+        "unit_price": 233.42,
+        "amount": 1867.36
+      }
+    ],
+    "subtotal": 7419.16,
+    "tax_rate": "10%",
+    "tax": 741.92,
+    "grand_total": 8161.08,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0112",
+    "vendor": "Pinnacle Designs",
+    "date": "2025-10-09",
+    "buyer": "Bernard Group",
+    "buyer_address": "8783 Erin Ranch Apt. 878, Christianshire, DE 08595",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 6,
+        "unit_price": 70.73,
+        "amount": 424.38
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 1,
+        "unit_price": 43.68,
+        "amount": 43.68
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 11,
+        "unit_price": 230.43,
+        "amount": 2534.73
+      }
+    ],
+    "subtotal": 3002.79,
+    "tax_rate": "8%",
+    "tax": 240.22,
+    "grand_total": 3243.01,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0113",
+    "vendor": "Prime Catering",
+    "date": "2026-06-02",
+    "buyer": "Leach, Harris and Herrera",
+    "buyer_address": "39718 Stokes Motorway Apt. 867, New Stevenport, VA 03354",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 2,
+        "unit_price": 32.48,
+        "amount": 64.96
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 56.25,
+        "amount": 168.75
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 5,
+        "unit_price": 24.45,
+        "amount": 122.25
+      }
+    ],
+    "subtotal": 355.96,
+    "tax_rate": "10%",
+    "tax": 35.6,
+    "grand_total": 391.56,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0114",
+    "vendor": "CloudNet Services",
+    "date": "2025-12-16",
+    "buyer": "Velasquez-Reese",
+    "buyer_address": "5180 Valerie Mountains, West Robertberg, WI 84586",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 13,
+        "unit_price": 39.71,
+        "amount": 516.23
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 3,
+        "unit_price": 93.61,
+        "amount": 280.83
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 14,
+        "unit_price": 43.41,
+        "amount": 607.74
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 11,
+        "unit_price": 286.87,
+        "amount": 3155.57
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 2,
+        "unit_price": 22.92,
+        "amount": 45.84
+      }
+    ],
+    "subtotal": 4606.21,
+    "tax_rate": "8%",
+    "tax": 368.5,
+    "grand_total": 4974.71,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0115",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2026-04-25",
+    "buyer": "Stuart, Brooks and Vance",
+    "buyer_address": "1825 Gregory Plain Suite 823, Port Andrewport, NH 88777",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 6,
+        "unit_price": 115.81,
+        "amount": 694.86
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 11.26,
+        "amount": 90.08
+      },
+      {
+        "description": "Office Chair",
+        "qty": 3,
+        "unit_price": 161.98,
+        "amount": 485.94
+      }
+    ],
+    "subtotal": 1270.88,
+    "tax_rate": "8%",
+    "tax": 101.67,
+    "grand_total": 1372.55,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0116",
+    "vendor": "Nexus Utilities",
+    "date": "2026-04-21",
+    "buyer": "Coleman, Gray and Hall",
+    "buyer_address": "3106 John Cliff, New Arthurton, IA 97565",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 3,
+        "unit_price": 317.09,
+        "amount": 951.27
+      },
+      {
+        "description": "Monitor",
+        "qty": 3,
+        "unit_price": 297.35,
+        "amount": 892.05
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 14,
+        "unit_price": 23.86,
+        "amount": 334.04
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 10,
+        "unit_price": 21.75,
+        "amount": 217.5
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 3,
+        "unit_price": 73.27,
+        "amount": 219.81
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 1,
+        "unit_price": 72.87,
+        "amount": 72.87
+      }
+    ],
+    "subtotal": 2687.54,
+    "tax_rate": "10%",
+    "tax": 268.75,
+    "grand_total": 2956.29,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0117",
+    "vendor": "Zenith Software",
+    "date": "2025-08-02",
+    "buyer": "Gonzales-Fernandez",
+    "buyer_address": "84395 Young Wells, Lake Adriana, MT 39888",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 5,
+        "unit_price": 117.25,
+        "amount": 586.25
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 13,
+        "unit_price": 22.79,
+        "amount": 296.27
+      },
+      {
+        "description": "Office Chair",
+        "qty": 14,
+        "unit_price": 177.61,
+        "amount": 2486.54
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 43.41,
+        "amount": 477.51
+      },
+      {
+        "description": "Server Rack",
+        "qty": 8,
+        "unit_price": 961.68,
+        "amount": 7693.44
+      }
+    ],
+    "subtotal": 11540.01,
+    "tax_rate": "8%",
+    "tax": 923.2,
+    "grand_total": 12463.21,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0118",
+    "vendor": "Delta Energy",
+    "date": "2025-10-30",
+    "buyer": "Hawkins PLC",
+    "buyer_address": "687 Teresa Row, Floydmouth, UT 55069",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 3,
+        "unit_price": 22.84,
+        "amount": 68.52
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 1,
+        "unit_price": 246.18,
+        "amount": 246.18
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 52.27,
+        "amount": 731.78
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 48.21,
+        "amount": 723.15
+      }
+    ],
+    "subtotal": 1769.63,
+    "tax_rate": "10%",
+    "tax": 176.96,
+    "grand_total": 1946.59,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0119",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-12-21",
+    "buyer": "Evans and Sons",
+    "buyer_address": "34270 Faulkner Point Apt. 634, West Deborah, NV 49138",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 15,
+        "unit_price": 30.4,
+        "amount": 456.0
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 14,
+        "unit_price": 22.06,
+        "amount": 308.84
+      }
+    ],
+    "subtotal": 764.84,
+    "tax_rate": "6%",
+    "tax": 45.89,
+    "grand_total": 810.73,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0120",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2025-08-20",
+    "buyer": "Hardy, Lee and Adams",
+    "buyer_address": "39837 Molly Isle, Susantown, IL 25407",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 4,
+        "unit_price": 431.7,
+        "amount": 1726.8
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 2,
+        "unit_price": 52.49,
+        "amount": 104.98
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 1,
+        "unit_price": 24.56,
+        "amount": 24.56
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 2,
+        "unit_price": 22.27,
+        "amount": 44.54
+      }
+    ],
+    "subtotal": 1900.88,
+    "tax_rate": "10%",
+    "tax": 190.09,
+    "grand_total": 2090.97,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0121",
+    "vendor": "CloudNet Services",
+    "date": "2026-04-29",
+    "buyer": "Burgess Group",
+    "buyer_address": "PSC 9363, Box 8546, APO AA 70447",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 106.38,
+        "amount": 1595.7
+      }
+    ],
+    "subtotal": 1595.7,
+    "tax_rate": "10%",
+    "tax": 159.57,
+    "grand_total": 1755.27,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0122",
+    "vendor": "Aero Industries",
+    "date": "2026-03-24",
+    "buyer": "Parker-Ward",
+    "buyer_address": "75355 Williams Way Apt. 204, Phillipsborough, MA 30650",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 4,
+        "unit_price": 2219.44,
+        "amount": 8877.76
+      },
+      {
+        "description": "Keyboard",
+        "qty": 9,
+        "unit_price": 76.41,
+        "amount": 687.69
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 10,
+        "unit_price": 294.16,
+        "amount": 2941.6
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 2,
+        "unit_price": 49.93,
+        "amount": 99.86
+      }
+    ],
+    "subtotal": 12606.91,
+    "tax_rate": "6%",
+    "tax": 756.41,
+    "grand_total": 13363.32,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0123",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2025-12-10",
+    "buyer": "Whitaker, Porter and Pena",
+    "buyer_address": "7725 Donald Plains Suite 280, Port Melanieton, WV 01337",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 2,
+        "unit_price": 23.33,
+        "amount": 46.66
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 15,
+        "unit_price": 23.5,
+        "amount": 352.5
+      }
+    ],
+    "subtotal": 399.16,
+    "tax_rate": "10%",
+    "tax": 39.92,
+    "grand_total": 439.08,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0124",
+    "vendor": "Delta Energy",
+    "date": "2025-12-23",
+    "buyer": "Kirby and Sons",
+    "buyer_address": "38750 Hopkins Brook, New Andreatown, AK 69892",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 10,
+        "unit_price": 173.49,
+        "amount": 1734.9
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 10,
+        "unit_price": 33.75,
+        "amount": 337.5
+      },
+      {
+        "description": "Server Rack",
+        "qty": 11,
+        "unit_price": 1168.21,
+        "amount": 12850.31
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 9,
+        "unit_price": 296.2,
+        "amount": 2665.8
+      },
+      {
+        "description": "Laptop",
+        "qty": 2,
+        "unit_price": 2420.79,
+        "amount": 4841.58
+      }
+    ],
+    "subtotal": 22430.09,
+    "tax_rate": "10%",
+    "tax": 2243.01,
+    "grand_total": 24673.1,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0125",
+    "vendor": "Nexus Utilities",
+    "date": "2026-04-22",
+    "buyer": "Nichols-Mitchell",
+    "buyer_address": "11823 Christine Glen Suite 461, Susanmouth, OK 32378",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 14,
+        "unit_price": 58.21,
+        "amount": 814.94
+      }
+    ],
+    "subtotal": 814.94,
+    "tax_rate": "10%",
+    "tax": 81.49,
+    "grand_total": 896.43,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0126",
+    "vendor": "Swift Logistics",
+    "date": "2026-04-12",
+    "buyer": "Evans Inc",
+    "buyer_address": "66687 Dana Squares, North Vincent, NE 85030",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 12,
+        "unit_price": 1917.08,
+        "amount": 23004.96
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 2,
+        "unit_price": 52.0,
+        "amount": 104.0
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 12,
+        "unit_price": 75.4,
+        "amount": 904.8
+      },
+      {
+        "description": "Monitor",
+        "qty": 3,
+        "unit_price": 226.6,
+        "amount": 679.8
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 9,
+        "unit_price": 13.76,
+        "amount": 123.84
+      },
+      {
+        "description": "Office Chair",
+        "qty": 11,
+        "unit_price": 170.04,
+        "amount": 1870.44
+      }
+    ],
+    "subtotal": 26687.84,
+    "tax_rate": "10%",
+    "tax": 2668.78,
+    "grand_total": 29356.62,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0127",
+    "vendor": "Aero Industries",
+    "date": "2026-05-16",
+    "buyer": "Knight-Hodge",
+    "buyer_address": "39740 Gabrielle Harbors, East Sarahmouth, AK 27653",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 1,
+        "unit_price": 12.99,
+        "amount": 12.99
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 1,
+        "unit_price": 50.6,
+        "amount": 50.6
+      },
+      {
+        "description": "Monitor",
+        "qty": 15,
+        "unit_price": 225.14,
+        "amount": 3377.1
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 15,
+        "unit_price": 35.85,
+        "amount": 537.75
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 7,
+        "unit_price": 89.35,
+        "amount": 625.45
+      },
+      {
+        "description": "Software License",
+        "qty": 9,
+        "unit_price": 215.69,
+        "amount": 1941.21
+      }
+    ],
+    "subtotal": 6545.1,
+    "tax_rate": "6%",
+    "tax": 392.71,
+    "grand_total": 6937.81,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0128",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-02-28",
+    "buyer": "Goodwin Ltd",
+    "buyer_address": "2939 Rhodes Plains, Patrickberg, WY 90850",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 2,
+        "unit_price": 679.61,
+        "amount": 1359.22
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 7,
+        "unit_price": 27.79,
+        "amount": 194.53
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 12,
+        "unit_price": 34.79,
+        "amount": 417.48
+      }
+    ],
+    "subtotal": 1971.23,
+    "tax_rate": "8%",
+    "tax": 157.7,
+    "grand_total": 2128.93,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0129",
+    "vendor": "Aero Industries",
+    "date": "2026-04-23",
+    "buyer": "Mason LLC",
+    "buyer_address": "15999 Novak Islands Apt. 477, West Angela, MS 57104",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 13,
+        "unit_price": 582.61,
+        "amount": 7573.93
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 7,
+        "unit_price": 27.76,
+        "amount": 194.32
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 10,
+        "unit_price": 34.89,
+        "amount": 348.9
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 3,
+        "unit_price": 62.73,
+        "amount": 188.19
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 6,
+        "unit_price": 18.08,
+        "amount": 108.48
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 44.74,
+        "amount": 268.44
+      }
+    ],
+    "subtotal": 8682.26,
+    "tax_rate": "8%",
+    "tax": 694.58,
+    "grand_total": 9376.84,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0130",
+    "vendor": "Elite Cleaners",
+    "date": "2025-09-26",
+    "buyer": "Willis, James and Barton",
+    "buyer_address": "114 Norman Tunnel, Lake Peter, MN 14466",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 8,
+        "unit_price": 12.97,
+        "amount": 103.76
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 14,
+        "unit_price": 56.91,
+        "amount": 796.74
+      }
+    ],
+    "subtotal": 900.5,
+    "tax_rate": "10%",
+    "tax": 90.05,
+    "grand_total": 990.55,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0131",
+    "vendor": "Summit Hardware",
+    "date": "2025-08-20",
+    "buyer": "Hahn Group",
+    "buyer_address": "21267 Garcia Corners Suite 819, Michelletown, LA 54739",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 11,
+        "unit_price": 58.25,
+        "amount": 640.75
+      }
+    ],
+    "subtotal": 640.75,
+    "tax_rate": "8%",
+    "tax": 51.26,
+    "grand_total": 692.01,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0132",
+    "vendor": "FreshFood Distribution",
+    "date": "2025-12-13",
+    "buyer": "Hardy PLC",
+    "buyer_address": "PSC 3982, Box 6224, APO AA 35681",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 14,
+        "unit_price": 42.34,
+        "amount": 592.76
+      }
+    ],
+    "subtotal": 592.76,
+    "tax_rate": "8%",
+    "tax": 47.42,
+    "grand_total": 640.18,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0133",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-01-23",
+    "buyer": "Brown Group",
+    "buyer_address": "1543 Wheeler Flat Suite 124, South Martinfurt, AS 43694",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 7,
+        "unit_price": 58.23,
+        "amount": 407.61
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 1,
+        "unit_price": 319.68,
+        "amount": 319.68
+      }
+    ],
+    "subtotal": 727.29,
+    "tax_rate": "10%",
+    "tax": 72.73,
+    "grand_total": 800.02,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0134",
+    "vendor": "Pinnacle Designs",
+    "date": "2026-01-02",
+    "buyer": "Jordan-Colon",
+    "buyer_address": "5937 Thompson Locks, Kellyfort, OK 32276",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 7,
+        "unit_price": 38.86,
+        "amount": 272.02
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 5,
+        "unit_price": 26.23,
+        "amount": 131.15
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 2,
+        "unit_price": 15.78,
+        "amount": 31.56
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 3,
+        "unit_price": 16.48,
+        "amount": 49.44
+      }
+    ],
+    "subtotal": 484.17,
+    "tax_rate": "8%",
+    "tax": 38.73,
+    "grand_total": 522.9,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0135",
+    "vendor": "Swift Logistics",
+    "date": "2025-11-19",
+    "buyer": "Ramirez-Hartman",
+    "buyer_address": "828 Stephanie Mountain, South Lauren, MP 91312",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 5,
+        "unit_price": 27.96,
+        "amount": 139.8
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 8,
+        "unit_price": 180.03,
+        "amount": 1440.24
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 3,
+        "unit_price": 108.23,
+        "amount": 324.69
+      }
+    ],
+    "subtotal": 1904.73,
+    "tax_rate": "8%",
+    "tax": 152.38,
+    "grand_total": 2057.11,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0136",
+    "vendor": "Zenith Software",
+    "date": "2025-08-11",
+    "buyer": "Chambers-Taylor",
+    "buyer_address": "266 Shane Rapid Suite 968, Stephensstad, UT 70874",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 16.95,
+        "amount": 186.45
+      }
+    ],
+    "subtotal": 186.45,
+    "tax_rate": "6%",
+    "tax": 11.19,
+    "grand_total": 197.64,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0137",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-03-03",
+    "buyer": "Rocha, Rodriguez and Wright",
+    "buyer_address": "909 Rasmussen Isle, Rodriguezville, KS 29599",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 6,
+        "unit_price": 16.65,
+        "amount": 99.9
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 2,
+        "unit_price": 445.09,
+        "amount": 890.18
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 13,
+        "unit_price": 38.33,
+        "amount": 498.29
+      }
+    ],
+    "subtotal": 1488.37,
+    "tax_rate": "8%",
+    "tax": 119.07,
+    "grand_total": 1607.44,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0138",
+    "vendor": "Nexus Utilities",
+    "date": "2026-01-30",
+    "buyer": "Stone, Carpenter and Johnston",
+    "buyer_address": "9825 Timothy Hill Suite 112, Larrymouth, WY 27615",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 10,
+        "unit_price": 55.95,
+        "amount": 559.5
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 2,
+        "unit_price": 19.11,
+        "amount": 38.22
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 12,
+        "unit_price": 73.13,
+        "amount": 877.56
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 9,
+        "unit_price": 27.32,
+        "amount": 245.88
+      },
+      {
+        "description": "Keyboard",
+        "qty": 7,
+        "unit_price": 69.4,
+        "amount": 485.8
+      }
+    ],
+    "subtotal": 2206.96,
+    "tax_rate": "6%",
+    "tax": 132.42,
+    "grand_total": 2339.38,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0139",
+    "vendor": "Summit Hardware",
+    "date": "2026-02-03",
+    "buyer": "Bailey-Davis",
+    "buyer_address": "1401 Melinda Rue Apt. 238, New Ethan, OH 56386",
+    "line_items": [
+      {
+        "description": "Network Cable (10m)",
+        "qty": 8,
+        "unit_price": 27.64,
+        "amount": 221.12
+      }
+    ],
+    "subtotal": 221.12,
+    "tax_rate": "8%",
+    "tax": 17.69,
+    "grand_total": 238.81,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0140",
+    "vendor": "Summit Hardware",
+    "date": "2026-01-11",
+    "buyer": "Salinas Ltd",
+    "buyer_address": "0937 Price Squares Apt. 341, Port Monicaburgh, MN 43228",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 14,
+        "unit_price": 10.11,
+        "amount": 141.54
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 28.69,
+        "amount": 86.07
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 3,
+        "unit_price": 198.4,
+        "amount": 595.2
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 21.76,
+        "amount": 261.12
+      },
+      {
+        "description": "Laptop",
+        "qty": 9,
+        "unit_price": 2321.37,
+        "amount": 20892.33
+      }
+    ],
+    "subtotal": 21976.26,
+    "tax_rate": "6%",
+    "tax": 1318.58,
+    "grand_total": 23294.84,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0141",
+    "vendor": "Summit Hardware",
+    "date": "2025-09-30",
+    "buyer": "Wilson-Lambert",
+    "buyer_address": "696 Michael Vista Suite 924, Lake Dennisville, IA 40527",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 9,
+        "unit_price": 17.8,
+        "amount": 160.2
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 11,
+        "unit_price": 22.59,
+        "amount": 248.49
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 10,
+        "unit_price": 13.08,
+        "amount": 130.8
+      },
+      {
+        "description": "Server Rack",
+        "qty": 11,
+        "unit_price": 1124.48,
+        "amount": 12369.28
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 88.41,
+        "amount": 1326.15
+      }
+    ],
+    "subtotal": 14234.92,
+    "tax_rate": "10%",
+    "tax": 1423.49,
+    "grand_total": 15658.41,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0142",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-08-30",
+    "buyer": "Brooks and Sons",
+    "buyer_address": "296 Lopez Roads Apt. 827, Donaldmouth, MP 59614",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 21.32,
+        "amount": 234.52
+      }
+    ],
+    "subtotal": 234.52,
+    "tax_rate": "10%",
+    "tax": 23.45,
+    "grand_total": 257.97,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0143",
+    "vendor": "Summit Hardware",
+    "date": "2026-03-13",
+    "buyer": "Glenn Inc",
+    "buyer_address": "8876 Perry Ville, Burnsland, OK 04545",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 15,
+        "unit_price": 1127.16,
+        "amount": 16907.4
+      }
+    ],
+    "subtotal": 16907.4,
+    "tax_rate": "8%",
+    "tax": 1352.59,
+    "grand_total": 18259.99,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0144",
+    "vendor": "Aero Industries",
+    "date": "2026-05-21",
+    "buyer": "Carter LLC",
+    "buyer_address": "79788 Ashley Grove Suite 807, South Curtis, MP 86179",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 8,
+        "unit_price": 34.38,
+        "amount": 275.04
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 1,
+        "unit_price": 52.65,
+        "amount": 52.65
+      }
+    ],
+    "subtotal": 327.69,
+    "tax_rate": "8%",
+    "tax": 26.22,
+    "grand_total": 353.91,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0145",
+    "vendor": "Apex Engineering",
+    "date": "2026-05-03",
+    "buyer": "Evans Inc",
+    "buyer_address": "71339 Callahan Ridge Suite 292, Port Jamie, AR 75221",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 12,
+        "unit_price": 29.37,
+        "amount": 352.44
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 14,
+        "unit_price": 16.91,
+        "amount": 236.74
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 7,
+        "unit_price": 23.92,
+        "amount": 167.44
+      }
+    ],
+    "subtotal": 756.62,
+    "tax_rate": "8%",
+    "tax": 60.53,
+    "grand_total": 817.15,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0146",
+    "vendor": "PrintPro Solutions",
+    "date": "2025-11-29",
+    "buyer": "Campbell, Ryan and Morris",
+    "buyer_address": "481 Sydney Turnpike Suite 042, East Dustin, MD 32948",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 5,
+        "unit_price": 207.36,
+        "amount": 1036.8
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 3,
+        "unit_price": 14.23,
+        "amount": 42.69
+      },
+      {
+        "description": "Monitor",
+        "qty": 5,
+        "unit_price": 767.23,
+        "amount": 3836.15
+      }
+    ],
+    "subtotal": 4915.64,
+    "tax_rate": "10%",
+    "tax": 491.56,
+    "grand_total": 5407.2,
+    "currency": "USD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0147",
+    "vendor": "FreshFood Distribution",
+    "date": "2026-05-07",
+    "buyer": "Long, Thomas and Chen",
+    "buyer_address": "1168 Neal Wells Suite 775, Port Kimland, VA 60590",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 3,
+        "unit_price": 19.97,
+        "amount": 59.91
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 9,
+        "unit_price": 220.02,
+        "amount": 1980.18
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 15,
+        "unit_price": 48.51,
+        "amount": 727.65
+      }
+    ],
+    "subtotal": 2767.74,
+    "tax_rate": "6%",
+    "tax": 166.06,
+    "grand_total": 2933.8,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0148",
+    "vendor": "Delta Energy",
+    "date": "2026-03-19",
+    "buyer": "Terry, Horn and Flynn",
+    "buyer_address": "74545 Ashlee Oval Suite 001, Smithburgh, NV 60337",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 1,
+        "unit_price": 67.69,
+        "amount": 67.69
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 8,
+        "unit_price": 239.63,
+        "amount": 1917.04
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 14,
+        "unit_price": 92.34,
+        "amount": 1292.76
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 12.86,
+        "amount": 102.88
+      }
+    ],
+    "subtotal": 3380.37,
+    "tax_rate": "6%",
+    "tax": 202.82,
+    "grand_total": 3583.19,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0149",
+    "vendor": "CloudNet Services",
+    "date": "2025-07-16",
+    "buyer": "Harris-Barker",
+    "buyer_address": "41541 Beck Run Apt. 064, South Diana, VT 12976",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 1,
+        "unit_price": 39.02,
+        "amount": 39.02
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 10,
+        "unit_price": 63.71,
+        "amount": 637.1
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 6,
+        "unit_price": 17.4,
+        "amount": 104.4
+      }
+    ],
+    "subtotal": 780.52,
+    "tax_rate": "6%",
+    "tax": 46.83,
+    "grand_total": 827.35,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0150",
+    "vendor": "Zenith Software",
+    "date": "2025-07-16",
+    "buyer": "Woods and Sons",
+    "buyer_address": "05162 Jones Lights Apt. 115, Nicoleberg, MS 99218",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 6,
+        "unit_price": 38.85,
+        "amount": 233.1
+      },
+      {
+        "description": "Office Chair",
+        "qty": 6,
+        "unit_price": 323.13,
+        "amount": 1938.78
+      },
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 65.3,
+        "amount": 391.8
+      },
+      {
+        "description": "Monitor",
+        "qty": 4,
+        "unit_price": 561.48,
+        "amount": 2245.92
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 225.01,
+        "amount": 1575.07
+      }
+    ],
+    "subtotal": 6384.67,
+    "tax_rate": "6%",
+    "tax": 383.08,
+    "grand_total": 6767.75,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0151",
+    "vendor": "Optima Consultants",
+    "date": "2026-06-20",
+    "buyer": "May Ltd",
+    "buyer_address": "275 Courtney Drive, Jensenmouth, VI 28975",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 15,
+        "unit_price": 290.12,
+        "amount": 4351.8
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 6,
+        "unit_price": 33.42,
+        "amount": 200.52
+      },
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 29.75,
+        "amount": 178.5
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 10,
+        "unit_price": 99.15,
+        "amount": 991.5
+      }
+    ],
+    "subtotal": 5722.32,
+    "tax_rate": "8%",
+    "tax": 457.79,
+    "grand_total": 6180.11,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0152",
+    "vendor": "Delta Energy",
+    "date": "2025-08-18",
+    "buyer": "Taylor Inc",
+    "buyer_address": "6523 Newman Gateway Suite 043, Lake Peter, SD 07653",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 6,
+        "unit_price": 831.24,
+        "amount": 4987.44
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 2,
+        "unit_price": 118.39,
+        "amount": 236.78
+      },
+      {
+        "description": "Software License",
+        "qty": 10,
+        "unit_price": 157.69,
+        "amount": 1576.9
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 15,
+        "unit_price": 41.76,
+        "amount": 626.4
+      },
+      {
+        "description": "Laptop",
+        "qty": 12,
+        "unit_price": 1869.74,
+        "amount": 22436.88
+      }
+    ],
+    "subtotal": 29864.4,
+    "tax_rate": "10%",
+    "tax": 2986.44,
+    "grand_total": 32850.84,
+    "currency": "USD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0153",
+    "vendor": "Summit Hardware",
+    "date": "2026-05-16",
+    "buyer": "Simpson Inc",
+    "buyer_address": "055 Paul Villages, Diazburgh, WV 62237",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 9,
+        "unit_price": 270.16,
+        "amount": 2431.44
+      },
+      {
+        "description": "Monitor",
+        "qty": 10,
+        "unit_price": 664.76,
+        "amount": 6647.6
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 7,
+        "unit_price": 51.82,
+        "amount": 362.74
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 11,
+        "unit_price": 199.92,
+        "amount": 2199.12
+      },
+      {
+        "description": "Keyboard",
+        "qty": 10,
+        "unit_price": 76.89,
+        "amount": 768.9
+      }
+    ],
+    "subtotal": 12409.8,
+    "tax_rate": "6%",
+    "tax": 744.59,
+    "grand_total": 13154.39,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0154",
+    "vendor": "Zenith Software",
+    "date": "2026-05-11",
+    "buyer": "Smith Inc",
+    "buyer_address": "06848 Henderson Locks, Lake Amandaberg, KY 11458",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 12,
+        "unit_price": 26.12,
+        "amount": 313.44
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 9,
+        "unit_price": 49.87,
+        "amount": 448.83
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 15,
+        "unit_price": 220.74,
+        "amount": 3311.1
+      }
+    ],
+    "subtotal": 4073.37,
+    "tax_rate": "10%",
+    "tax": 407.34,
+    "grand_total": 4480.71,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0155",
+    "vendor": "CloudNet Services",
+    "date": "2025-11-13",
+    "buyer": "Dixon and Sons",
+    "buyer_address": "Unit 2856 Box 9146, DPO AP 31779",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 7,
+        "unit_price": 197.06,
+        "amount": 1379.42
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 3,
+        "unit_price": 19.19,
+        "amount": 57.57
+      },
+      {
+        "description": "Server Rack",
+        "qty": 9,
+        "unit_price": 842.33,
+        "amount": 7580.97
+      },
+      {
+        "description": "Software License",
+        "qty": 6,
+        "unit_price": 286.55,
+        "amount": 1719.3
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 14,
+        "unit_price": 36.63,
+        "amount": 512.82
+      }
+    ],
+    "subtotal": 11250.08,
+    "tax_rate": "10%",
+    "tax": 1125.01,
+    "grand_total": 12375.09,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0156",
+    "vendor": "Quantum Labs",
+    "date": "2025-08-07",
+    "buyer": "Miller Group",
+    "buyer_address": "2102 Frank Key, Garyberg, WA 35728",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 5,
+        "unit_price": 183.73,
+        "amount": 918.65
+      },
+      {
+        "description": "Software License",
+        "qty": 5,
+        "unit_price": 319.91,
+        "amount": 1599.55
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 12,
+        "unit_price": 24.33,
+        "amount": 291.96
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 12,
+        "unit_price": 29.67,
+        "amount": 356.04
+      }
+    ],
+    "subtotal": 3166.2,
+    "tax_rate": "8%",
+    "tax": 253.3,
+    "grand_total": 3419.5,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0157",
+    "vendor": "Swift Logistics",
+    "date": "2026-04-26",
+    "buyer": "Wise Inc",
+    "buyer_address": "8149 Tyler Pass Suite 079, West Eric, WI 13988",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 7,
+        "unit_price": 427.35,
+        "amount": 2991.45
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 13,
+        "unit_price": 78.28,
+        "amount": 1017.64
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 5,
+        "unit_price": 12.97,
+        "amount": 64.85
+      }
+    ],
+    "subtotal": 4073.94,
+    "tax_rate": "10%",
+    "tax": 407.39,
+    "grand_total": 4481.33,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0158",
+    "vendor": "Zenith Software",
+    "date": "2026-06-28",
+    "buyer": "Craig, Wilson and Yang",
+    "buyer_address": "07562 Sarah Walks, New Lindachester, IN 42680",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 15,
+        "unit_price": 31.86,
+        "amount": 477.9
+      },
+      {
+        "description": "Server Rack",
+        "qty": 5,
+        "unit_price": 637.27,
+        "amount": 3186.35
+      },
+      {
+        "description": "Office Chair",
+        "qty": 10,
+        "unit_price": 396.36,
+        "amount": 3963.6
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 4,
+        "unit_price": 17.58,
+        "amount": 70.32
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 11,
+        "unit_price": 418.71,
+        "amount": 4605.81
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 4,
+        "unit_price": 43.71,
+        "amount": 174.84
+      }
+    ],
+    "subtotal": 12478.82,
+    "tax_rate": "6%",
+    "tax": 748.73,
+    "grand_total": 13227.55,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0159",
+    "vendor": "Optima Consultants",
+    "date": "2025-10-20",
+    "buyer": "Moon-Flores",
+    "buyer_address": "80238 Stephanie Cliff Suite 445, New Stephenstad, ID 38720",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 9,
+        "unit_price": 1477.91,
+        "amount": 13301.19
+      },
+      {
+        "description": "Office Chair",
+        "qty": 3,
+        "unit_price": 262.76,
+        "amount": 788.28
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 27.61,
+        "amount": 414.15
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 8,
+        "unit_price": 58.65,
+        "amount": 469.2
+      },
+      {
+        "description": "Keyboard",
+        "qty": 4,
+        "unit_price": 65.35,
+        "amount": 261.4
+      },
+      {
+        "description": "Laptop",
+        "qty": 5,
+        "unit_price": 1345.99,
+        "amount": 6729.95
+      }
+    ],
+    "subtotal": 21964.17,
+    "tax_rate": "10%",
+    "tax": 2196.42,
+    "grand_total": 24160.59,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0160",
+    "vendor": "Summit Hardware",
+    "date": "2026-02-19",
+    "buyer": "Stevenson-Sanchez",
+    "buyer_address": "83206 Jesse Key Apt. 506, Daltonhaven, IA 55527",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 15,
+        "unit_price": 343.16,
+        "amount": 5147.4
+      },
+      {
+        "description": "Monitor",
+        "qty": 15,
+        "unit_price": 751.78,
+        "amount": 11276.7
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 14,
+        "unit_price": 21.13,
+        "amount": 295.82
+      },
+      {
+        "description": "Keyboard",
+        "qty": 8,
+        "unit_price": 31.18,
+        "amount": 249.44
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 12,
+        "unit_price": 294.32,
+        "amount": 3531.84
+      }
+    ],
+    "subtotal": 20501.2,
+    "tax_rate": "8%",
+    "tax": 1640.1,
+    "grand_total": 22141.3,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0161",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-01-23",
+    "buyer": "Kaufman and Sons",
+    "buyer_address": "38657 Beverly Parkways, Lake Lori, CA 78081",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 9,
+        "unit_price": 309.73,
+        "amount": 2787.57
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 28.77,
+        "amount": 431.55
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 14,
+        "unit_price": 37.69,
+        "amount": 527.66
+      },
+      {
+        "description": "Software License",
+        "qty": 5,
+        "unit_price": 117.48,
+        "amount": 587.4
+      },
+      {
+        "description": "Server Rack",
+        "qty": 2,
+        "unit_price": 830.68,
+        "amount": 1661.36
+      }
+    ],
+    "subtotal": 5995.54,
+    "tax_rate": "10%",
+    "tax": 599.55,
+    "grand_total": 6595.09,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0162",
+    "vendor": "Swift Logistics",
+    "date": "2026-02-21",
+    "buyer": "Graham and Sons",
+    "buyer_address": "6557 Hall Flats Apt. 912, East Shannonmouth, MT 16326",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 10,
+        "unit_price": 19.46,
+        "amount": 194.6
+      },
+      {
+        "description": "Laptop",
+        "qty": 4,
+        "unit_price": 1098.34,
+        "amount": 4393.36
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 14,
+        "unit_price": 47.36,
+        "amount": 663.04
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 7,
+        "unit_price": 392.91,
+        "amount": 2750.37
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 9,
+        "unit_price": 49.68,
+        "amount": 447.12
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 7,
+        "unit_price": 45.12,
+        "amount": 315.84
+      }
+    ],
+    "subtotal": 8764.33,
+    "tax_rate": "6%",
+    "tax": 525.86,
+    "grand_total": 9290.19,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0163",
+    "vendor": "Optima Consultants",
+    "date": "2026-02-09",
+    "buyer": "Oconnell-Clark",
+    "buyer_address": "12490 Mary Islands Apt. 135, Palmerport, KS 23290",
+    "line_items": [
+      {
+        "description": "Laptop",
+        "qty": 7,
+        "unit_price": 1200.39,
+        "amount": 8402.73
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 13,
+        "unit_price": 23.01,
+        "amount": 299.13
+      }
+    ],
+    "subtotal": 8701.86,
+    "tax_rate": "8%",
+    "tax": 696.15,
+    "grand_total": 9398.01,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0164",
+    "vendor": "Stellar Media",
+    "date": "2025-07-28",
+    "buyer": "Bond-Hawkins",
+    "buyer_address": "1210 Maria Forges, East Madison, MN 90453",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 25.79,
+        "amount": 283.69
+      }
+    ],
+    "subtotal": 283.69,
+    "tax_rate": "6%",
+    "tax": 17.02,
+    "grand_total": 300.71,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0165",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-03-17",
+    "buyer": "Miller, Willis and Lowery",
+    "buyer_address": "72151 Sheri Causeway, New Ryan, VA 52274",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 9,
+        "unit_price": 113.85,
+        "amount": 1024.65
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 15,
+        "unit_price": 19.96,
+        "amount": 299.4
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 5,
+        "unit_price": 253.54,
+        "amount": 1267.7
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 28.32,
+        "amount": 311.52
+      }
+    ],
+    "subtotal": 2903.27,
+    "tax_rate": "8%",
+    "tax": 232.26,
+    "grand_total": 3135.53,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0166",
+    "vendor": "BuildMart Materials",
+    "date": "2026-01-24",
+    "buyer": "Reyes Group",
+    "buyer_address": "44720 Deborah Parks, Andradefort, AR 11998",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 35.47,
+        "amount": 106.41
+      },
+      {
+        "description": "Server Rack",
+        "qty": 10,
+        "unit_price": 873.62,
+        "amount": 8736.2
+      }
+    ],
+    "subtotal": 8842.61,
+    "tax_rate": "10%",
+    "tax": 884.26,
+    "grand_total": 9726.87,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0167",
+    "vendor": "Nexus Utilities",
+    "date": "2025-11-01",
+    "buyer": "Taylor-Gonzalez",
+    "buyer_address": "806 Castillo Tunnel, Coopershire, NY 42654",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 9,
+        "unit_price": 217.01,
+        "amount": 1953.09
+      },
+      {
+        "description": "Software License",
+        "qty": 12,
+        "unit_price": 176.62,
+        "amount": 2119.44
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 15,
+        "unit_price": 21.28,
+        "amount": 319.2
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 1,
+        "unit_price": 79.73,
+        "amount": 79.73
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 15,
+        "unit_price": 80.44,
+        "amount": 1206.6
+      },
+      {
+        "description": "Monitor",
+        "qty": 10,
+        "unit_price": 522.0,
+        "amount": 5220.0
+      }
+    ],
+    "subtotal": 10898.06,
+    "tax_rate": "6%",
+    "tax": 653.88,
+    "grand_total": 11551.94,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0168",
+    "vendor": "Zenith Software",
+    "date": "2025-12-13",
+    "buyer": "White-Flores",
+    "buyer_address": "78593 Craig Shoals Apt. 480, New Meghan, AS 51412",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 12,
+        "unit_price": 237.47,
+        "amount": 2849.64
+      }
+    ],
+    "subtotal": 2849.64,
+    "tax_rate": "6%",
+    "tax": 170.98,
+    "grand_total": 3020.62,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0169",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2025-11-30",
+    "buyer": "Thompson PLC",
+    "buyer_address": "059 Anna Field Suite 842, Johnsonton, IN 79362",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 1,
+        "unit_price": 40.15,
+        "amount": 40.15
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 11,
+        "unit_price": 44.21,
+        "amount": 486.31
+      },
+      {
+        "description": "Software License",
+        "qty": 12,
+        "unit_price": 57.62,
+        "amount": 691.44
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 5,
+        "unit_price": 105.32,
+        "amount": 526.6
+      }
+    ],
+    "subtotal": 1744.5,
+    "tax_rate": "10%",
+    "tax": 174.45,
+    "grand_total": 1918.95,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0170",
+    "vendor": "OfficeMart Trading",
+    "date": "2025-10-08",
+    "buyer": "Fox Inc",
+    "buyer_address": "52500 Brenda Divide, Port Aliciastad, CA 49468",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 41.01,
+        "amount": 246.06
+      }
+    ],
+    "subtotal": 246.06,
+    "tax_rate": "10%",
+    "tax": 24.61,
+    "grand_total": 270.67,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0171",
+    "vendor": "Aero Industries",
+    "date": "2026-04-15",
+    "buyer": "Foster, Garcia and Turner",
+    "buyer_address": "675 Jasmine Points, Jeffreyshire, GU 23484",
+    "line_items": [
+      {
+        "description": "Whiteboard",
+        "qty": 7,
+        "unit_price": 54.4,
+        "amount": 380.8
+      }
+    ],
+    "subtotal": 380.8,
+    "tax_rate": "6%",
+    "tax": 22.85,
+    "grand_total": 403.65,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0172",
+    "vendor": "Summit Hardware",
+    "date": "2025-12-09",
+    "buyer": "Gross-Phillips",
+    "buyer_address": "969 Ian Island, Lake Ariana, NM 18935",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 15,
+        "unit_price": 56.74,
+        "amount": 851.1
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 7,
+        "unit_price": 34.81,
+        "amount": 243.67
+      },
+      {
+        "description": "Software License",
+        "qty": 11,
+        "unit_price": 356.09,
+        "amount": 3916.99
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 3,
+        "unit_price": 39.61,
+        "amount": 118.83
+      }
+    ],
+    "subtotal": 5130.59,
+    "tax_rate": "8%",
+    "tax": 410.45,
+    "grand_total": 5541.04,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0173",
+    "vendor": "Nexus Utilities",
+    "date": "2025-11-21",
+    "buyer": "Miller, Reed and Flores",
+    "buyer_address": "570 Clark Square, West Jonathanville, VA 00668",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 14,
+        "unit_price": 121.15,
+        "amount": 1696.1
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 1,
+        "unit_price": 59.03,
+        "amount": 59.03
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 8,
+        "unit_price": 48.57,
+        "amount": 388.56
+      },
+      {
+        "description": "Office Chair",
+        "qty": 9,
+        "unit_price": 269.65,
+        "amount": 2426.85
+      }
+    ],
+    "subtotal": 4570.54,
+    "tax_rate": "8%",
+    "tax": 365.64,
+    "grand_total": 4936.18,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0174",
+    "vendor": "Zenith Software",
+    "date": "2025-08-03",
+    "buyer": "Kim-Barnes",
+    "buyer_address": "6586 Maria Turnpike Apt. 271, West Andrewview, CT 10226",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 15,
+        "unit_price": 54.38,
+        "amount": 815.7
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 13,
+        "unit_price": 18.39,
+        "amount": 239.07
+      },
+      {
+        "description": "Office Chair",
+        "qty": 13,
+        "unit_price": 364.08,
+        "amount": 4733.04
+      }
+    ],
+    "subtotal": 5787.81,
+    "tax_rate": "10%",
+    "tax": 578.78,
+    "grand_total": 6366.59,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0175",
+    "vendor": "Apex Engineering",
+    "date": "2025-11-25",
+    "buyer": "Barron and Sons",
+    "buyer_address": "9970 Dunlap Expressway, Mooreville, MA 27442",
+    "line_items": [
+      {
+        "description": "Office Chair",
+        "qty": 10,
+        "unit_price": 113.43,
+        "amount": 1134.3
+      }
+    ],
+    "subtotal": 1134.3,
+    "tax_rate": "10%",
+    "tax": 113.43,
+    "grand_total": 1247.73,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0176",
+    "vendor": "GlobalSupply Pte Ltd",
+    "date": "2025-09-27",
+    "buyer": "Terry-Bowen",
+    "buyer_address": "443 Brandon Ports Suite 205, South Christopherfort, ID 13213",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 340.6,
+        "amount": 2724.8
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 4,
+        "unit_price": 75.26,
+        "amount": 301.04
+      }
+    ],
+    "subtotal": 3025.84,
+    "tax_rate": "6%",
+    "tax": 181.55,
+    "grand_total": 3207.39,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0177",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-07-25",
+    "buyer": "Jackson LLC",
+    "buyer_address": "Unit 7146 Box 7741, DPO AP 71820",
+    "line_items": [
+      {
+        "description": "Extension Cord",
+        "qty": 4,
+        "unit_price": 16.04,
+        "amount": 64.16
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 3,
+        "unit_price": 445.28,
+        "amount": 1335.84
+      }
+    ],
+    "subtotal": 1400.0,
+    "tax_rate": "10%",
+    "tax": 140.0,
+    "grand_total": 1540.0,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0178",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-12-13",
+    "buyer": "Watson Group",
+    "buyer_address": "47743 Elliott Drive Apt. 158, Arellanoshire, IN 73062",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 11,
+        "unit_price": 456.32,
+        "amount": 5019.52
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 8,
+        "unit_price": 8.8,
+        "amount": 70.4
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 6,
+        "unit_price": 28.83,
+        "amount": 172.98
+      }
+    ],
+    "subtotal": 5262.9,
+    "tax_rate": "10%",
+    "tax": 526.29,
+    "grand_total": 5789.19,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0179",
+    "vendor": "Optima Consultants",
+    "date": "2025-08-08",
+    "buyer": "Cardenas-Barnes",
+    "buyer_address": "374 Ralph Walk Apt. 898, North Stacy, NV 23160",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 13,
+        "unit_price": 36.14,
+        "amount": 469.82
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 4,
+        "unit_price": 400.28,
+        "amount": 1601.12
+      },
+      {
+        "description": "Keyboard",
+        "qty": 5,
+        "unit_price": 71.45,
+        "amount": 357.25
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 51.26,
+        "amount": 153.78
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 15,
+        "unit_price": 158.64,
+        "amount": 2379.6
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 7,
+        "unit_price": 34.26,
+        "amount": 239.82
+      }
+    ],
+    "subtotal": 5201.39,
+    "tax_rate": "10%",
+    "tax": 520.14,
+    "grand_total": 5721.53,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0180",
+    "vendor": "Prime Catering",
+    "date": "2025-09-18",
+    "buyer": "Stokes and Sons",
+    "buyer_address": "632 Flores Stream, North Paulfurt, OH 43247",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 6,
+        "unit_price": 34.4,
+        "amount": 206.4
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 15,
+        "unit_price": 217.47,
+        "amount": 3262.05
+      }
+    ],
+    "subtotal": 3468.45,
+    "tax_rate": "8%",
+    "tax": 277.48,
+    "grand_total": 3745.93,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0181",
+    "vendor": "Apex Engineering",
+    "date": "2026-06-13",
+    "buyer": "Stone-Stark",
+    "buyer_address": "62299 Sara Port Apt. 485, Bakerfort, OK 80318",
+    "line_items": [
+      {
+        "description": "Desk Organizer",
+        "qty": 7,
+        "unit_price": 35.21,
+        "amount": 246.47
+      }
+    ],
+    "subtotal": 246.47,
+    "tax_rate": "10%",
+    "tax": 24.65,
+    "grand_total": 271.12,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0182",
+    "vendor": "Apex Engineering",
+    "date": "2026-01-15",
+    "buyer": "Jackson Group",
+    "buyer_address": "65307 Prince Brooks Suite 444, Garrisonville, VI 30379",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 5,
+        "unit_price": 293.55,
+        "amount": 1467.75
+      },
+      {
+        "description": "Server Rack",
+        "qty": 1,
+        "unit_price": 711.81,
+        "amount": 711.81
+      },
+      {
+        "description": "Office Chair",
+        "qty": 4,
+        "unit_price": 484.83,
+        "amount": 1939.32
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 2,
+        "unit_price": 42.41,
+        "amount": 84.82
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 13,
+        "unit_price": 16.14,
+        "amount": 209.82
+      }
+    ],
+    "subtotal": 4413.52,
+    "tax_rate": "6%",
+    "tax": 264.81,
+    "grand_total": 4678.33,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0183",
+    "vendor": "Apex Engineering",
+    "date": "2025-09-06",
+    "buyer": "Mccann-Ramos",
+    "buyer_address": "691 Scott View Suite 785, New Laceyland, ME 93505",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 7,
+        "unit_price": 213.19,
+        "amount": 1492.33
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 11,
+        "unit_price": 17.19,
+        "amount": 189.09
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 5,
+        "unit_price": 51.58,
+        "amount": 257.9
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 15,
+        "unit_price": 37.38,
+        "amount": 560.7
+      }
+    ],
+    "subtotal": 2500.02,
+    "tax_rate": "6%",
+    "tax": 150.0,
+    "grand_total": 2650.02,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0184",
+    "vendor": "Optima Consultants",
+    "date": "2026-01-28",
+    "buyer": "Taylor-York",
+    "buyer_address": "33030 Williams Lake, West Micheal, NH 66708",
+    "line_items": [
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 7,
+        "unit_price": 26.6,
+        "amount": 186.2
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 14,
+        "unit_price": 14.43,
+        "amount": 202.02
+      }
+    ],
+    "subtotal": 388.22,
+    "tax_rate": "6%",
+    "tax": 23.29,
+    "grand_total": 411.51,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0185",
+    "vendor": "Nexus Utilities",
+    "date": "2025-12-17",
+    "buyer": "Leblanc, Maldonado and Allen",
+    "buyer_address": "79855 Mary Green Apt. 406, East Melissaborough, PR 29513",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 4,
+        "unit_price": 31.4,
+        "amount": 125.6
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 14,
+        "unit_price": 59.66,
+        "amount": 835.24
+      },
+      {
+        "description": "Keyboard",
+        "qty": 9,
+        "unit_price": 59.28,
+        "amount": 533.52
+      },
+      {
+        "description": "Office Chair",
+        "qty": 11,
+        "unit_price": 235.03,
+        "amount": 2585.33
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 13,
+        "unit_price": 21.97,
+        "amount": 285.61
+      }
+    ],
+    "subtotal": 4365.3,
+    "tax_rate": "10%",
+    "tax": 436.53,
+    "grand_total": 4801.83,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0186",
+    "vendor": "Aero Industries",
+    "date": "2026-03-24",
+    "buyer": "Byrd LLC",
+    "buyer_address": "072 Carolyn Branch, West Charlene, ME 93921",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 12,
+        "unit_price": 17.29,
+        "amount": 207.48
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 3,
+        "unit_price": 57.09,
+        "amount": 171.27
+      },
+      {
+        "description": "Keyboard",
+        "qty": 9,
+        "unit_price": 79.42,
+        "amount": 714.78
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 1,
+        "unit_price": 24.05,
+        "amount": 24.05
+      }
+    ],
+    "subtotal": 1117.58,
+    "tax_rate": "6%",
+    "tax": 67.05,
+    "grand_total": 1184.63,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0187",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2026-04-17",
+    "buyer": "Hill, Woodard and York",
+    "buyer_address": "4896 Adrian Shore, Annaport, ME 90208",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 3,
+        "unit_price": 15.41,
+        "amount": 46.23
+      },
+      {
+        "description": "Software License",
+        "qty": 9,
+        "unit_price": 209.6,
+        "amount": 1886.4
+      },
+      {
+        "description": "Monitor",
+        "qty": 1,
+        "unit_price": 570.7,
+        "amount": 570.7
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 11,
+        "unit_price": 57.69,
+        "amount": 634.59
+      }
+    ],
+    "subtotal": 3137.92,
+    "tax_rate": "8%",
+    "tax": 251.03,
+    "grand_total": 3388.95,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0188",
+    "vendor": "TechCorp Sdn Bhd",
+    "date": "2025-08-26",
+    "buyer": "Brown-Mcneil",
+    "buyer_address": "4328 Rachel Valley Suite 520, Brightview, PW 55363",
+    "line_items": [
+      {
+        "description": "First Aid Kit",
+        "qty": 1,
+        "unit_price": 20.5,
+        "amount": 20.5
+      }
+    ],
+    "subtotal": 20.5,
+    "tax_rate": "10%",
+    "tax": 2.05,
+    "grand_total": 22.55,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0189",
+    "vendor": "SecureGuard Systems",
+    "date": "2025-12-20",
+    "buyer": "Doyle-Aguilar",
+    "buyer_address": "Unit 3538 Box 7584, DPO AE 86695",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 14,
+        "unit_price": 350.29,
+        "amount": 4904.06
+      }
+    ],
+    "subtotal": 4904.06,
+    "tax_rate": "8%",
+    "tax": 392.32,
+    "grand_total": 5296.38,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0190",
+    "vendor": "PrintPro Solutions",
+    "date": "2026-06-21",
+    "buyer": "White, Davis and Anderson",
+    "buyer_address": "513 Walker Well, Robertmouth, MN 34653",
+    "line_items": [
+      {
+        "description": "Printer Ink",
+        "qty": 5,
+        "unit_price": 51.68,
+        "amount": 258.4
+      },
+      {
+        "description": "Software License",
+        "qty": 5,
+        "unit_price": 328.23,
+        "amount": 1641.15
+      },
+      {
+        "description": "Office Chair",
+        "qty": 2,
+        "unit_price": 249.22,
+        "amount": 498.44
+      },
+      {
+        "description": "Whiteboard",
+        "qty": 7,
+        "unit_price": 76.72,
+        "amount": 537.04
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 4,
+        "unit_price": 44.71,
+        "amount": 178.84
+      }
+    ],
+    "subtotal": 3113.87,
+    "tax_rate": "6%",
+    "tax": 186.83,
+    "grand_total": 3300.7,
+    "currency": "USD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0191",
+    "vendor": "OfficeMart Trading",
+    "date": "2026-02-28",
+    "buyer": "Ford-Wilson",
+    "buyer_address": "3816 Gutierrez Ways, East Victoria, MA 54134",
+    "line_items": [
+      {
+        "description": "Monitor",
+        "qty": 8,
+        "unit_price": 233.67,
+        "amount": 1869.36
+      },
+      {
+        "description": "Keyboard",
+        "qty": 1,
+        "unit_price": 62.17,
+        "amount": 62.17
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 2,
+        "unit_price": 224.98,
+        "amount": 449.96
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 7,
+        "unit_price": 26.83,
+        "amount": 187.81
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 6,
+        "unit_price": 36.98,
+        "amount": 221.88
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 14,
+        "unit_price": 44.22,
+        "amount": 619.08
+      }
+    ],
+    "subtotal": 3410.26,
+    "tax_rate": "10%",
+    "tax": 341.03,
+    "grand_total": 3751.29,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0192",
+    "vendor": "Apex Engineering",
+    "date": "2026-02-22",
+    "buyer": "Thomas-Huffman",
+    "buyer_address": "5250 Shannon Fords, New Kathy, NM 12040",
+    "line_items": [
+      {
+        "description": "Server Rack",
+        "qty": 15,
+        "unit_price": 1043.03,
+        "amount": 15645.45
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 11,
+        "unit_price": 15.99,
+        "amount": 175.89
+      },
+      {
+        "description": "Laptop",
+        "qty": 15,
+        "unit_price": 2245.73,
+        "amount": 33685.95
+      },
+      {
+        "description": "Monitor",
+        "qty": 1,
+        "unit_price": 776.88,
+        "amount": 776.88
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 10,
+        "unit_price": 12.88,
+        "amount": 128.8
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 14,
+        "unit_price": 47.07,
+        "amount": 658.98
+      }
+    ],
+    "subtotal": 51071.95,
+    "tax_rate": "8%",
+    "tax": 4085.76,
+    "grand_total": 55157.71,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0193",
+    "vendor": "FreshFood Distribution",
+    "date": "2025-09-04",
+    "buyer": "Hamilton, Jordan and Patterson",
+    "buyer_address": "83505 Andrew Avenue, East Heather, MI 41407",
+    "line_items": [
+      {
+        "description": "Software License",
+        "qty": 7,
+        "unit_price": 314.46,
+        "amount": 2201.22
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 3,
+        "unit_price": 77.43,
+        "amount": 232.29
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 12,
+        "unit_price": 24.48,
+        "amount": 293.76
+      },
+      {
+        "description": "Desk Organizer",
+        "qty": 9,
+        "unit_price": 37.36,
+        "amount": 336.24
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 6,
+        "unit_price": 8.91,
+        "amount": 53.46
+      }
+    ],
+    "subtotal": 3116.97,
+    "tax_rate": "8%",
+    "tax": 249.36,
+    "grand_total": 3366.33,
+    "currency": "MYR",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0194",
+    "vendor": "Optima Consultants",
+    "date": "2025-09-04",
+    "buyer": "Reyes PLC",
+    "buyer_address": "44789 Hamilton Spur, West Wendy, NM 47588",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 13,
+        "unit_price": 89.56,
+        "amount": 1164.28
+      },
+      {
+        "description": "Extension Cord",
+        "qty": 8,
+        "unit_price": 14.56,
+        "amount": 116.48
+      },
+      {
+        "description": "Laptop",
+        "qty": 9,
+        "unit_price": 2399.94,
+        "amount": 21599.46
+      },
+      {
+        "description": "Server Rack",
+        "qty": 7,
+        "unit_price": 685.74,
+        "amount": 4800.18
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 10,
+        "unit_price": 44.73,
+        "amount": 447.3
+      }
+    ],
+    "subtotal": 28127.7,
+    "tax_rate": "6%",
+    "tax": 1687.66,
+    "grand_total": 29815.36,
+    "currency": "SGD",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0195",
+    "vendor": "BuildMart Materials",
+    "date": "2026-05-03",
+    "buyer": "Martin Group",
+    "buyer_address": "230 David Station, South Nancyview, WI 70589",
+    "line_items": [
+      {
+        "description": "Keyboard",
+        "qty": 13,
+        "unit_price": 58.03,
+        "amount": 754.39
+      },
+      {
+        "description": "UPS Backup Unit",
+        "qty": 12,
+        "unit_price": 248.58,
+        "amount": 2982.96
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 6,
+        "unit_price": 19.79,
+        "amount": 118.74
+      },
+      {
+        "description": "Server Rack",
+        "qty": 1,
+        "unit_price": 1442.96,
+        "amount": 1442.96
+      },
+      {
+        "description": "Consulting Hour",
+        "qty": 8,
+        "unit_price": 203.99,
+        "amount": 1631.92
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 5,
+        "unit_price": 28.58,
+        "amount": 142.9
+      }
+    ],
+    "subtotal": 7073.87,
+    "tax_rate": "6%",
+    "tax": 424.43,
+    "grand_total": 7498.3,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2026-0196",
+    "vendor": "Zenith Software",
+    "date": "2026-03-15",
+    "buyer": "Wheeler Inc",
+    "buyer_address": "16761 Wells Drives, Lake Gina, AL 39968",
+    "line_items": [
+      {
+        "description": "UPS Backup Unit",
+        "qty": 6,
+        "unit_price": 302.89,
+        "amount": 1817.34
+      },
+      {
+        "description": "First Aid Kit",
+        "qty": 10,
+        "unit_price": 37.94,
+        "amount": 379.4
+      },
+      {
+        "description": "Monitor",
+        "qty": 6,
+        "unit_price": 718.23,
+        "amount": 4309.38
+      },
+      {
+        "description": "Laptop",
+        "qty": 1,
+        "unit_price": 1296.14,
+        "amount": 1296.14
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 7,
+        "unit_price": 29.92,
+        "amount": 209.44
+      }
+    ],
+    "subtotal": 8011.7,
+    "tax_rate": "10%",
+    "tax": 801.17,
+    "grand_total": 8812.87,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0197",
+    "vendor": "Stellar Media",
+    "date": "2025-12-26",
+    "buyer": "Garcia, Meyer and Dean",
+    "buyer_address": "89141 Tyler Rest Apt. 483, Jadeport, GA 05665",
+    "line_items": [
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 5,
+        "unit_price": 12.56,
+        "amount": 62.8
+      },
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 3,
+        "unit_price": 33.8,
+        "amount": 101.4
+      },
+      {
+        "description": "Keyboard",
+        "qty": 7,
+        "unit_price": 36.56,
+        "amount": 255.92
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 5,
+        "unit_price": 23.14,
+        "amount": 115.7
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 2,
+        "unit_price": 31.25,
+        "amount": 62.5
+      }
+    ],
+    "subtotal": 598.32,
+    "tax_rate": "6%",
+    "tax": 35.9,
+    "grand_total": 634.22,
+    "currency": "SGD",
+    "payment_terms": "Due on Receipt"
+  },
+  {
+    "invoice_id": "INV-2026-0198",
+    "vendor": "Aero Industries",
+    "date": "2026-02-13",
+    "buyer": "Lozano-Watts",
+    "buyer_address": "01197 Stacy Tunnel, Lake Jenniferview, SD 30799",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 1,
+        "unit_price": 292.32,
+        "amount": 292.32
+      },
+      {
+        "description": "Network Cable (10m)",
+        "qty": 6,
+        "unit_price": 31.36,
+        "amount": 188.16
+      },
+      {
+        "description": "Monitor",
+        "qty": 7,
+        "unit_price": 682.45,
+        "amount": 4777.15
+      },
+      {
+        "description": "Keyboard",
+        "qty": 6,
+        "unit_price": 46.41,
+        "amount": 278.46
+      },
+      {
+        "description": "Printer Ink",
+        "qty": 7,
+        "unit_price": 51.7,
+        "amount": 361.9
+      }
+    ],
+    "subtotal": 5897.99,
+    "tax_rate": "10%",
+    "tax": 589.8,
+    "grand_total": 6487.79,
+    "currency": "SGD",
+    "payment_terms": "Net 30"
+  },
+  {
+    "invoice_id": "INV-2026-0199",
+    "vendor": "SecureGuard Systems",
+    "date": "2026-01-09",
+    "buyer": "Baker-Williams",
+    "buyer_address": "5561 Melissa Cape, Port Devonburgh, MA 47362",
+    "line_items": [
+      {
+        "description": "Consulting Hour",
+        "qty": 3,
+        "unit_price": 294.69,
+        "amount": 884.07
+      },
+      {
+        "description": "Server Rack",
+        "qty": 6,
+        "unit_price": 791.45,
+        "amount": 4748.7
+      },
+      {
+        "description": "A4 Paper (Box)",
+        "qty": 12,
+        "unit_price": 18.76,
+        "amount": 225.12
+      }
+    ],
+    "subtotal": 5857.89,
+    "tax_rate": "10%",
+    "tax": 585.79,
+    "grand_total": 6443.68,
+    "currency": "MYR",
+    "payment_terms": "Net 60"
+  },
+  {
+    "invoice_id": "INV-2027-0200",
+    "vendor": "Prime Catering",
+    "date": "2026-06-28",
+    "buyer": "Friedman-Adams",
+    "buyer_address": "2166 Nelson Lights Suite 621, Lake Jessica, PR 21393",
+    "line_items": [
+      {
+        "description": "Cleaning Supplies Kit",
+        "qty": 15,
+        "unit_price": 63.83,
+        "amount": 957.45
+      },
+      {
+        "description": "Coffee Beans (Bag)",
+        "qty": 10,
+        "unit_price": 59.9,
+        "amount": 599.0
+      },
+      {
+        "description": "Monitor",
+        "qty": 3,
+        "unit_price": 609.03,
+        "amount": 1827.09
+      }
+    ],
+    "subtotal": 3383.54,
+    "tax_rate": "10%",
+    "tax": 338.35,
+    "grand_total": 3721.89,
+    "currency": "MYR",
+    "payment_terms": "Due on Receipt"
+  }
+]

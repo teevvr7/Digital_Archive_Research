@@ -1,0 +1,63 @@
+1. Daily Summary of Activities
+- Audited the existing system capabilities and drafted the initial RAG (Retrieval-Augmented Generation) integration plan for the Digital Archive system.
+- Performed an architectural critique of the proposed chatbot pipeline to identify potential bottlenecks (such as model loading latencies and naïve sliding-window text chunking).
+- Outlined a custom structured chunking strategy specifically designed for structured financial documents (invoices, receipts) to keep tabular rows and header fields cohesive.
+- Drafted the primary architecture and specification plan (`invoice_insight_plan.md` in `nalan_plan/rag_folder`) detailing the database schemas, API scopes, and evaluation parameters.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: RAG Integration Architectural Critique
+Description of Work Done: Audited the original chatbot proposal. Documented critical issues including model instantiation latency, vector index limits, lack of multi-tenant isolation schemas, and chunking failures on tabular invoice formats.
+Status: Completed
+Remarks: Findings documented in the review notes.
+
+Task Number: 2
+Task / Project Name: Initial RAG Sandbox Planning
+Description of Work Done: Created `nalan_plan/rag_folder` directory and initialized `invoice_insight_plan.md` containing the technical scope, data schema modifications, and retrieval pipeline details.
+Status: Completed
+Remarks: Outlines the baseline sandbox framework.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Loading embedding models on demand creates massive latency spikes.
+Root Cause: The proposed retrieval module instantiated `SentenceTransformer("all-MiniLM-L6-v2")` inside the API request/response loop, causing a 2-5 second process startup delay on every user question.
+Resolution Provided: Outlined a singleton import pattern to pre-load the model once during application process startup, mimicking the PaddleOCR pattern.
+
+Issue Number: 2
+Issue Description: Naïve character-based sliding-window chunking slices database records arbitrarily.
+Root Cause: Standard character-based recursive splitting (e.g. 500 characters, 100 character overlap) tears line-item tables in half and splits values from their metadata.
+Resolution Provided: Suggested converting extracted JSON properties into structured key-value template strings before embedding so each document chunk is self-contained.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, Markdown, PostgreSQL.
+IDE / Tools: Git, PowerShell, alembic database tools.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Maintaining a clean separation between the operational document pipeline and semantic query tools while keeping database resources consolidated.
+Solution: Proposed utilizing the existing PostgreSQL Supabase backend with `pgvector` extensions and isolating document chunks under tenant-scoped RLS policies.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Learned more about tabular document chunking methodologies and the limits of text embedding models on sparse financial structures.
+- Explored context length optimization and system prompt engineering boundaries for domain-specific RAG.
+- Audited pgvector HNSW index configurations and construction hyperparameter tuning.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Refine the RAG sandbox specifications based on self-hosted model capabilities.
+- Address gaps in the dataset generation and evaluation plans.
+- Create a concrete, step-by-step roadmap to implement the RAG sandbox.

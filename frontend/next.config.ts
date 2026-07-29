@@ -12,6 +12,10 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Produces a minimal, self-contained `.next/standalone` build (only the
+  // files needed to run `node server.js`, no full node_modules) — required
+  // for a small, fast-starting container image (Cloud Run, Docker, etc.).
+  output: "standalone",
   // Allows phones/other devices on the LAN to load dev-server resources (HMR, JS chunks)
   // when testing via http://192.168.0.56:3000 instead of localhost.
   allowedDevOrigins: ["192.168.0.56"],
@@ -24,5 +28,9 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
+// module.exports = {
+//   allowedDevOrigins: ['192.168.0.57'],
+// }
 
 export default nextConfig;

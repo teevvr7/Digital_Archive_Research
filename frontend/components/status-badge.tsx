@@ -41,6 +41,11 @@ const STATUS_CONFIG: Record<
     className: "status-failed",
     dot: "bg-red-500",
   },
+  success: {
+    label: "Success",
+    className: "status-success",
+    dot: "bg-green-500",
+  },
 };
 
 export function StatusBadge({ status }: { status: ProcessingStatus }) {

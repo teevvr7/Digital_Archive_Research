@@ -63,10 +63,15 @@ class Settings(BaseSettings):
     # ---- IDP tuning ----
     confidence_threshold: float = 0.7  # minimum confidence for a VLM extraction to be "accepted"
     promote_after_n: int = 3  # how many accepted examples before a template is "promoted"
-    vlm_max_pages: int = (
-        10  # overall page ceiling per doc; chunking + vlm_max_chunk_calls bound cost
-    )
+    vlm_max_pages: int = 3  # overall page ceiling per doc (dev-tuned down from 10 against real cost)
     max_upload_mb: int = 50  # largest single file the API will accept, in megabytes
+
+    # ---- Pluggable IDP Settings ----
+    paddle_ocr_url: str = "http://localhost:8000/v1"
+    paddle_ocr_model: str = "PaddlePaddle/PaddleOCR-VL"
+    qwen_llm_url: str = "http://localhost:8001/v1"
+    qwen_llm_model: str = "Qwen2.5-1.5B"
+    allow_mock_fallback: bool = False
 
     # ---- LLM budget gate ----
     # Per-tenant monthly VLM token cap used when tenants.llm_monthly_token_cap is NULL.

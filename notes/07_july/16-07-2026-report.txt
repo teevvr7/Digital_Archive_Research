@@ -1,0 +1,81 @@
+1. Daily Summary of Activities
+- Evaluated the use of a real invoice dataset from Kaggle, but decided to stick with a predictable synthetic dataset to ensure testing stability during this early experimentation phase.
+- Reorganized the chatbot development folder into a simple, flat workspace layout to prevent folder pathing and file import errors during scripts execution.
+- Resolved Python environment pathing issues to allow scripts and notebooks to run seamlessly in the workspace.
+- Fixed database driver compatibility issues to align the workspace connection helpers with standard backend databases.
+- Successfully ran the initialization scripts to generate 200 mock invoices, produce 150 ground-truth query questions, verify database connections, and test structured invoice data formatting.
+- Created a master development log to record architectural designs and progress highlights across all phases.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: RAG Workspace Reorganization
+Description of Work Done: Flattened the workspace folder structure by moving configuration files and connection helpers to the root to prevent pathing issues.
+Status: Completed
+Remarks: Workspace is now organized and runs cleanly.
+
+Task Number: 2
+Task / Project Name: Database Driver Alignment
+Description of Work Done: Migrated database connection helpers to match the modern database driver packages installed in the system backend.
+Status: Completed
+Remarks: Verified successful database connection test.
+
+Task Number: 3
+Task / Project Name: Project Setup Execution
+Description of Work Done: Executed the foundations script, generating 200 sample invoices, 150 Q&A pairs, verifying PostgreSQL connection, and test-running serializers.
+Status: Completed
+Remarks: All initial data setup and database verifications passed.
+
+Task Number: 4
+Task / Project Name: Development Log Initialization
+Description of Work Done: Initialized the progress log to document scaffolding layouts, database drivers, formatting strategies, and Phase 2 targets.
+Status: Completed
+Remarks: Active workspace log is now ready.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Development notebook cannot identify the local Python environment.
+Root Cause: The project virtual environment folder was nested deep in the directory and ignored by the editor.
+Resolution Provided: Registered the correct Python environment path within the editor's workspace configuration settings.
+
+Issue Number: 2
+Issue Description: Database connection check fails with a vague error code.
+Root Cause: The test script expected query outputs as simple lists, but the database returned them as name-mapped columns, causing a index mismatch.
+Resolution Provided: Adjusted the test check to read database outputs dynamically.
+
+Issue Number: 3
+Issue Description: Command execution crashes when printing output containing checkmark icons.
+Root Cause: Default Windows command consoles use old character sets that do not support special emoji symbols.
+Resolution Provided: Replaced the checkmark emoji in the print statements with simple ASCII text.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, SQL, PostgreSQL, Docker, Markdown.
+IDE / Tools: Git, PowerShell, Docker CLI, VS Code.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Encountering unstandardized key naming conventions in Kaggle datasets.
+Solution: Opted to remain with a predictable, schema-aligned dataset for initial development stability before trying to normalize complex external data.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- Learned how IDE editors scan, cache, and register Python environment kernels.
+- Studied dictionary-based database row querying.
+- Explored formatting strategies for preparing structured documents for search indexing.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Implement the ingestion program to calculate vector embeddings for the structured invoices.
+- Write the vector records into the database and test search retrieval matching.

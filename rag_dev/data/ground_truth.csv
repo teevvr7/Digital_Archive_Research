@@ -1,0 +1,151 @@
+question,expected_answer,source_invoice_id,question_type
+What is the billing date for invoice INV-2026-0145?,2026-05-03,INV-2026-0145,date_lookup
+What was the subtotal amount on invoice INV-2026-0176?,MYR 3025.84,INV-2026-0176,subtotal_lookup
+What was the subtotal amount on invoice INV-2025-0027?,SGD 1041.00,INV-2025-0027,subtotal_lookup
+What is the grand total for invoice INV-2025-0033?,MYR 6133.13,INV-2025-0033,total_lookup
+Which vendor issued invoice INV-2026-0134?,Pinnacle Designs,INV-2026-0134,vendor_lookup
+What was the unit price of Extension Cord on invoice INV-2025-0088?,MYR 29.78,INV-2025-0088,line_item_price
+What was the unit price of Desk Organizer on invoice INV-2025-0083?,SGD 35.17,INV-2025-0083,line_item_price
+Which vendor issued invoice INV-2026-0130?,Elite Cleaners,INV-2026-0130,vendor_lookup
+How many Cleaning Supplies Kit items were purchased in invoice INV-2027-0200?,15,INV-2027-0200,line_item_qty
+What is the grand total for invoice INV-2025-0032?,MYR 3601.77,INV-2025-0032,total_lookup
+What is the grand total for invoice INV-2025-0037?,SGD 1912.13,INV-2025-0037,total_lookup
+What is the grand total for invoice INV-2026-0128?,USD 2128.93,INV-2026-0128,total_lookup
+How many Server Rack items were purchased in invoice INV-2026-0155?,9,INV-2026-0155,line_item_qty
+What was the unit price of Desk Organizer on invoice INV-2026-0117?,USD 43.41,INV-2026-0117,line_item_price
+What was the subtotal amount on invoice INV-2025-0074?,USD 1793.11,INV-2025-0074,subtotal_lookup
+What was the subtotal amount on invoice INV-2025-0006?,USD 8893.64,INV-2025-0006,subtotal_lookup
+What is the grand total for invoice INV-2026-0143?,SGD 18259.99,INV-2026-0143,total_lookup
+What was the subtotal amount on invoice INV-2026-0130?,USD 900.50,INV-2026-0130,subtotal_lookup
+How many Extension Cord items were purchased in invoice INV-2025-0045?,10,INV-2025-0045,line_item_qty
+What was the subtotal amount on invoice INV-2026-0149?,USD 780.52,INV-2026-0149,subtotal_lookup
+Which vendor issued invoice INV-2025-0022?,Nexus Utilities,INV-2025-0022,vendor_lookup
+Which vendor issued invoice INV-2026-0123?,GlobalSupply Pte Ltd,INV-2026-0123,vendor_lookup
+What is the billing date for invoice INV-2025-0001?,2026-03-21,INV-2025-0001,date_lookup
+How many Laptop items were purchased in invoice INV-2025-0001?,12,INV-2025-0001,line_item_qty
+What is the billing date for invoice INV-2026-0101?,2026-02-17,INV-2026-0101,date_lookup
+How many Server Rack items were purchased in invoice INV-2025-0096?,6,INV-2025-0096,line_item_qty
+What was the subtotal amount on invoice INV-2026-0110?,MYR 9939.43,INV-2026-0110,subtotal_lookup
+How many UPS Backup Unit items were purchased in invoice INV-2026-0122?,10,INV-2026-0122,line_item_qty
+What was the subtotal amount on invoice INV-2025-0082?,SGD 5234.36,INV-2025-0082,subtotal_lookup
+How many Desk Organizer items were purchased in invoice INV-2026-0181?,7,INV-2026-0181,line_item_qty
+How many Network Cable (10m) items were purchased in invoice INV-2026-0119?,14,INV-2026-0119,line_item_qty
+What was the subtotal amount on invoice INV-2026-0166?,SGD 8842.61,INV-2026-0166,subtotal_lookup
+What was the unit price of Printer Ink on invoice INV-2026-0109?,USD 42.68,INV-2026-0109,line_item_price
+What is the billing date for invoice INV-2026-0148?,2026-03-19,INV-2026-0148,date_lookup
+How many Desk Organizer items were purchased in invoice INV-2026-0164?,11,INV-2026-0164,line_item_qty
+Which vendor issued invoice INV-2025-0099?,Delta Energy,INV-2025-0099,vendor_lookup
+What was the unit price of Cleaning Supplies Kit on invoice INV-2025-0037?,SGD 41.51,INV-2025-0037,line_item_price
+What is the billing date for invoice INV-2025-0058?,2026-03-27,INV-2025-0058,date_lookup
+What was the subtotal amount on invoice INV-2026-0195?,MYR 7073.87,INV-2026-0195,subtotal_lookup
+What was the unit price of Office Chair on invoice INV-2025-0058?,SGD 173.75,INV-2025-0058,line_item_price
+What was the unit price of UPS Backup Unit on invoice INV-2025-0033?,MYR 251.49,INV-2025-0033,line_item_price
+What was the unit price of Server Rack on invoice INV-2026-0155?,SGD 842.33,INV-2026-0155,line_item_price
+What was the unit price of Extension Cord on invoice INV-2026-0159?,MYR 27.61,INV-2026-0159,line_item_price
+What is the grand total for invoice INV-2026-0112?,MYR 3243.01,INV-2026-0112,total_lookup
+What is the billing date for invoice INV-2026-0106?,2026-03-27,INV-2026-0106,date_lookup
+What is the billing date for invoice INV-2026-0123?,2025-12-10,INV-2026-0123,date_lookup
+What is the billing date for invoice INV-2025-0087?,2026-06-25,INV-2025-0087,date_lookup
+What was the unit price of Desk Organizer on invoice INV-2026-0113?,SGD 32.48,INV-2026-0113,line_item_price
+Which vendor issued invoice INV-2025-0073?,BuildMart Materials,INV-2025-0073,vendor_lookup
+How many Extension Cord items were purchased in invoice INV-2026-0159?,15,INV-2026-0159,line_item_qty
+Which vendor issued invoice INV-2026-0143?,Summit Hardware,INV-2026-0143,vendor_lookup
+How many Extension Cord items were purchased in invoice INV-2026-0128?,7,INV-2026-0128,line_item_qty
+How many Whiteboard items were purchased in invoice INV-2025-0068?,15,INV-2025-0068,line_item_qty
+What was the subtotal amount on invoice INV-2026-0198?,SGD 5897.99,INV-2026-0198,subtotal_lookup
+What was the unit price of UPS Backup Unit on invoice INV-2026-0195?,MYR 248.58,INV-2026-0195,line_item_price
+How many Software License items were purchased in invoice INV-2025-0070?,12,INV-2025-0070,line_item_qty
+How many Whiteboard items were purchased in invoice INV-2025-0091?,15,INV-2025-0091,line_item_qty
+How many Software License items were purchased in invoice INV-2026-0127?,9,INV-2026-0127,line_item_qty
+What is the grand total for invoice INV-2026-0149?,USD 827.35,INV-2026-0149,total_lookup
+What is the grand total for invoice INV-2026-0102?,MYR 2927.64,INV-2026-0102,total_lookup
+What was the subtotal amount on invoice INV-2026-0103?,MYR 178.77,INV-2026-0103,subtotal_lookup
+What was the unit price of Extension Cord on invoice INV-2026-0116?,SGD 23.86,INV-2026-0116,line_item_price
+What is the billing date for invoice INV-2025-0073?,2025-11-29,INV-2025-0073,date_lookup
+How many Cleaning Supplies Kit items were purchased in invoice INV-2025-0025?,11,INV-2025-0025,line_item_qty
+What is the grand total for invoice INV-2026-0122?,USD 13363.32,INV-2026-0122,total_lookup
+What is the billing date for invoice INV-2026-0146?,2025-11-29,INV-2026-0146,date_lookup
+What is the billing date for invoice INV-2026-0103?,2026-04-22,INV-2026-0103,date_lookup
+What was the subtotal amount on invoice INV-2026-0156?,USD 3166.20,INV-2026-0156,subtotal_lookup
+Which vendor issued invoice INV-2026-0119?,OfficeMart Trading,INV-2026-0119,vendor_lookup
+What was the subtotal amount on invoice INV-2025-0073?,MYR 10297.16,INV-2025-0073,subtotal_lookup
+What is the billing date for invoice INV-2026-0196?,2026-03-15,INV-2026-0196,date_lookup
+What is the billing date for invoice INV-2025-0050?,2025-08-20,INV-2025-0050,date_lookup
+What is the billing date for invoice INV-2026-0104?,2026-02-02,INV-2026-0104,date_lookup
+What is the billing date for invoice INV-2025-0067?,2026-06-24,INV-2025-0067,date_lookup
+Which vendor issued invoice INV-2025-0004?,Zenith Software,INV-2025-0004,vendor_lookup
+How many Desk Organizer items were purchased in invoice INV-2025-0010?,2,INV-2025-0010,line_item_qty
+Which vendor issued invoice INV-2026-0193?,FreshFood Distribution,INV-2026-0193,vendor_lookup
+How many Whiteboard items were purchased in invoice INV-2025-0071?,12,INV-2025-0071,line_item_qty
+What is the billing date for invoice INV-2025-0047?,2025-11-24,INV-2025-0047,date_lookup
+What was the unit price of UPS Backup Unit on invoice INV-2026-0173?,MYR 121.15,INV-2026-0173,line_item_price
+What was the subtotal amount on invoice INV-2026-0121?,MYR 1595.70,INV-2026-0121,subtotal_lookup
+What was the unit price of Coffee Beans (Bag) on invoice INV-2025-0051?,MYR 59.43,INV-2025-0051,line_item_price
+How many Desk Organizer items were purchased in invoice INV-2026-0113?,2,INV-2026-0113,line_item_qty
+What was the unit price of Laptop on invoice INV-2025-0085?,SGD 2413.95,INV-2025-0085,line_item_price
+What was the subtotal amount on invoice INV-2026-0139?,MYR 221.12,INV-2026-0139,subtotal_lookup
+What was the subtotal amount on invoice INV-2026-0165?,USD 2903.27,INV-2026-0165,subtotal_lookup
+Which vendor issued invoice INV-2025-0095?,PrintPro Solutions,INV-2025-0095,vendor_lookup
+What was the unit price of Printer Ink on invoice INV-2025-0031?,SGD 56.99,INV-2025-0031,line_item_price
+What is the billing date for invoice INV-2025-0042?,2026-03-04,INV-2025-0042,date_lookup
+Which vendor issued invoice INV-2025-0044?,TechCorp Sdn Bhd,INV-2025-0044,vendor_lookup
+What was the subtotal amount on invoice INV-2025-0022?,SGD 11.00,INV-2025-0022,subtotal_lookup
+What is the grand total for invoice INV-2025-0038?,SGD 19649.14,INV-2025-0038,total_lookup
+How many Office Chair items were purchased in invoice INV-2025-0043?,8,INV-2025-0043,line_item_qty
+Which vendor issued invoice INV-2025-0091?,OfficeMart Trading,INV-2025-0091,vendor_lookup
+What is the grand total for invoice INV-2025-0019?,SGD 5479.67,INV-2025-0019,total_lookup
+What is the billing date for invoice INV-2025-0066?,2026-06-18,INV-2025-0066,date_lookup
+What is the billing date for invoice INV-2026-0119?,2025-12-21,INV-2026-0119,date_lookup
+What is the billing date for invoice INV-2025-0025?,2025-09-11,INV-2025-0025,date_lookup
+What was the subtotal amount on invoice INV-2025-0097?,MYR 28183.30,INV-2025-0097,subtotal_lookup
+Which vendor issued invoice INV-2025-0081?,Elite Cleaners,INV-2025-0081,vendor_lookup
+What was the subtotal amount on invoice INV-2025-0072?,USD 13682.49,INV-2025-0072,subtotal_lookup
+What was the unit price of Printer Ink on invoice INV-2026-0187?,SGD 15.41,INV-2026-0187,line_item_price
+What is the grand total for invoice INV-2025-0096?,MYR 8947.52,INV-2025-0096,total_lookup
+Which vendor issued invoice INV-2026-0120?,TechCorp Sdn Bhd,INV-2026-0120,vendor_lookup
+What was the subtotal amount on invoice INV-2025-0084?,MYR 333.00,INV-2025-0084,subtotal_lookup
+What was the subtotal amount on invoice INV-2025-0083?,SGD 29051.12,INV-2025-0083,subtotal_lookup
+How many Extension Cord items were purchased in invoice INV-2025-0017?,11,INV-2025-0017,line_item_qty
+What is the grand total for invoice INV-2025-0084?,MYR 366.30,INV-2025-0084,total_lookup
+What is the billing date for invoice INV-2025-0007?,2025-09-13,INV-2025-0007,date_lookup
+Which vendor issued invoice INV-2026-0156?,Quantum Labs,INV-2026-0156,vendor_lookup
+How many First Aid Kit items were purchased in invoice INV-2025-0019?,9,INV-2025-0019,line_item_qty
+How many invoices are in the database from Prime Catering?,10,multiple,count_aggregation
+What was the unit price of UPS Backup Unit on invoice INV-2026-0189?,MYR 350.29,INV-2026-0189,line_item_price
+What was the unit price of Monitor on invoice INV-2026-0167?,USD 522.00,INV-2026-0167,line_item_price
+Which vendor issued invoice INV-2026-0140?,Summit Hardware,INV-2026-0140,vendor_lookup
+Which vendor issued invoice INV-2025-0008?,CloudNet Services,INV-2025-0008,vendor_lookup
+How many Consulting Hour items were purchased in invoice INV-2026-0124?,9,INV-2026-0124,line_item_qty
+What is the billing date for invoice INV-2026-0172?,2025-12-09,INV-2026-0172,date_lookup
+What was the subtotal amount on invoice INV-2025-0076?,SGD 4421.61,INV-2025-0076,subtotal_lookup
+Which vendor issued invoice INV-2026-0139?,Summit Hardware,INV-2026-0139,vendor_lookup
+What was the unit price of Server Rack on invoice INV-2026-0182?,SGD 711.81,INV-2026-0182,line_item_price
+What was the unit price of A4 Paper (Box) on invoice INV-2025-0012?,SGD 17.02,INV-2025-0012,line_item_price
+How many Office Chair items were purchased in invoice INV-2025-0024?,1,INV-2025-0024,line_item_qty
+How many Network Cable (10m) items were purchased in invoice INV-2026-0198?,6,INV-2026-0198,line_item_qty
+What is the billing date for invoice INV-2025-0083?,2026-03-09,INV-2025-0083,date_lookup
+Which vendor issued invoice INV-2026-0127?,Aero Industries,INV-2026-0127,vendor_lookup
+What was the subtotal amount on invoice INV-2026-0171?,SGD 380.80,INV-2026-0171,subtotal_lookup
+What is the grand total for invoice INV-2025-0064?,USD 20127.03,INV-2025-0064,total_lookup
+What was the subtotal amount on invoice INV-2026-0167?,USD 10898.06,INV-2026-0167,subtotal_lookup
+What is the billing date for invoice INV-2026-0199?,2026-01-09,INV-2026-0199,date_lookup
+What is the grand total for invoice INV-2026-0198?,SGD 6487.79,INV-2026-0198,total_lookup
+Which vendor issued invoice INV-2025-0067?,GlobalSupply Pte Ltd,INV-2025-0067,vendor_lookup
+What was the unit price of Consulting Hour on invoice INV-2026-0168?,SGD 237.47,INV-2026-0168,line_item_price
+How many Monitor items were purchased in invoice INV-2026-0178?,11,INV-2026-0178,line_item_qty
+What is the grand total for invoice INV-2025-0016?,USD 2450.54,INV-2025-0016,total_lookup
+What was the subtotal amount on invoice INV-2025-0059?,SGD 782.53,INV-2025-0059,subtotal_lookup
+What is the grand total for invoice INV-2026-0157?,MYR 4481.33,INV-2026-0157,total_lookup
+What is the billing date for invoice INV-2025-0060?,2025-10-21,INV-2025-0060,date_lookup
+What is the billing date for invoice INV-2026-0198?,2026-02-13,INV-2026-0198,date_lookup
+What was the subtotal amount on invoice INV-2026-0160?,MYR 20501.20,INV-2026-0160,subtotal_lookup
+What was the unit price of A4 Paper (Box) on invoice INV-2026-0137?,MYR 16.65,INV-2026-0137,line_item_price
+What was the subtotal amount on invoice INV-2026-0190?,USD 3113.87,INV-2026-0190,subtotal_lookup
+What was the subtotal amount on invoice INV-2026-0134?,SGD 484.17,INV-2026-0134,subtotal_lookup
+What was the unit price of Software License on invoice INV-2025-0018?,MYR 116.57,INV-2025-0018,line_item_price
+What is the grand total for invoice INV-2025-0072?,USD 14777.09,INV-2025-0072,total_lookup
+What is the billing date for invoice INV-2026-0107?,2026-05-11,INV-2026-0107,date_lookup
+How many Extension Cord items were purchased in invoice INV-2025-0088?,4,INV-2025-0088,line_item_qty
+What is the grand total for invoice INV-2025-0057?,SGD 10268.22,INV-2025-0057,total_lookup
+How many Desk Organizer items were purchased in invoice INV-2026-0193?,9,INV-2026-0193,line_item_qty
+What is the billing date for invoice INV-2025-0046?,2026-01-11,INV-2025-0046,date_lookup

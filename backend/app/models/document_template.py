@@ -10,7 +10,7 @@ import datetime
 import uuid
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, REAL, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, REAL, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,6 +44,12 @@ class DocumentTemplate(Base):
     )  # accepted-extraction tally
     confidence: Mapped[float | None] = mapped_column(REAL, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Which IDP strategy this specific template runs under — usually inherited
+    # from the document type, but a template can override it.
+    extraction_method: Mapped[str] = mapped_column(String, nullable=False, default="default")
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    use_image: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    use_ocr: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     # One example document that produced this template — a reference for humans reviewing it.
     sample_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True

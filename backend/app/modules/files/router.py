@@ -57,13 +57,54 @@ async def upload_documents(
         list[str] | None,
         Form(description="Per-file JSON [{fieldId, value}] of existing fields to attach + set"),
     ] = None,
+    template_id: Annotated[list[str] | None, Form()] = None,
 ) -> DocumentListOut:
     db, user = ctx
     types = document_type or []
     # Pad with "other" so every file has a type hint
     if len(types) < len(files):
         types += ["other"] * (len(files) - len(types))
-    return service.create_documents(db, user, files, types, field_values, new_fields, attach_fields)
+
+    tpl_ids = []
+    if template_id:
+        for tid in template_id:
+            if tid and tid.strip() and tid != "null" and tid != "undefined":
+                try:
+                    tpl_ids.append(uuid.UUID(tid))
+                except ValueError:
+                    tpl_ids.append(None)
+            else:
+                tpl_ids.append(None)
+
+    return service.create_documents(
+        db, user, files, types, field_values, new_fields, attach_fields, template_ids=tpl_ids
+    )
+
+
+@router.post(
+    "/documents/single",
+    response_model=DocumentListOut,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a single document (with file browser button)",
+)
+async def upload_single_document(
+    ctx: _DbCtx,
+    file: UploadFile = File(description="File to upload"),
+    document_type: str | None = Form(None),
+    template_id: str | None = Form(None),
+) -> DocumentListOut:
+    db, user = ctx
+    types = [document_type or "other"]
+    
+    tpl_id = None
+    if template_id and template_id.strip() and template_id != "null" and template_id != "undefined":
+        try:
+            tpl_id = uuid.UUID(template_id)
+        except ValueError:
+            pass
+            
+    return service.create_documents(db, user, [file], types, template_ids=[tpl_id])
 
 
 @router.get(
@@ -172,6 +213,22 @@ def get_document_thumbnail(ctx: _DbCtx, doc_id: uuid.UUID) -> dict[str, str]:
 def retry_document(ctx: _DbCtx, doc_id: uuid.UUID) -> DocumentOut:
     db, _ = ctx
     return service.retry_document(db, doc_id)
+
+
+@router.post(
+    "/documents/{doc_id}/reprocess",
+    response_model=DocumentOut,
+    response_model_by_alias=True,
+    summary="Reprocess a document with optional template selection",
+)
+def reprocess_document(
+    ctx: _DbCtx,
+    doc_id: uuid.UUID,
+    template_id: uuid.UUID | None = Query(None),
+    document_type_id: uuid.UUID | None = Query(None)
+) -> DocumentOut:
+    db, _ = ctx
+    return service.reprocess_document(db, doc_id, template_id, document_type_id)
 
 
 @router.post(

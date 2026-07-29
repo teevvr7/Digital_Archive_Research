@@ -1,0 +1,71 @@
+1. Daily Summary of Activities
+- Cleaned up duplicated imports and router definitions in the IDP config router module.
+- Resolved N+1 SQL queries on dashboard and list views by batch-loading extraction histories and templates.
+- Refactored the empty-trash document storage deletion logic to run asynchronously via background Redis Queue (RQ) worker tasks.
+- Integrated eager model pre-loading on startup inside the remote GPU AI server to resolve parallel initialization race conditions.
+- Updated the backend HTTP client timeout configuration to support longer multi-page Paddle-Qwen pipelines.
+- Assisted in worker diagnostics, highlighting in-memory caching mechanisms and validating successful document processing.
+
+--------------------------------------------------
+
+2. Tasks & Deliverables
+
+Task Number: 1
+Task / Project Name: Codebase Cleanups & Optimizations
+Description of Work Done: Cleaned imports in `config_router.py`. Created a batch pre-loader helper for extraction history and templates, optimizing lists and dashboard. Exchanged synchronous S3 deletions for async queue tasks.
+Status: Completed
+Remarks: 100% test coverage passing (227 tests).
+
+Task Number: 2
+Task / Project Name: Remote AI Server Pre-loading
+Description of Work Done: Added startup event hooks to eager-initialize the PaddleOCR model context on service boot, eliminating multi-thread model creation race conditions and VRAM overhead.
+Status: Completed
+Remarks: VRAM footprint remains steady during parallel page extraction.
+
+Task Number: 3
+Task / Project Name: Request Timeout Heuristics
+Description of Work Done: Adjusted backend client timeout thresholds in `paddle_qwen.py` to 600s to allow remote multi-page executions, and resolved worker process sync issues.
+Status: Completed
+Remarks: Document extraction completed successfully.
+
+--------------------------------------------------
+
+3. Technical Issues / Support Tickets Handled
+
+Issue Number: 1
+Issue Description: Duplicate model contexts initializing on GPU server during parallel page extraction.
+Root Cause: Non-thread-safe lazy-loading check allowed multiple threads to trigger model creation concurrently.
+Resolution Provided: Initialized the model eagerly at FastAPI startup.
+
+Issue Number: 2
+Issue Description: Unified remote Paddle-Qwen pipeline requests failing with ReadTimeout after 120s.
+Root Cause: Default backend client timeout was too tight (120s), and local workers were executing cached stale code prior to restart.
+Resolution Provided: Increased client timeout to 600.0s and validated after an RQ worker restart.
+
+--------------------------------------------------
+
+4. Systems / Tools Used
+
+Languages & Frameworks: Python, FastAPI, Next.js, PostgreSQL, Redis.
+Infrastructure: Supabase (DB/Storage), RQ (Worker), Lightning AI (Remote GPU Space).
+IDE / Tools: Git, VS Code, PowerShell.
+
+--------------------------------------------------
+
+5. Challenges Faced & Solutions Applied
+
+Challenge: Ephemeral proxy ingress limits and worker cache synchronization.
+Solution: Clarified python module caching in active RQ worker memories and instructed a worker restart to apply config adjustments.
+
+--------------------------------------------------
+
+6. Learning & Skills Development
+- FastAPI startup hooks and lifespan hooks for machine learning model preloading.
+- Dynamic caching allocators in CUDA and PaddlePaddle framework.
+- Managing asynchronous network execution states with python HTTP clients.
+
+--------------------------------------------------
+
+7. Plan for Next Session
+- Implement precision badging for dynamic pipelines and OCR engines.
+- Refine the custom fields layout overrides and manual edit interfaces.

@@ -64,7 +64,8 @@ export type ProcessingStatus =
   | "ai_extraction"
   | "completed"
   | "needs_review"
-  | "failed";
+  | "failed"
+  | "success";
 
 export type DocumentType =
   | "invoice"
@@ -122,9 +123,15 @@ export interface Document {
   correspondent: { id: string; name: string } | null;
   customFieldValues: FieldValue[];
   storageKey: string;
+  documentTypeId?: string | null;
+  templateId?: string | null;
   hasThumbnail: boolean;
   deletedAt: string | null;
   duplicateOfDocumentId: string | null;
+  extractionMethod?: string | null;
+  ocrUsed?: boolean;
+  ocrEngine?: string | null;
+  vlmModel?: string | null;
 }
 
 export interface ActivityEvent {

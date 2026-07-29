@@ -43,6 +43,9 @@ import {
   apiSetFieldValue,
   apiDeleteFieldValue,
   apiPredefinedFields,
+  apiReprocessDocument,
+  apiListIDPConfigs,
+  apiListTemplates,
   apiCorrespondents,
   apiActivity,
   apiCreateShare,
@@ -51,6 +54,8 @@ import {
   type DocumentPatch,
   type ActivityListResponse,
   type DocumentShare,
+  type Template,
+  type IDPConfig,
 } from "@/lib/api";
 import { CustomFieldInput, parseCustomFieldValue } from "@/components/custom-field-input";
 import { Modal } from "@/components/ui/modal";
@@ -155,6 +160,11 @@ export default function DocumentViewerPage({
   const [history, setHistory] = useState<ActivityListResponse | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [configs, setConfigs] = useState<IDPConfig[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<string>("");
+  const [reprocessing, setReprocessing] = useState(false);
   const [textContent, setTextContent] = useState<string | null>(null);
 
   // Share modal state
@@ -195,6 +205,22 @@ export default function DocumentViewerPage({
   const [fieldDraft, setFieldDraft] = useState<string>("");
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
   const [showFieldPicker, setShowFieldPicker] = useState(false);
+
+  useEffect(() => {
+    Promise.all([apiListIDPConfigs(), apiListTemplates()])
+      .then(([configRes, templateRes]) => {
+        setConfigs(configRes.configs);
+        setTemplates(templateRes);
+      })
+      .catch((e) => console.error("Failed to load configs/templates:", e));
+  }, []);
+
+  useEffect(() => {
+    if (doc) {
+      setSelectedTemplateId(doc.templateId || "");
+      setSelectedDocType(doc.documentType || "");
+    }
+  }, [doc]);
 
   useEffect(() => {
     apiTags().then(setAllTags).catch(() => {});
@@ -322,6 +348,22 @@ export default function DocumentViewerPage({
       setDoc(updated);
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : "Extraction request failed");
+    }
+  };
+
+  const handleReprocess = async () => {
+    if (!doc) return;
+    setActionError("");
+    setReprocessing(true);
+    try {
+      const docTypeConfig = configs.find((c) => c.name.toLowerCase() === selectedDocType.toLowerCase());
+      const docTypeId = docTypeConfig?.documentTypeId || null;
+      const updated = await apiReprocessDocument(doc.id, selectedTemplateId || null, docTypeId);
+      setDoc(updated);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Reprocessing failed");
+    } finally {
+      setReprocessing(false);
     }
   };
 
@@ -532,6 +574,41 @@ export default function DocumentViewerPage({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={doc.status} />
+          {doc.extractionMethod === "deterministic" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Deterministic Match
+            </span>
+          )}
+          {doc.extractionMethod === "vlm" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+              {doc.vlmModel
+                ? `VLM (${doc.vlmModel.toLowerCase().includes("qwen") ? "Qwen-VL" : doc.vlmModel.split("/").pop()})`
+                : "VLM Extraction"}
+            </span>
+          )}
+          {doc.extractionMethod === "manual" && (
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              Manually Verified
+            </span>
+          )}
+          {doc.status !== "failed" && doc.status !== "queued" && doc.status !== "extracting_text" && doc.status !== "ocr_processing" && (
+            <>
+              {doc.hasTextLayer && (
+                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  Digital Read
+                </span>
+              )}
+              {doc.ocrUsed && (
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${
+                  doc.ocrEngine === "paddleocr"
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    : "bg-cyan-50 text-cyan-700 border-cyan-200"
+                }`}>
+                  {doc.ocrEngine === "paddleocr" ? "GPU OCR (Paddle)" : "Local OCR (Rapid)"}
+                </span>
+              )}
+            </>
+          )}
           {actionError && (
             <span className="text-xs text-red-500">{actionError}</span>
           )}
@@ -778,6 +855,82 @@ export default function DocumentViewerPage({
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "extracted" && (
               <div className="space-y-4">
+                {/* Template override select & reprocess */}
+                {(() => {
+                  const docTypeConfig = configs.find((c) => c.name.toLowerCase() === selectedDocType.toLowerCase());
+                  const matchingTemplates = docTypeConfig
+                    ? templates.filter((t) => t.documentTypeId === docTypeConfig.documentTypeId)
+                    : [];
+
+                  return (
+                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4 space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                          Document Type
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={selectedDocType}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+                              setSelectedDocType(newType);
+                              
+                              const newConfig = configs.find((c) => c.name.toLowerCase() === newType.toLowerCase());
+                              const defaultTpl = newConfig
+                                ? templates.find((t) => t.documentTypeId === newConfig.documentTypeId && t.isDefault)
+                                : undefined;
+                              setSelectedTemplateId(defaultTpl?.id || "");
+                            }}
+                            className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                          >
+                            {configs.map((c) => (
+                              <option key={c.documentTypeId} value={c.name.toLowerCase()}>
+                                {c.name.charAt(0).toUpperCase() + c.name.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                          Extraction Template Layout
+                        </label>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <select
+                              value={selectedTemplateId || ""}
+                              onChange={(e) => setSelectedTemplateId(e.target.value)}
+                              className="w-full appearance-none text-xs pl-2.5 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                            >
+                              <option value="">Default Strategy</option>
+                              {matchingTemplates.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name} {t.isDefault ? "(Default)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          </div>
+                          <button
+                            onClick={handleReprocess}
+                            disabled={reprocessing}
+                            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {reprocessing ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            )}
+                            Reprocess
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* ---- Extracted structured data ---- */}
                 {doc.extractedData ? (
                   <div className="space-y-3">
@@ -804,20 +957,25 @@ export default function DocumentViewerPage({
                     {extractionEditing ? (
                       /* ---- Correction form ---- */
                       <div className="space-y-2">
-                        {Object.entries(extractionDraft).map(([key]) => (
-                          <div key={key}>
-                            <label className="text-xs text-slate-500 capitalize block mb-0.5">
-                              {key.replace(/_/g, " ")}
-                            </label>
-                            <input
-                              value={extractionDraft[key]}
-                              onChange={(e) =>
-                                setExtractionDraft((d) => ({ ...d, [key]: e.target.value }))
-                              }
-                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        ))}
+                        {Object.entries(extractionDraft).map(([key, val]) => {
+                          if (typeof val === "object" && val !== null) {
+                            return null;
+                          }
+                          return (
+                            <div key={key}>
+                              <label className="text-xs text-slate-500 capitalize block mb-0.5">
+                                {key.replace(/_/g, " ")}
+                              </label>
+                              <input
+                                value={String(val ?? "")}
+                                onChange={(e) =>
+                                  setExtractionDraft((d) => ({ ...d, [key]: e.target.value }))
+                                }
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                          );
+                        })}
                         <div className="flex gap-2 pt-1">
                           <button
                             onClick={handleSaveExtraction}
@@ -845,33 +1003,139 @@ export default function DocumentViewerPage({
                       <>
                         {Object.entries(doc.extractedData).map(([key, value]) => {
                           if (Array.isArray(value)) {
+                            const isPrimitiveArray = value.length > 0 && typeof value[0] !== "object";
                             return (
                               <div key={key} className="bg-slate-50 rounded-lg p-3">
                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                                   {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
                                 </p>
                                 <div className="space-y-2">
-                                  {(value as Record<string, unknown>[]).map((item, i) => (
-                                    <div key={i} className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1">
-                                      {Object.entries(item).map(([k, v]) => (
-                                        <div key={k} className="flex items-center justify-between gap-2">
-                                          <span className="text-slate-400 capitalize">{k.replace(/([A-Z])/g, " $1")}</span>
-                                          <span className="font-medium text-slate-700 text-right">{String(v)}</span>
+                                  {isPrimitiveArray ? (
+                                    <div className="space-y-1">
+                                      {(value as string[]).map((item, i) => (
+                                        <div key={i} className="text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded p-2">
+                                          {item}
                                         </div>
                                       ))}
+                                    </div>
+                                  ) : (
+                                    (value as Record<string, unknown>[]).map((item, i) => (
+                                      <div
+                                        key={i}
+                                        className="bg-white border border-slate-200 rounded p-2 text-xs space-y-1"
+                                      >
+                                        {Object.entries(item).map(([k, v]) => {
+                                          if (Array.isArray(v)) {
+                                            const isSubPrimitive = v.length > 0 && typeof v[0] !== "object";
+                                            return (
+                                              <div key={k} className="mt-2 pl-3 border-l-2 border-slate-100 space-y-1.5 w-full">
+                                                <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider block">
+                                                  {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:
+                                                </span>
+                                                {isSubPrimitive ? (
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {v.map((subVal, subIdx) => (
+                                                      <span key={subIdx} className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                                        {String(subVal)}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  (v as Record<string, unknown>[]).map((subItem, subIdx) => (
+                                                    <div key={subIdx} className="bg-slate-50 border border-slate-150 rounded p-1.5 space-y-1 w-full">
+                                                      {Object.entries(subItem).map(([subK, subV]) => (
+                                                        <div key={subK} className="flex items-center justify-between gap-2 text-[11px]">
+                                                          <span className="text-slate-400 capitalize">
+                                                            {subK.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                                          </span>
+                                                          <span className="font-medium text-slate-600 text-right">
+                                                            {String(subV)}
+                                                          </span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ))
+                                                )}
+                                              </div>
+                                            );
+                                          }
+                                          if (typeof v === "object" && v !== null) {
+                                            return (
+                                              <div key={k} className="mt-1 pl-3 border-l-2 border-slate-100 space-y-1 w-full">
+                                                <span className="text-[11px] text-slate-500 font-semibold block">
+                                                  {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:
+                                                </span>
+                                                {Object.entries(v).map(([objK, objV]) => (
+                                                  <div key={objK} className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400 capitalize">
+                                                      {objK.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                                    </span>
+                                                    <span className="font-medium text-slate-600 text-right">
+                                                      {String(objV)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <div key={k} className="flex items-center justify-between gap-2">
+                                              <span className="text-slate-400 capitalize">
+                                                {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                                              </span>
+                                              <span className="font-medium text-slate-700 text-right">
+                                                {String(v)}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Render nested objects (e.g. vendor_details, financials) inside cards
+                          if (typeof value === "object" && value !== null) {
+                            return (
+                              <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                                  {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
+                                    <div
+                                      key={k}
+                                      className="flex items-start justify-between gap-3 py-1 border-b border-slate-100 last:border-b-0"
+                                    >
+                                      <span className="text-xs text-slate-400 capitalize">
+                                        {k.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                                      </span>
+                                      <span className="text-xs font-medium text-slate-700 text-right">
+                                        {typeof v === "number" && k.toLowerCase().includes("amount")
+                                          ? `MYR ${(v as number).toFixed(2)}`
+                                          : String(v)}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
                               </div>
                             );
                           }
+
                           return (
-                            <div key={key} className="flex items-start justify-between gap-3 py-2 border-b border-slate-50">
+                            <div
+                              key={key}
+                              className="flex items-start justify-between gap-3 py-2 border-b border-slate-50"
+                            >
                               <span className="text-xs text-slate-500 capitalize flex-shrink-0">
-                                {key.replace(/_/g, " ")}
+                                {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
                               </span>
                               <span className="text-xs font-semibold text-slate-800 text-right">
-                                {typeof value === "number" && key.toLowerCase().includes("amount")
+                                {typeof value === "number" &&
+                                key.toLowerCase().includes("amount")
                                   ? `MYR ${(value as number).toFixed(2)}`
                                   : String(value)}
                               </span>

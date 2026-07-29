@@ -113,6 +113,7 @@ def verify_token(token: str) -> TokenData:
             key,
             algorithms=[alg],  # only accept the ONE algorithm we resolved above
             audience=AUDIENCE,  # reject tokens not intended for "authenticated" use
+            leeway=60,  # tolerate up to 60s of clock skew between client and Supabase
         )
     except jwt.ExpiredSignatureError:
         # The token was valid once but its "exp" claim has passed.
