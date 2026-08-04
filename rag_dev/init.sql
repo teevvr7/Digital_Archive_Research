@@ -31,9 +31,11 @@ CREATE TABLE feedback (
     id SERIAL PRIMARY KEY,
     question TEXT NOT NULL,
     answer TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT 'rag',  -- 'sql' or 'rag'
     retrieved_ids TEXT[],               -- Array of invoice_ids retrieved as context
     relevance_score REAL,               -- Similarity score of the top result
     response_time_ms INT,               -- Total response latency in milliseconds
     user_rating INT,                    -- User feedback: +1 (thumbs up), -1 (thumbs down)
     created_at TIMESTAMP DEFAULT NOW()
 );
+

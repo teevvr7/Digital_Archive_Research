@@ -5,9 +5,10 @@ from psycopg.rows import dict_row
 from src.config import DATABASE_URL
 
 def get_db_connection():
-    """Return a new raw database connection returning dictionaries from rows."""
-    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    """Return a new raw database connection returning dictionaries from rows with autocommit enabled."""
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=True)
     return conn
+
 
 def init_db():
     """Verify database connection can be established."""

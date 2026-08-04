@@ -3,24 +3,28 @@
 import json
 
 def vector_search(query: str, model, db_conn, top_k: int = 5) -> list[dict]:
-    """Retrieve top_k documents using Cosine Similarity on embeddings.
-    
-    In pgvector, `<=>` calculates cosine distance. 
-    Similarity score = 1 - Cosine Distance.
-    """
+    """Retrieve top_k documents using Cosine Similarity on embeddings."""
     q_vec = model.encode(query).tolist()
     cursor = db_conn.cursor()
     
-    cursor.execute("""
-        SELECT invoice_id, content_text, content_json,
-               1 - (embedding <=> %s::vector) AS similarity
-        FROM invoice_chunks
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s;
-    """, (q_vec, q_vec, top_k))
-    
-    rows = cursor.fetchall()
-    cursor.close()
+    try:
+        cursor.execute("""
+            SELECT invoice_id, content_text, content_json,
+                   1 - (embedding <=> %s::vector) AS similarity
+            FROM invoice_chunks
+            ORDER BY embedding <=> %s::vector
+            LIMIT %s;
+        """, (q_vec, q_vec, top_k))
+        
+        rows = cursor.fetchall()
+        cursor.close()
+    except Exception as e:
+        cursor.close()
+        try:
+            db_conn.rollback()
+        except Exception:
+            pass
+        return []
     
     results = []
     for row in rows:
@@ -36,23 +40,28 @@ def vector_search(query: str, model, db_conn, top_k: int = 5) -> list[dict]:
     return results
 
 def keyword_search(query: str, db_conn, top_k: int = 5) -> list[dict]:
-    """Retrieve top_k documents using PostgreSQL Full-Text Search (FTS).
-    
-    Uses `plainto_tsquery` against the GIN-indexed `search_tsv` column.
-    """
+    """Retrieve top_k documents using PostgreSQL Full-Text Search (FTS)."""
     cursor = db_conn.cursor()
     
-    cursor.execute("""
-        SELECT invoice_id, content_text, content_json,
-               ts_rank(search_tsv, plainto_tsquery('english', %s)) AS rank_score
-        FROM invoice_chunks
-        WHERE search_tsv @@ plainto_tsquery('english', %s)
-        ORDER BY rank_score DESC
-        LIMIT %s;
-    """, (query, query, top_k))
-    
-    rows = cursor.fetchall()
-    cursor.close()
+    try:
+        cursor.execute("""
+            SELECT invoice_id, content_text, content_json,
+                   ts_rank(search_tsv, plainto_tsquery('english', %s)) AS rank_score
+            FROM invoice_chunks
+            WHERE search_tsv @@ plainto_tsquery('english', %s)
+            ORDER BY rank_score DESC
+            LIMIT %s;
+        """, (query, query, top_k))
+        
+        rows = cursor.fetchall()
+        cursor.close()
+    except Exception as e:
+        cursor.close()
+        try:
+            db_conn.rollback()
+        except Exception:
+            pass
+        return []
     
     results = []
     for row in rows:

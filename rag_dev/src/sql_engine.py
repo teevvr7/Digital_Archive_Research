@@ -88,14 +88,32 @@ def text_to_sql_answer(query: str, db_conn, client=None) -> dict:
         cursor.close()
     except Exception as e:
         cursor.close()
+        try:
+            db_conn.rollback()
+        except Exception:
+            pass
+            
         # Fallback to direct ID match if generated SQL errored but an ID was present
         if id_match:
             target_id = id_match.group(0).upper()
             sql_query = f"SELECT content_json FROM invoice_chunks WHERE content_json->>'invoice_id' = '{target_id}';"
             cursor = db_conn.cursor()
-            cursor.execute(sql_query)
-            rows = cursor.fetchall()
-            cursor.close()
+            try:
+                cursor.execute(sql_query)
+                rows = cursor.fetchall()
+                cursor.close()
+            except Exception as e_sub:
+                cursor.close()
+                try:
+                    db_conn.rollback()
+                except Exception:
+                    pass
+                return {
+                    "answer": f"SQL execution error: {str(e_sub)}",
+                    "sql": sql_query,
+                    "data": None,
+                    "method": "sql"
+                }
         else:
             return {
                 "answer": f"SQL execution error: {str(e)}",
