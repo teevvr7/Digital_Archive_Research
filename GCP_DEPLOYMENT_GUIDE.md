@@ -89,23 +89,27 @@ SSH into your VM:
 gcloud compute ssh datawiz-production-vm --zone=asia-southeast1-a
 ```
 
-Once connected, update system packages and install Python 3.11, Git, Node.js 20 LTS, Docker, and build utilities:
+Once connected, update system packages and install Python, Git, Node.js 20 LTS, `uv`, Docker, and build utilities:
 
 ```bash
 # 1. Update APT packages
 sudo apt update && sudo apt upgrade -y
 
-# 2. Install Python 3.11, venv, git, build utilities
-sudo apt install -y python3.11 python3.11-venv python3-pip git build-essential curl ca-certificates
+# 2. Install Python 3, venv, git, build utilities
+sudo apt install -y python3 python3-venv python3-pip git build-essential curl ca-certificates
 
-# 3. Install Node.js 20 LTS
+# 3. Install Astral uv (Ultra-fast Python manager — automatically handles Python versions)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+
+# 4. Install Node.js 20 LTS
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# 4. Install PM2 globally (Process Manager for production background tasks)
+# 5. Install PM2 globally (Process Manager for production background tasks)
 sudo npm install -g pm2
 
-# 5. Install Docker Engine
+# 6. Install Docker Engine
 sudo apt install -y docker.io
 sudo systemctl enable docker
 sudo systemctl start docker
@@ -205,7 +209,7 @@ Paste the following configuration:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://nyfigvqavhasoarapmtj.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55ZmlndnFhdmhhc29hcmFwbXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NjMyNjUsImV4cCI6MjA5NjQzOTI2NX0.oFFicAJj9gUbUbIkLOq_Ko9wRrv-hBvmn4gCT4pVh-SdA
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55ZmlndnFhdmhhc29hcmFwbXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NjMyNjUsImV4cCI6MjA5NjQzOTI2NX0.oFFicAJj9gUbIkLOq_Ko9wRrv-hBvmn4gCT4pVh-SdA
 NEXT_PUBLIC_API_BASE_URL=http://<YOUR_VM_EXTERNAL_IP>:8000/api
 ```
 
@@ -213,18 +217,44 @@ NEXT_PUBLIC_API_BASE_URL=http://<YOUR_VM_EXTERNAL_IP>:8000/api
 
 ## 6. Step 5: Backend Setup & Database Migrations
 
+### Option 5A: Ultra-Fast Setup with `uv` (Recommended)
+
+```bash
+cd ~/Digital_Archive_Research/backend
+
+# 1. Create Virtual Environment (uv automatically downloads Python 3.11 if missing!)
+uv venv venv --python 3.11
+
+# 2. Activate Virtual Environment
+source venv/bin/activate
+
+# 3. Install dependencies instantly with uv
+uv pip install -e ".[worker]"
+
+# 4. Run Alembic Database Migrations
+alembic upgrade head
+```
+
+---
+
+### Option 5B: Standard Setup with `python3`
+
+If using standard `python3` without `uv`:
+
 ```bash
 cd ~/Digital_Archive_Research/backend
 
 # 1. Create Virtual Environment
-python3.11 -m venv venv
+python3 -m venv venv
+
+# 2. Activate Virtual Environment
 source venv/bin/activate
 
-# 2. Upgrade pip and install dependencies
+# 3. Upgrade pip and install dependencies
 pip install --upgrade pip
-pip install -e .[worker]
+pip install -e ".[worker]"
 
-# 3. Run Alembic Database Migrations
+# 4. Run Alembic Database Migrations
 alembic upgrade head
 ```
 
