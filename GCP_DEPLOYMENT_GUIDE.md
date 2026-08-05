@@ -167,11 +167,11 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 SUPABASE_JWT_SECRET=EoGa65xnOvZDgdI4KR8ZHIzAMqQkLsi7K+0yBD90UADGXPCcUz0ur5+HJW3gX3+E0n1eG0rJWiAKyghU0aBIFQ==
 SUPABASE_STORAGE_BUCKET=documents
 
-# ==== Database Connection ====
+# ==== Database Connection (IPv4 Pooler for GCP VM compatibility) ====
 # API uses transaction pooler (port 6543)
 DATABASE_URL=postgresql+psycopg://app_user.nyfigvqavhasoarapmtj:elonmuskcol%40bw%21thneym%40r@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
-# Alembic uses direct connection (port 5432)
-ALEMBIC_DATABASE_URL=postgresql+psycopg://postgres:Digital123%40archive@db.nyfigvqavhasoarapmtj.supabase.co:5432/postgres
+# Alembic uses session pooler (port 5432, IPv4 compatible)
+ALEMBIC_DATABASE_URL=postgresql+psycopg://postgres.nyfigvqavhasoarapmtj:Digital123%40archive@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres
 DB_PREPARE_THRESHOLD=none
 
 # ==== Redis Queue ====
