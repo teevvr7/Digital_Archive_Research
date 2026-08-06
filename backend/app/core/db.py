@@ -6,7 +6,7 @@ so server-side prepared statements must be disabled (``prepare_threshold=None``)
 """
 
 # create_engine builds the low-level connection pool to Postgres.
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 
 # sessionmaker builds a factory that produces new ORM Session objects on demand.
 from sqlalchemy.orm import sessionmaker
@@ -45,6 +45,19 @@ def _make_engine():
 # (each engine manages its own connection pool).
 engine = _make_engine()
 
+
+# --- search_path fix for Supabase + PgBouncer transaction pooler ---
+# Supabase installs extensions (pg_trgm, etc.) in the 'extensions' schema.
+# PgBouncer's transaction pooler resets session state between transactions,
+# so ALTER ROLE SET search_path doesn't persist. This listener runs
+# SET search_path on every fresh connection checkout from the pool.
+@event.listens_for(engine, "connect")
+def _set_search_path(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute('SET search_path TO "$user", public, extensions')
+    cursor.close()
+
+
 # SessionLocal is a callable factory: SessionLocal() returns a brand-new
 # Session bound to the shared engine above. Every request/job creates its
 # own Session so work never gets mixed up between concurrent requests.
@@ -54,3 +67,4 @@ SessionLocal = sessionmaker(
     autocommit=False,  # never auto-commit — the caller controls transaction boundaries
     future=True,  # opt into SQLAlchemy 2.0-style Session behavior
 )
+
