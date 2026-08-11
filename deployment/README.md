@@ -35,11 +35,13 @@ Both strategies deploy a **co-located production architecture** on a single Comp
 ```text
 deployment/
 ├── README.md                                 # Master deployment index (this file)
-├── local_cli_automation/                     # Strategy 1: Local PowerShell + gcloud CLI
-│   ├── deploy-gcp.ps1                        # Master local PowerShell orchestrator
+├── SYSTEM_UPDATE_GUIDE.md                    # Developer guide for updating existing GCP VM
+├── update-gcp.ps1                            # 1-click PowerShell update script for existing GCP VM
+├── local_cli_automation/                     # Strategy 1: Local PowerShell + gcloud CLI initial setup
+│   ├── deploy-gcp.ps1                        # Master local PowerShell initial orchestrator
 │   ├── setup-vm.sh                           # VM initialization & build shell script
 │   └── LOCAL_CLI_DEPLOYMENT_GUIDE.md         # Full documentation for local CLI deployment
-└── gcp_cloud_console_automation/             # Strategy 2: GCP Web Console / Cloud Shell
+└── gcp_cloud_console_automation/             # Strategy 2: GCP Web Console / Cloud Shell initial setup
     ├── cloud_shell_deploy.sh                 # 1-click deployment script for Cloud Shell
     ├── startup_script_metadata.sh            # GCP Compute Engine Startup Metadata script
     └── CLOUD_CONSOLE_DEPLOYMENT_GUIDE.md     # Full documentation for Cloud Console deployment
