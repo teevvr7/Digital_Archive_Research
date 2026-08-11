@@ -1,12 +1,12 @@
 # System Architecture & Database Schema Specification
 
-This document provides a technical specification of the DataWiz Intelligent Document Processing (IDP) and Digital Archiving System architecture, pipeline workflows, template matching mechanics, hybrid search engine, and full PostgreSQL database schema.
+This document provides an exact technical specification of the DataWiz Intelligent Document Processing (IDP) and Digital Archiving System architecture, pipeline workflows, template matching mechanics, hybrid search engine, and full PostgreSQL database schema synchronized directly with the `backend/app/models/` Python codebase.
 
 ---
 
 ## 🏛️ 1. High-Level System Architecture
 
-The system is designed as a modular, decoupled microservice architecture separating web UI, API routing, asynchronous background processing, database storage, and GPU AI inference.
+The system is designed as a modular microservice architecture separating web UI, API routing, asynchronous background processing, database storage, and GPU AI inference.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -60,36 +60,21 @@ The system is designed as a modular, decoupled microservice architecture separat
 
 ## 🔄 2. IDP Ingestion & Processing Pipeline
 
-### Step 1: Document Upload & Storage Ingestion
-1. User uploads a file (PDF, PNG, JPEG) via the Frontend Upload interface.
-2. `POST /api/documents/upload` receives the file stream, calculates an MD5 checksum for deduplication, and streams the file payload directly to Supabase Storage bucket `documents` under key `{tenant_id}/{document_id}/{filename}`.
-3. A record is inserted into `documents` with status `'uploaded'`.
-4. A processing job is enqueued to Redis (`IDP_QUEUE_NAME`).
-
-### Step 2: Strategy Selection & Template Matching
-When the worker picks up the job (`app.modules.files.service.process_document`):
-1. **Template Fingerprint Inspection**: The document structure, filename, and visual headers are compared against active `document_templates` for the tenant.
-2. **Strategy Dispatch**:
-   - **`paddle_qwen` (Hybrid Default)**: Runs PaddleOCR to extract text boundaries and line bounding boxes, followed by Qwen3-VL-4B to parse visual structure and extract key-value JSON fields.
-   - **`vlm_only`**: Direct visual-language model pass over document images.
-   - **`ocr_only`**: Fast text extraction for standard digital PDFs with existing text layers.
-
-### Step 3: Structured Key-Value Field Extraction
-1. Target field definitions (names, types, descriptions, validation regex) are fetched from `document_type_fields` and `document_templates`.
-2. The AI prompt injector merges the target JSON schema with customized prompt hints configured in the IDP Control Center.
-3. The response is validated against Pydantic schema schemas.
-
-### Step 4: Confidence Scoring & Auto-Promotion
-1. Field-level confidence scores are calculated based on OCR text alignment and model log-probabilities.
-2. Overall document confidence is derived:
-   - If `confidence >= CONFIDENCE_THRESHOLD` (default `0.7`), the document status transitions to `'processed'`.
-   - If confidence is below threshold, status becomes `'review_required'` for human validation in the Inbox.
+### Document Processing States (`backend/app/models/document.py`)
+During ingestion, a document transitions through the following exact status states:
+- **`queued`**: File uploaded, enqueued to Redis background worker.
+- **`extracting_text`**: Worker is extracting plain text or reading text layers.
+- **`ocr_processing`**: Worker is running PaddleOCR on scanned images/pages.
+- **`ai_extraction`**: Worker is invoking Qwen3-VL-4B visual-language processing.
+- **`completed`**: Pipeline finished successfully and confidence requirements were met.
+- **`needs_review`**: Pipeline completed but extraction confidence was below threshold.
+- **`failed`**: Pipeline encountered an error and ran out of retries.
 
 ---
 
 ## 🔍 3. Search Engine & RAG Subsystem Architecture
 
-The search service (`app.modules.search.service`) executes a **Hybrid Search Engine** combining three distinct search techniques over ingested documents:
+The search service (`app.modules.search.service`) executes a **Hybrid Search Engine** combining three distinct search techniques:
 
 ```
                           User Search Query String (e.g. "Acme Invoice 2026")
@@ -110,230 +95,133 @@ The search service (`app.modules.search.service`) executes a **Hybrid Search Eng
                                     Sorted Document Results Payload
 ```
 
-1. **Full-Text Keyword Search (FTS)**:
-   PostgreSQL `search_tsv` (`tsvector`) column automatically updated via DB triggers, matching queries using `websearch_to_tsquery('english', q)` and `to_tsquery('english', q + ':*')`.
-2. **Trigram Fuzzy Matching (`pg_trgm`)**:
-   Uses `word_similarity(q, title)` and `word_similarity(q, original_filename)` to catch typos and partial filename matches.
-3. **Vector Semantic Search (`pgvector`)**:
-   Calculates cosine similarity distance between query embeddings and document chunk vector embeddings.
-
 ---
 
-## 🗄️ 4. Complete PostgreSQL Database Schema
+## 🗄️ 4. Synchronized Database Schema Specification
 
-The database consists of **18 relational tables** configured with native Supabase Row Level Security (RLS).
+Below is the code-synchronized specification of every model in `backend/app/models/`.
 
-### Entity Relationship Map
-
-```
-  ┌──────────────┐          1:N         ┌──────────────┐
-  │   tenants    │─────────────────────>│    users     │
-  └──────┬───────┘                      └──────────────┘
-         │
-         │ 1:N
-         ├─────────────────────────────>┌──────────────────────┐
-         │                              │    document_types    │
-         │                              └──────────┬───────────┘
-         │                                         │ 1:N
-         │                                         ▼
-         │                              ┌──────────────────────┐ 1:N ┌──────────────────────┐
-         ├─────────────────────────────>│  document_templates  │────>│ document_type_fields │
-         │                              └──────────┬───────────┘     └──────────────────────┘
-         │                                         │ 1:N
-         │ 1:N                                     ▼
-         ├─────────────────────────────>┌──────────────────────┐
-         │                              │      documents       │
-         │                              └──────────┬───────────┘
-         │                                         │
-         │                                         ├───────────────> 1:N  ┌──────────────────────┐
-         │                                         │                      │     extractions      │
-         │                                         │                      └──────────────────────┘
-         │                                         ├───────────────> 1:N  ┌──────────────────────┐
-         │                                         │                      │    processing_jobs   │
-         │                                         │                      └──────────────────────┘
-         │                                         ├───────────────> M:N  ┌──────────────────────┐
-         │                                         │                      │         tags         │
-         │                                         │                      └──────────────────────┘
-         │                                         └───────────────> 1:N  ┌──────────────────────┐
-         │                                                                │  correspondents /    │
-         │                                                                │  custom_fields /     │
-         │                                                                │  saved_views / etc.  │
-         └───────────────────────────────────────────────────────────────>└──────────────────────┘
-```
-
----
-
-### Master Table Schema Specifications
-
-#### 1. `tenants`
-Defines isolated customer tenant accounts.
+### 1. `tenants` (`app.models.tenant.Tenant`)
 - `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `name` (VARCHAR(255), Not Null)
-- `slug` (VARCHAR(255), Unique, Not Null)
-- `trash_retention_days` (INTEGER, Default `30`)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
-- `updated_at` (TIMESTAMPTZ, Default `now()`)
+- `name` (String, Not Null)
+- `slug` (String, Unique, Not Null)
+- `trash_retention_days` (Integer, Default `30`)
+- `created_at`, `updated_at` (DateTime with Timezone)
 
-#### 2. `users`
-App user accounts mapped to Supabase Auth UUIDs.
+### 2. `users` (`app.models.user.User`)
 - `id` (UUID, Primary Key, References `auth.users(id)`)
-- `tenant_id` (UUID, Not Null, Foreign Key -> `tenants.id`)
-- `email` (VARCHAR(255), Not Null)
-- `full_name` (VARCHAR(255))
-- `role` (VARCHAR(50), Default `'member'`) — (`'owner'`, `'admin'`, `'member'`, `'viewer'`)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
+- `tenant_id` (UUID, Foreign Key -> `tenants.id`)
+- `email` (String, Not Null)
+- `full_name` (String, Nullable)
+- `role` (String, Default `'member'`) — (`'owner'`, `'admin'`, `'member'`, `'viewer'`)
+- `created_at` (DateTime with Timezone)
 
-#### 3. `documents`
-Master record for uploaded physical and digital files.
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `tenant_id` (UUID, Not Null, Foreign Key -> `tenants.id`)
-- `filename` (VARCHAR(255), Not Null)
-- `original_filename` (VARCHAR(255), Not Null)
-- `mime_type` (VARCHAR(100), Not Null)
-- `size_bytes` (BIGINT, Not Null)
-- `storage_key` (TEXT, Not Null)
-- `thumbnail_key` (TEXT)
-- `status` (VARCHAR(50), Not Null, Default `'uploaded'`) — (`'uploaded'`, `'processing'`, `'processed'`, `'review_required'`, `'failed'`, `'archived'`)
-- `error_message` (TEXT)
-- `document_type_id` (UUID, Foreign Key -> `document_types.id`)
-- `template_id` (UUID, Foreign Key -> `document_templates.id`)
-- `page_count` (INTEGER, Default `1`)
-- `has_text_layer` (BOOLEAN, Default `false`)
-- `ocr_used` (BOOLEAN, Default `false`)
-- `ocr_confidence` (DOUBLE PRECISION)
-- `extracted_data` (JSONB, Default `'{}'`)
-- `extracted_text` (TEXT)
-- `confidence` (DOUBLE PRECISION)
-- `search_tsv` (TSVECTOR) — Full-text search index vector
-- `checksum` (VARCHAR(64)) — MD5 file hash
-- `title` (VARCHAR(255))
-- `document_date` (DATE)
-- `vendor` (VARCHAR(255))
-- `invoice_no` (VARCHAR(100))
-- `total_amount` (NUMERIC(15, 2))
-- `currency` (VARCHAR(10))
-- `correspondent_id` (UUID, Foreign Key -> `correspondents.id`)
-- `duplicate_of_document_id` (UUID, Foreign Key -> `documents.id`)
-- `uploaded_by` (UUID, Foreign Key -> `users.id`)
-- `uploaded_at` (TIMESTAMPTZ, Default `now()`)
-- `processed_at` (TIMESTAMPTZ)
-- `deleted_at` (TIMESTAMPTZ) — Soft delete timestamp
+### 3. `documents` (`app.models.document.Document`)
+- `id` (UUID, Primary Key)
+- `tenant_id` (UUID, Foreign Key -> `tenants.id`, Not Null, Indexed)
+- `filename` (String, Not Null)
+- `original_filename` (String, Not Null)
+- `mime_type` (String, Not Null)
+- `size_bytes` (BigInteger, Not Null)
+- `storage_key` (String, Not Null)
+- `status` (String, Not Null, Default `'queued'`)
+- `error_message` (Text, Nullable)
+- `document_type_id` (UUID, Foreign Key -> `document_types.id`, Nullable)
+- `template_id` (UUID, Foreign Key -> `document_templates.id`, Nullable)
+- `document_type` (String, Default `'other'`)
+- `page_count` (Integer, Nullable)
+- `has_text_layer` (Boolean, Default `false`)
+- `ocr_used` (Boolean, Default `false`)
+- `ocr_confidence` (REAL, Nullable)
+- `extracted_data` (JSONB, Nullable)
+- `extracted_text` (Text, Nullable)
+- `confidence` (REAL, Nullable)
+- `search_tsv` (TSVECTOR, Nullable) — Full-text search GIN index
+- `checksum` (String(64), Nullable) — SHA-256 hash for deduplication
+- `title` (String, Nullable)
+- `document_date` (Date, Nullable)
+- `thumbnail_key` (String, Nullable)
+- `correspondent_id` (UUID, Foreign Key -> `correspondents.id`, Nullable)
+- `vendor` (String, Nullable)
+- `invoice_no` (String, Nullable)
+- `total_amount` (Numeric(12, 2), Nullable)
+- `currency` (String(8), Nullable)
+- `duplicate_of_document_id` (UUID, Foreign Key -> `documents.id`, Nullable)
+- `deleted_at` (DateTime with Timezone, Nullable) — Soft delete
+- `uploaded_by` (UUID, Foreign Key -> `users.id`, Not Null)
+- `uploaded_at` (DateTime with Timezone, Default `now()`)
+- `processed_at` (DateTime with Timezone, Nullable)
 
-#### 4. `document_types`
-System and custom document classifications (*Invoice*, *Receipt*, etc.).
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
+### 4. `document_types` (`app.models.document_type.DocumentType`)
+- `id` (UUID, Primary Key)
 - `tenant_id` (UUID, Nullable, Foreign Key -> `tenants.id`) — `NULL` denotes global system types.
-- `name` (VARCHAR(100), Not Null)
-- `slug` (VARCHAR(100), Not Null)
-- `description` (TEXT)
-- `icon` (VARCHAR(50))
-- `is_system` (BOOLEAN, Default `false`)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
+- `name` (String, Not Null) — e.g. `'invoice'`, `'receipt'`
+- `description` (Text, Nullable)
+- `json_schema` (JSONB, Nullable) — Soft schema for extraction confidence scoring
+- `is_system` (Boolean, Default `false`) — `true` for system-seeded types
+- `extraction_method` (String, Default `'paddle_qwen'`) — (`'paddle_qwen'`, `'cascade'`)
 
-#### 5. `document_templates`
-IDP extraction schemas and configuration presets.
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `tenant_id` (UUID, Foreign Key -> `tenants.id`)
-- `document_type_id` (UUID, Not Null, Foreign Key -> `document_types.id`)
-- `name` (VARCHAR(255), Not Null)
-- `description` (TEXT)
-- `extraction_strategy` (VARCHAR(50), Default `'paddle_qwen'`)
-- `target_schema` (JSONB, Not Null, Default `'{}'`) — JSON Schema field definitions
-- `prompt_hints` (TEXT) — Custom prompt guidelines for VLM parsing
-- `sample_file_key` (TEXT)
-- `is_active` (BOOLEAN, Default `true`)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
+### 5. `document_templates` (`app.models.document_template.DocumentTemplate`)
+- `id` (UUID, Primary Key)
+- `tenant_id` (UUID, Foreign Key -> `tenants.id`, Not Null)
+- `document_type_id` (UUID, Foreign Key -> `document_types.id`, Not Null)
+- `name` (String, Not Null)
+- `fingerprint` (String, Not Null) — Identifies layout visual structure
+- `field_mappings` (JSONB, Not Null, Default `{}`)
+- `status` (String, Default `'candidate'`) — (`'candidate'`, `'promoted'`, `'disabled'`)
+- `examples_count` (Integer, Default `0`)
+- `confidence` (REAL, Nullable)
+- `version` (Integer, Default `1`)
+- `extraction_method` (String, Default `'default'`)
+- `is_default` (Boolean, Default `false`)
+- `use_image` (Boolean, Default `false`)
+- `use_ocr` (Boolean, Default `true`)
+- `sample_document_id` (UUID, Foreign Key -> `documents.id`, Nullable)
 
-#### 6. `document_type_fields`
-Field definition rules per document type.
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `tenant_id` (UUID, Foreign Key -> `tenants.id`)
-- `document_type_id` (UUID, Foreign Key -> `document_types.id`)
-- `field_name` (VARCHAR(100), Not Null)
-- `field_label` (VARCHAR(100), Not Null)
-- `data_type` (VARCHAR(50), Not Null) — (`'string'`, `'number'`, `'date'`, `'boolean'`, `'array'`)
-- `is_required` (BOOLEAN, Default `false`)
-- `description` (TEXT)
+### 6. `extractions` (`app.models.extraction.Extraction`)
+- `id` (UUID, Primary Key)
+- `tenant_id` (UUID, Foreign Key -> `tenants.id`, Not Null)
+- `document_id` (UUID, Foreign Key -> `documents.id`, Not Null)
+- `template_id` (UUID, Foreign Key -> `document_templates.id`, Nullable)
+- `raw_payload` (JSONB, Nullable)
+- `normalized_payload` (JSONB, Nullable)
+- `field_confidences` (JSONB, Nullable)
+- `overall_confidence` (REAL, Nullable)
+- `accepted_by_user` (Boolean, Default `false`)
 
-#### 7. `extractions`
-Detailed field extraction history and confidence breakdown per document run.
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `tenant_id` (UUID, Foreign Key -> `tenants.id`)
-- `document_id` (UUID, Foreign Key -> `documents.id`)
-- `template_id` (UUID, Foreign Key -> `document_templates.id`)
-- `extraction_method` (VARCHAR(50))
-- `raw_response` (JSONB)
-- `structured_data` (JSONB)
-- `field_confidences` (JSONB)
-- `overall_confidence` (DOUBLE PRECISION)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
+### 7. `processing_jobs` (`app.models.processing_job.ProcessingJob`)
+- `id` (UUID, Primary Key)
+- `tenant_id` (UUID, Foreign Key -> `tenants.id`, Not Null)
+- `document_id` (UUID, Foreign Key -> `documents.id`, Not Null)
+- `job_type` (String, Not Null)
+- `status` (String, Default `'pending'`) — (`'pending'`, `'processing'`, `'completed'`, `'failed'`)
+- `error_message` (Text, Nullable)
+- `started_at`, `completed_at` (DateTime with Timezone)
 
-#### 8. `processing_jobs`
-Background job tracking for Redis RQ tasks.
-- `id` (UUID, Primary Key, Default `gen_random_uuid()`)
-- `tenant_id` (UUID, Foreign Key -> `tenants.id`)
-- `document_id` (UUID, Foreign Key -> `documents.id`)
-- `job_type` (VARCHAR(50), Not Null)
-- `status` (VARCHAR(50), Not Null, Default `'pending'`)
-- `retry_count` (INTEGER, Default `0`)
-- `error_log` (TEXT)
-- `created_at` (TIMESTAMPTZ, Default `now()`)
-- `completed_at` (TIMESTAMPTZ)
-
-#### 9–18. Supporting Tables
-- **`tags`**: Document taxonomy tags (`id`, `tenant_id`, `name`, `color`).
-- **`correspondents`**: Senders/Vendors/Organizations (`id`, `tenant_id`, `name`, `email`, `match_rules`).
-- **`custom_fields`**: Tenant-defined metadata fields (`id`, `tenant_id`, `name`, `field_type`).
-- **`saved_views`**: User custom search filters and grid view settings (`id`, `user_id`, `name`, `query_params`).
-- **`document_shares`**: External document sharing links with expiration (`id`, `document_id`, `share_token`, `expires_at`).
-- **`ai_usage`**: Token consumption telemetry (`id`, `tenant_id`, `prompt_tokens`, `completion_tokens`, `model_name`).
-- **`activity_events`**: Audit log of document changes (`id`, `tenant_id`, `user_id`, `event_type`, `payload`).
-- **`api_keys`**: Developer API authentication tokens (`id`, `tenant_id`, `key_hash`, `name`, `permissions`).
+### 8–18. Additional Registered Entities
+- **`tags`** & **`document_tags`**: Tag definitions and many-to-many junction mapping.
+- **`correspondents`**: Vendor/sender entities (`name`, `email`, `match_rules`).
+- **`custom_fields`** & **`document_field_values`**: Dynamic tenant-specific custom fields and typed document field values.
+- **`saved_views`**: Preset search and spreadsheet view filters.
+- **`document_shares`**: Secure temporary document share tokens.
+- **`ai_usage`**: LLM & VLM token telemetry logs.
+- **`activity_events`**: Audit trail of document modifications.
+- **`api_keys`**: Hashed developer API access tokens.
 
 ---
 
-## 🔒 5. Multi-Tenancy Security & Row Level Security (RLS)
+## 🔒 5. Row Level Security (RLS) Policy Pattern
 
-All database operations enforce multi-tenant isolation via **PostgreSQL Row Level Security (RLS)**.
+Every database transaction executes `SET LOCAL app.current_tenant = '{tenant_id}'`, ensuring native PostgreSQL RLS enforcement:
 
-### RLS Execution Mechanism
-1. Every API request authenticates the user's Supabase JWT token.
-2. The FastAPI DB session middleware inspects `jwt.claims.tenant_id` and executes:
-   ```sql
-   SET LOCAL app.current_tenant = 'tenant-uuid-here';
-   ```
-3. Database tables enforce native RLS policies evaluating `tenant_id`:
-   ```sql
-   -- Standard Tenant Isolation Policy Pattern
-   CREATE POLICY tenant_isolation_documents ON documents
-       FOR ALL
-       USING (tenant_id = current_setting('app.current_tenant', true)::uuid);
-   ```
-4. Global system records (e.g. system document types) use hybrid policies:
-   ```sql
-   CREATE POLICY tenant_isolation_document_types ON document_types
-       FOR SELECT
-       USING (tenant_id IS NULL OR tenant_id = current_setting('app.current_tenant', true)::uuid);
-   ```
+```sql
+-- Example Document Isolation Policy
+CREATE POLICY tenant_isolation_documents ON documents
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
----
-
-## ⚡ 6. Database Indexes & Performance Optimization
-
-- **Full-Text Search Index**:
-  ```sql
-  CREATE INDEX idx_documents_search_tsv ON documents USING gin(search_tsv);
-  ```
-- **Trigram Fuzzy Search Indexes**:
-  ```sql
-  CREATE INDEX idx_documents_title_trgm ON documents USING gin(lower(title) gin_trgm_ops);
-  CREATE INDEX idx_documents_filename_trgm ON documents USING gin(lower(original_filename) gin_trgm_ops);
-  ```
-- **JSONB Ingestion Index**:
-  ```sql
-  CREATE INDEX idx_documents_extracted_data ON documents USING gin(extracted_data jsonb_path_ops);
-  ```
-- **Soft Delete Partial Index**:
-  ```sql
-  CREATE INDEX idx_documents_active ON documents (tenant_id, uploaded_at DESC) WHERE deleted_at IS NULL;
-  ```
+-- Example Global + Tenant Hybrid Policy
+CREATE POLICY tenant_isolation_document_types ON document_types
+    FOR SELECT
+    USING (tenant_id IS NULL OR tenant_id = current_setting('app.current_tenant', true)::uuid);
+```

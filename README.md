@@ -10,8 +10,9 @@ The DataWiz Digital Archiving Platform provides a complete end-to-end pipeline f
 
 ### Core Capabilities
 1. **Multi-Engine Ingestion Pipeline**:
-   - High-accuracy optical character recognition and visual-language parsing powered by **PaddleOCR** and **Qwen3-VL** (via remote GPU inference server) with automated fallback mechanisms.
+   - High-accuracy optical character recognition and visual-language parsing powered by **PaddleOCR** and **Qwen3-VL-4B-Instruct** (via remote GPU inference server) with automated fallback mechanisms.
    - Support for single and multi-page PDFs, high-resolution scans, PNGs, and JPEGs.
+   - Clear pipeline document states (`queued`, `extracting_text`, `ocr_processing`, `ai_extraction`, `needs_review`, `completed`, `failed`).
 2. **IDP Control Center & Dynamic Schema Engine**:
    - Custom document type configuration (*Invoice*, *Receipt*, *Bank Statement*, *Tax Form*, *Utility Bill*, custom types).
    - Dynamic target JSON schema definition and prompt hint customization per document type.
@@ -54,7 +55,7 @@ The DataWiz Digital Archiving Platform provides a complete end-to-end pipeline f
 ┌──────────────────────────────┐                                      │
 │   Async IDP Worker (RQ)      │                                      │
 │  (app.worker / SimpleWorker) │                                      │
-└───────────────┬──────────────┘                                      │
+└──────────────┬──────────────┘                                      │
                 │ Remote AI Inference Calls                           │ Storage Upload / Signed URLs
                 ▼                                                     ▼
 ┌──────────────────────────────┐                       ┌───────────────────────────────────────────┐
@@ -108,7 +109,8 @@ Digital_Archive_Research/
 │
 ├── docs/                           # Master Technical & Developer Documentation
 │   ├── DEVELOPER_GUIDE.md          # Complete local setup, prerequisites, and troubleshooting
-│   └── ARCHITECTURE_AND_DATABASE.md# In-depth system architecture & database schema specification
+│   ├── ARCHITECTURE_AND_DATABASE.md# In-depth system architecture & database schema specification
+│   └── archive/                    # Preserved historical specs, incident logs, and developer notes
 │
 ├── GCP_DEPLOYMENT_GUIDE.md         # Production single-VM GCP Cloud deployment guide
 ├── start-system.ps1                # Automated PowerShell system launcher for local development
