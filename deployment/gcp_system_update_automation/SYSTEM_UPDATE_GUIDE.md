@@ -15,7 +15,7 @@ git commit -m "your update commit message"
 git push origin main
 
 # 2. Trigger the automated GCP VM update from your local terminal
-.\deployment\update-gcp.ps1
+.\deployment\gcp_system_update_automation\update-gcp.ps1
 ```
 
 ---
@@ -24,10 +24,10 @@ git push origin main
 
 ### Method 1: Automated Local PowerShell Script (Recommended)
 
-Run the update script located at [`deployment/update-gcp.ps1`](./update-gcp.ps1) from your local terminal:
+Run the update script located at [`deployment/gcp_system_update_automation/update-gcp.ps1`](./update-gcp.ps1) from your local terminal:
 
 ```powershell
-.\deployment\update-gcp.ps1
+.\deployment\gcp_system_update_automation\update-gcp.ps1
 ```
 
 **What this script automatically performs**:
