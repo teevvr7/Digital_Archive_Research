@@ -48,12 +48,11 @@ Thumbs.db
 .idea/
 .vscode/
 
-legacy_reference/
+docs/archive/legacy_reference/
 # ---- Local manual test scratch ----
 frontend/test_upload.mjs
 test_document/
 
 # ---- Personal reports / developer notes / subprojects ----
-notes/
+docs/archive/notes/
 rag_dev/
-
