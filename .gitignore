@@ -53,6 +53,7 @@ legacy_reference/
 frontend/test_upload.mjs
 test_document/
 
-# ---- Personal reports / developer notes ----
+# ---- Personal reports / developer notes / subprojects ----
 notes/
+rag_dev/
 
