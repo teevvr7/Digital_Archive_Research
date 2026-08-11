@@ -112,7 +112,10 @@ Digital_Archive_Research/
 │   ├── ARCHITECTURE_AND_DATABASE.md# In-depth system architecture & database schema specification
 │   └── archive/                    # Preserved historical specs, incident logs, and developer notes
 │
-├── GCP_DEPLOYMENT_GUIDE.md         # Production single-VM GCP Cloud deployment guide
+├── deployment/                     # Production GCP Deployment Suite (Local CLI & Cloud Console)
+│   ├── README.md                   # Master deployment index
+│   ├── local_cli_automation/       # Strategy 1: Local Terminal (PowerShell + gcloud)
+│   └── gcp_cloud_console_automation/# Strategy 2: GCP Web Console / Cloud Shell
 ├── start-system.ps1                # Automated PowerShell system launcher for local development
 ├── CLAUDE.md                       # AI developer reference guide
 └── .gitignore                      # Git exclusion rules
@@ -146,7 +149,7 @@ For detailed step-by-step installation, database migration commands, and environ
 |---|---|
 | **[Developer Guide](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/docs/DEVELOPER_GUIDE.md)** | Step-by-step local development setup, environment variables, running migrations, running tests, and troubleshooting known issues. |
 | **[Architecture & Database Spec](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/docs/ARCHITECTURE_AND_DATABASE.md)** | Comprehensive breakdown of system components, OCR/VLM extraction pipelines, IDP template matching engine, hybrid search, and full PostgreSQL schema with RLS policies. |
-| **[GCP Deployment Guide](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/GCP_DEPLOYMENT_GUIDE.md)** | Single-VM production deployment guide for Google Cloud Platform Compute Engine using PM2, Docker Redis, and fast Python tooling (`uv`). |
+| **[GCP Deployment Suite](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/deployment/README.md)** | Production GCP deployment automation suite (Strategy 1: Local PowerShell CLI; Strategy 2: GCP Cloud Console & Cloud Shell). |
 
 ---
 

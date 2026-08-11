@@ -232,4 +232,4 @@ pytest app/tests/test_idp_tenant_isolation.py
 
 ## 📈 6. Production Deployment Overview
 
-For instructions on deploying the full stack to a single Google Cloud Platform (GCP) Compute Engine VM with PM2 process supervision and SSL, refer to **[GCP_DEPLOYMENT_GUIDE.md](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/GCP_DEPLOYMENT_GUIDE.md)**.
+For instructions on deploying the full stack to a single Google Cloud Platform (GCP) Compute Engine VM with PM2 process supervision, Caddy reverse proxy, and SSL, refer to **[deployment/README.md](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/deployment/README.md)**.
