@@ -36,7 +36,12 @@ const ORG_ITEMS = [
   { href: "/views", label: "Saved Views", icon: Bookmark },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+  className?: string;
+}
+
+export function Sidebar({ onNavigate, className }: SidebarProps) {
   const pathname = usePathname();
   const { user, tenant, signOut } = useAuth();
 
@@ -45,7 +50,11 @@ export function Sidebar() {
     : 0;
 
   return (
-    <aside className="sidebar w-64 flex-shrink-0 flex flex-col h-screen sticky top-0">
+    <aside
+      className={`sidebar w-64 flex-shrink-0 flex flex-col ${
+        className ?? "hidden md:flex h-screen sticky top-0"
+      }`}
+    >
       {/* Logo */}
       <div className="px-6 py-5 border-b border-slate-700">
         <div className="flex items-center gap-2.5">
@@ -77,6 +86,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onNavigate}
               className={`sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
                 active ? "active" : ""
               }`}
@@ -95,6 +105,7 @@ export function Sidebar() {
               <Link
                 key={href}
                 href={href}
+                onClick={onNavigate}
                 className={`sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
                   active ? "active" : ""
                 }`}
@@ -109,6 +120,7 @@ export function Sidebar() {
         <div className="pt-4 border-t border-slate-700 mt-4">
           <Link
             href="/settings"
+            onClick={onNavigate}
             className={`sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
               pathname === "/settings" ? "active" : ""
             }`}

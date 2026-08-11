@@ -228,8 +228,19 @@ pytest app/tests/test_idp_tenant_isolation.py
 - **Root Cause**: System default document types (`invoice`, `receipt`, etc.) have `tenant_id = NULL`. Strict RLS policies filtering by `tenant_id = app.current_tenant` exclude `NULL` tenant rows.
 - **Solution**: Enforce RLS policy `tenant_isolation_document_types` allowing `tenant_id IS NULL OR tenant_id = current_setting('app.current_tenant', true)::uuid`.
 
+### Issue 5: Transaction GUC Reset & RLS Block During `db.refresh()` (`500 Internal server error` on Template Save)
+- **Symptom**: `PUT /idp/config/templates/{id}` returns `500 {"detail":"Internal server error"}` (or `TypeError: Failed to fetch` on frontend).
+- **Root Cause**: Route handlers called `db.commit()` inside the endpoint before `db.refresh()`. The transaction-local tenant GUC (`app.current_tenant`, set via `SET LOCAL`) was automatically cleared when `db.commit()` ended the transaction. Subsequent `db.refresh()` SELECT queries failed under Row-Level Security (RLS) because no tenant context remained, raising `InvalidRequestError: Instance has been deleted, or its row is otherwise not present`.
+- **Solution**: Route handlers using `get_tenant_db` must call `db.flush()` instead of `db.commit()`. `db.flush()` writes changes within the active transaction (preserving the GUC for `db.refresh()`), allowing the `get_tenant_db` dependency to handle final commit upon request completion.
+
+### Issue 6: Route Shadowing on FastAPI Parameterized Endpoints (`422` or `500` on `POST /idp/config/document-types`)
+- **Symptom**: Creating a new document type via `POST /idp/config/document-types` returns a `422 Unprocessable Entity` (`uuid_parsing` error for path parameter `document_type_id="document-types"`) or `500 Internal server error`.
+- **Root Cause**: FastAPI evaluates routes in exact registration order. Generic parameterized path `@router.post("/{document_type_id}")` was registered *before* static path `@router.post("/document-types")`. FastAPI matched `/document-types` against `/{document_type_id}`, setting `document_type_id = "document-types"` and attempting UUID parsing.
+- **Solution**: In FastAPI routers, always define specific static paths (e.g. `@router.post("/document-types")`) **before** generic parameter paths (e.g. `@router.post("/{document_type_id}")`).
+
 ---
 
 ## 📈 6. Production Deployment Overview
 
 For instructions on deploying the full stack to a single Google Cloud Platform (GCP) Compute Engine VM with PM2 process supervision, Caddy reverse proxy, and SSL, refer to **[deployment/README.md](file:///c:/Users/pnala/Desktop/IDP_Archive/idp_codebase/Digital_Archive_Research/deployment/README.md)**.
+

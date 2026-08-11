@@ -544,8 +544,8 @@ export default function DocumentViewerPage({
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <Link
             href="/documents"
             className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 text-sm transition-colors"
@@ -554,7 +554,7 @@ export default function DocumentViewerPage({
             Documents
           </Link>
           <span className="text-slate-300">/</span>
-          <span className="text-slate-700 text-sm font-medium truncate max-w-xs">
+          <span className="text-slate-700 text-sm font-medium truncate max-w-[180px] sm:max-w-xs">
             {doc.title || doc.originalFilename}
           </span>
           {isTrashed && (
@@ -572,7 +572,7 @@ export default function DocumentViewerPage({
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
           <StatusBadge status={doc.status} />
           {doc.extractionMethod === "deterministic" && (
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -747,9 +747,9 @@ export default function DocumentViewerPage({
             </div>
       </Modal>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
         {/* Document preview panel */}
-        <div className="flex-1 bg-slate-100 flex flex-col items-center justify-center border-r border-slate-200 overflow-hidden">
+        <div className="w-full lg:w-1/2 h-[450px] lg:h-full bg-slate-100 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-200 overflow-hidden flex-shrink-0">
           <div className="w-full h-full flex items-center justify-center">
             {TEXT_MIMES.has(doc.mimeType) ? (
               textContent != null ? (

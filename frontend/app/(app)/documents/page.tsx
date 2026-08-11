@@ -1311,7 +1311,7 @@ function DocumentsPageInner() {
           {docs.length === 0 ? (
             <EmptyState {...emptyStateProps} />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {docs.map((doc) => (
                 <DocCard
                   key={doc.id}
@@ -1324,7 +1324,7 @@ function DocumentsPageInner() {
           )}
         </>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">

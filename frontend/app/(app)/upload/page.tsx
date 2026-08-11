@@ -735,7 +735,7 @@ export default function UploadPage() {
   const pendingCount = files.filter((f) => f.status === "pending").length;
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 sm:p-8 max-w-3xl">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-900">Upload Documents</h1>
         <p className="text-slate-500 text-sm mt-0.5">

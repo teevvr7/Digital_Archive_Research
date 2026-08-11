@@ -243,7 +243,7 @@ def create_template(
         use_ocr=request.use_ocr
     )
     db.add(template)
-    db.commit()
+    db.flush()
     db.refresh(template)
     
     clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
@@ -291,7 +291,7 @@ def update_template(
     template.use_image = request.use_image
     template.use_ocr = request.use_ocr
     
-    db.commit()
+    db.flush()
     db.refresh(template)
     
     clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
@@ -334,7 +334,7 @@ def set_default_template(
     ).update({DocumentTemplate.is_default: False})
     
     template.is_default = True
-    db.commit()
+    db.flush()
     db.refresh(template)
     
     clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
@@ -373,7 +373,7 @@ def delete_template(
     doc_type_id = template.document_type_id
     
     db.delete(template)
-    db.commit()
+    db.flush()
     
     if was_default:
         next_template = db.query(DocumentTemplate).filter(
@@ -382,8 +382,101 @@ def delete_template(
         ).first()
         if next_template:
             next_template.is_default = True
-            db.commit()
+            db.flush()
             
+    return None
+
+
+@router.post("/document-types", response_model=IDPConfigResponse)
+def create_document_type(
+    request: DocumentTypeCreateRequest,
+    ctx: tuple[Session, TokenData] = Depends(get_tenant_db)
+):
+    """Creates a custom tenant-specific document type."""
+    db, user = ctx
+    tenant_uuid = UUID(user.tenant_id)
+    
+    # Check if a document type with the same name already exists for this tenant
+    existing = db.query(DocumentType).filter(
+        DocumentType.name.ilike(request.name),
+        DocumentType.tenant_id == tenant_uuid
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A document type named '{request.name}' already exists."
+        )
+        
+    # Default schema template for a new document type
+    default_schema = {
+        "document_details": {
+            "document_type": request.name.lower(),
+            "document_number": "string",
+            "document_date": "YYYY-MM-DD"
+        }
+    }
+    
+    import json
+    schema_payload = dict(default_schema)
+    schema_payload["_instruction"] = DEFAULT_INSTRUCTION
+    schema_payload["_rules"] = DEFAULT_RULES
+    schema_payload["_original_schema_str"] = json.dumps(default_schema)
+    
+    doc_type = DocumentType(
+        tenant_id=tenant_uuid,
+        name=request.name,
+        description=request.description,
+        is_system=False,
+        extraction_method=request.extraction_method,
+        json_schema=schema_payload
+    )
+    db.add(doc_type)
+    db.flush()
+    db.refresh(doc_type)
+    
+    clean_schema, instruction, rules = split_schema_payload(doc_type.json_schema)
+    return IDPConfigResponse(
+        document_type_id=doc_type.id,
+        name=doc_type.name,
+        extraction_method=doc_type.extraction_method,
+        json_schema=clean_schema,
+        instruction=instruction,
+        rules=rules,
+        is_customized=False,
+        is_system=False
+    )
+
+
+@router.delete("/document-types/{document_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document_type(
+    document_type_id: UUID,
+    ctx: tuple[Session, TokenData] = Depends(get_tenant_db)
+):
+    """Deletes a custom document type. System/global types cannot be deleted."""
+    db, user = ctx
+    tenant_uuid = UUID(user.tenant_id)
+    
+    doc_type = db.get(DocumentType, document_type_id)
+    if not doc_type:
+        raise HTTPException(
+            status_code=404,
+            detail="Document type not found."
+        )
+        
+    if doc_type.tenant_id != tenant_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to delete this system-default document type."
+        )
+        
+    # Cascade delete any document templates associated with this document type
+    db.query(DocumentTemplate).filter(
+        DocumentTemplate.document_type_id == document_type_id,
+        DocumentTemplate.tenant_id == tenant_uuid
+    ).delete()
+    
+    db.delete(doc_type)
+    db.flush()
     return None
 
 
@@ -501,7 +594,7 @@ def update_idp_configuration(
         )
         db.add(template)
         
-    db.commit()
+    db.flush()
     db.refresh(template)
     
     clean_schema, instruction, rules = split_schema_payload(template.field_mappings)
@@ -516,97 +609,5 @@ def update_idp_configuration(
         is_system=(doc_type.tenant_id is None)
     )
 
-
-@router.post("/document-types", response_model=IDPConfigResponse)
-def create_document_type(
-    request: DocumentTypeCreateRequest,
-    ctx: tuple[Session, TokenData] = Depends(get_tenant_db)
-):
-    """Creates a custom tenant-specific document type."""
-    db, user = ctx
-    tenant_uuid = UUID(user.tenant_id)
-    
-    # Check if a document type with the same name already exists for this tenant
-    existing = db.query(DocumentType).filter(
-        DocumentType.name.ilike(request.name),
-        DocumentType.tenant_id == tenant_uuid
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"A document type named '{request.name}' already exists."
-        )
-        
-    # Default schema template for a new document type
-    default_schema = {
-        "document_details": {
-            "document_type": request.name.lower(),
-            "document_number": "string",
-            "document_date": "YYYY-MM-DD"
-        }
-    }
-    
-    import json
-    schema_payload = dict(default_schema)
-    schema_payload["_instruction"] = DEFAULT_INSTRUCTION
-    schema_payload["_rules"] = DEFAULT_RULES
-    schema_payload["_original_schema_str"] = json.dumps(default_schema)
-    
-    doc_type = DocumentType(
-        tenant_id=tenant_uuid,
-        name=request.name,
-        description=request.description,
-        is_system=False,
-        extraction_method=request.extraction_method,
-        json_schema=schema_payload
-    )
-    db.add(doc_type)
-    db.commit()
-    db.refresh(doc_type)
-    
-    clean_schema, instruction, rules = split_schema_payload(doc_type.json_schema)
-    return IDPConfigResponse(
-        document_type_id=doc_type.id,
-        name=doc_type.name,
-        extraction_method=doc_type.extraction_method,
-        json_schema=clean_schema,
-        instruction=instruction,
-        rules=rules,
-        is_customized=False,
-        is_system=False
-    )
-
-
-@router.delete("/document-types/{document_type_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document_type(
-    document_type_id: UUID,
-    ctx: tuple[Session, TokenData] = Depends(get_tenant_db)
-):
-    """Deletes a custom document type. System/global types cannot be deleted."""
-    db, user = ctx
-    tenant_uuid = UUID(user.tenant_id)
-    
-    doc_type = db.get(DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(
-            status_code=404,
-            detail="Document type not found."
-        )
-        
-    if doc_type.tenant_id != tenant_uuid:
-        raise HTTPException(
-            status_code=403,
-            detail="You do not have permission to delete this system-default document type."
-        )
-        
-    # Cascade delete any document templates associated with this document type
-    db.query(DocumentTemplate).filter(
-        DocumentTemplate.document_type_id == document_type_id,
-        DocumentTemplate.tenant_id == tenant_uuid
-    ).delete()
-    
-    db.delete(doc_type)
-    db.commit()
-    return None
 
 
