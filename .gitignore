@@ -48,11 +48,13 @@ Thumbs.db
 .idea/
 .vscode/
 
+# ---- Archives / local scratch ----
 docs/archive/legacy_reference/
-# ---- Local manual test scratch ----
 frontend/test_upload.mjs
 test_document/
 
-# ---- Personal reports / developer notes / subprojects ----
+# ---- Personal reports / developer notes / subprojects / local refs ----
 docs/archive/notes/
 rag_dev/
+CLAUDE.md
+MVP_Roadmap_AI_Digital_Archive.xlsx
