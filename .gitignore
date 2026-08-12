@@ -47,6 +47,8 @@ Thumbs.db
 *.pem
 .idea/
 .vscode/
+.claude/
+.gemini/
 
 # ---- Archives / local scratch ----
 docs/archive/legacy_reference/
